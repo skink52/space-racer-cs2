@@ -34,7 +34,7 @@ def load_smd(path, mats, off=(0, 0, 0), yaw=0.0, pitch=0.0):
         m = lines[i]; vs = []
         for k in range(3):
             f = lines[i + 1 + k].split()
-            x, y, z = float(f[1]), float(f[2]), float(f[3])
+            x, y, z = -float(f[2]), float(f[1]), float(f[3])     # the SMD holds (y, -x, z) for ModelDoc
             x, z = x * cp + z * sp, -x * sp + z * cp
             x, y = x * cy - y * sy, x * sy + y * cy
             vs.append((x + off[0], y + off[1], z + off[2], float(f[7]), float(f[8])))

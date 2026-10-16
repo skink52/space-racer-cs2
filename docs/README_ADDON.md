@@ -41,7 +41,7 @@ Loading screen, radar and map icon are in `panorama/images/` and compile with th
 - Everyone spawns in the lobby; the view slowly circles the track of the next race, and the HUD shows the car
   picker, the countdown and NEXT TRACK. Bodies are parked in the booth
   for the whole round; the view is a chase camera behind your car.
-- After freeze time, everyone on T or CT who is not AFK goes to a grid: 1-32 players race together, 33-64 are
+- About 2 seconds into each CS2 round (freeze time is set to 0), everyone on T or CT who is not AFK goes to a grid: 1-32 players race together, 33-64 are
   split evenly into two arenas (or, with `ARENA_LAYOUT '4x16'`, up to four arenas of 16) (each with the same share of Ts and CTs), on different tracks. 10-second countdown;
   you can still swap cars (A / D) until 3 seconds before the lights.
 - Rounds are locked: nobody joins a race in progress. Latecomers watch (Mouse 1 / 2 change car, E change arena)

@@ -52,13 +52,14 @@ def _group(cls, name, remaps):
 
 
 def smd_text(tris):
-    """tris: list of (smd_material_name, [(x,y,z,u,v)]*3, (nx,ny,nz)). Source coordinates straight through."""
+    """tris: list of (smd_material_name, [(x,y,z,u,v)]*3, (nx,ny,nz)) in game coordinates (x east, y north, z up)."""
     out = ["version 1", "nodes", '0 "root" -1', "end", "skeleton", "time 0",
            "0 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000", "end", "triangles"]
     for mat, verts, n in tris:
         out.append(mat)
         for (x, y, z, u, v) in verts:
-            out.append("0 %.3f %.3f %.3f %.4f %.4f %.4f %.5f %.5f" % (x, y, z, n[0], n[1], n[2], u, v))
+            # ModelDoc turns SMD imports 90 degrees: write (y, -x, z) to cancel it (same fix as FreeDM)
+            out.append("0 %.3f %.3f %.3f %.4f %.4f %.4f %.5f %.5f" % (y, -x, z, n[1], -n[0], n[2], u, v))
     out.append("end")
     return "\n".join(out) + "\n"
 

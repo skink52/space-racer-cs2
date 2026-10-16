@@ -98,8 +98,8 @@ class ArenaView {
       const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50)
         : car.air ? clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25)
         : -deg(Math.atan2(T.z[j] - T.z[i], T.step)) + rampTilt;
-      // roll: the lean of a banked bend (positive roll = right side down in CS2) plus a little from sliding
-      const roll = car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18) - (car.air ? 0 : deg(Math.atan(car.bank)));
+      // roll: the lean of a banked bend plus a little from sliding (CONFIG.ROLL_SIGN sets which way CS2 turns a roll)
+      const roll = CONFIG.ROLL_SIGN * (car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18) - (car.air ? 0 : deg(Math.atan(car.bank))));
       const yaw = deg(car.yaw + car.spinYaw);
       const pos = this.world(car.x, car.y, car.z);
       if (car.state === 'wrecked') pos.z -= Math.min(8, car.stateTime * 6);

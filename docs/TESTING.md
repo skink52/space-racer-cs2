@@ -17,7 +17,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 1. Console on map load: `[spr] v0.3.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too.
-3. After freeze time: `RACE 1: <track> (1)` in chat, a 10-second countdown on the grid, your car on the grid
+3. About 2 s after the round starts (mp_freezetime 0): `RACE 1: <track> (1)` in chat, a 10-second countdown on the grid, your car on the grid
    seen from behind and above. Watch for the car model, its side colour (T orange / CT blue), the hover shadow.
 4. Drive: W accelerates, A / D steer, Mouse 1 boosts (charge bar drains, flame model), Space drifts, Mouse 2
    spins. Camera: does it lag the car nicely, roll in corners, and never clip through the track? Rails bounce you.

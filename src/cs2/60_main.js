@@ -566,7 +566,7 @@ Instance.OnScriptReload({
 });
 Instance.OnRoundStart(() => guard('roundstart', () => {
   if (phase !== 'lobby') cleanupRound(true);
-  startAt = Instance.GetGameTime() + 0.5;
+  startAt = Instance.GetGameTime() + CONFIG.START_DELAY;
   cvars(['mp_ignore_round_win_conditions 1']);
 }));
 Instance.OnRoundEnd((ev) => guard('roundend', () => {

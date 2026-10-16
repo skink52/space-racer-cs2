@@ -135,6 +135,7 @@ function placeCamera(pk, car, view, dt, preset) {
   const bankDeg = car.air || car.state === 'falling' ? 0 : -deg(Math.atan(car.bank)) * CONFIG.CAM_BANK;
   pk.bankRoll = (pk.bankRoll || 0) + (bankDeg - (pk.bankRoll || 0)) * Math.min(1, dt * 4);
   roll += pk.bankRoll;
+  roll *= CONFIG.ROLL_SIGN;
   if (car.spinTimer > 0) roll = 0;
   const pitch = cp.pitch + (car.state === 'falling' ? Math.min(40, car.stateTime * 30) : 0);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }

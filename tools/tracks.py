@@ -31,6 +31,7 @@ RAIL_H = 30
 SKIRT = 80
 CHECKPOINTS = 8
 TUBE_UP = 110           # tube centre above the road
+PAD_UP = 2.5            # pads, start line and hazard stripes float this far over the road (less z-fights at a distance)
 FLOOR_DROP = 1500       # the grid floor sits this far under the lowest road
 
 # ---------------------------------------------------------------- spline sampling
@@ -526,13 +527,13 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
             bz = -SKIRT - G.lift[end % N]
             tris += s2.quad_n('edge', Z(tr, bz), Z(tl, bz), tl, tr, (0, 1), (4, 1), (4, 0), (0, 0), nn)
             d = (-tan[end % N, 0] * 30 * sgn, -tan[end % N, 1] * 30 * sgn)
-            tris += s2.quad_n('edge', Z(tr, 0.8), Z((tr[0] + d[0], tr[1] + d[1], tr[2]), 0.8), Z((tl[0] + d[0], tl[1] + d[1], tl[2]), 0.8), Z(tl, 0.8),
+            tris += s2.quad_n('edge', Z(tr, PAD_UP), Z((tr[0] + d[0], tr[1] + d[1], tr[2]), PAD_UP), Z((tl[0] + d[0], tl[1] + d[1], tl[2]), PAD_UP), Z(tl, PAD_UP),
                               (0, 0), (0, 1), (4, 1), (4, 0), (0, 0, 1))
         if i in gapset:
             for side in (1, -1):
                 pa, pb = (l0, l1) if side > 0 else (r0, r1)
                 ia, ib = (G.L(i, 0.92), G.L(j, 0.92)) if side > 0 else (G.R(i, 0.92), G.R(j, 0.92))
-                tris += s2.quad_n('edge', Z(ia, 0.6), Z(ib, 0.6), Z(pb, 0.6), Z(pa, 0.6), (u0 * 4, 0), (u1 * 4, 0), (u1 * 4, 1), (u0 * 4, 1), (0, 0, 1))
+                tris += s2.quad_n('edge', Z(ia, PAD_UP), Z(ib, PAD_UP), Z(pb, PAD_UP), Z(pa, PAD_UP), (u0 * 4, 0), (u1 * 4, 0), (u1 * 4, 1), (u0 * 4, 1), (0, 0, 1))
         else:
             ur0, ur1 = i * step / 256.0, (i + 1) * step / 256.0
             for side in (1, -1):
@@ -551,13 +552,13 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
             j = i + 1
             uu = 1.0 if kind == 'boost' else 0.5
             u0, u1 = k * step / 256.0 * uu, (k + 1) * step / 256.0 * uu
-            p00, p01 = G.at(i, -hw[i % N] * l1f, 0.5), G.at(j, -hw[j % N] * l1f, 0.5)
-            p11, p10 = G.at(j, -hw[j % N] * l0f, 0.5), G.at(i, -hw[i % N] * l0f, 0.5)
+            p00, p01 = G.at(i, -hw[i % N] * l1f, PAD_UP), G.at(j, -hw[j % N] * l1f, PAD_UP)
+            p11, p10 = G.at(j, -hw[j % N] * l0f, PAD_UP), G.at(i, -hw[i % N] * l0f, PAD_UP)
             tris += s2.quad_n(kind, p00, p01, p11, p10, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (0, 0, 1))
             if i % N == b % N: break
             i += 1; k += 1
     # start line
-    tris += s2.quad_n('start', Z(G.R(0), 0.7), Z(G.R(1), 0.7), Z(G.L(1), 0.7), Z(G.L(0), 0.7), (0, 1), (1, 1), (1, 0), (0, 0), (0, 0, 1))
+    tris += s2.quad_n('start', Z(G.R(0), PAD_UP + 1), Z(G.R(1), PAD_UP + 1), Z(G.L(1), PAD_UP + 1), Z(G.L(0), PAD_UP + 1), (0, 1), (1, 1), (1, 0), (0, 0), (0, 0, 1))
     # checkpoint gates (not at the start): two pylons, a crossbar and the sector number in voxel digits
     for k, ci in enumerate(cps[1:]):
         out = 90

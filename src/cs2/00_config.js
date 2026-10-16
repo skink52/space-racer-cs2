@@ -38,8 +38,9 @@ const CONFIG = {
   APPLY_CVARS: true,
   CVARS_ALWAYS: [
     'mp_respawn_immunitytime 0', 'mp_death_drop_gun 0', 'mp_buy_anywhere 0', 'mp_buytime 0', 'sv_disable_radar 1',
-    'mp_respawn_on_death_t 1', 'mp_respawn_on_death_ct 1', 'mp_teammates_are_enemies 1',
+    'mp_respawn_on_death_t 1', 'mp_respawn_on_death_ct 1', 'mp_teammates_are_enemies 1', 'mp_freezetime 0',
   ],
+  START_DELAY: 2,                // seconds after a CS2 round starts (no freeze time) before the race is set up
   ROUND_END_WAIT: 20,            // seconds after a race: if CS2 hasn't ended the round by then (warmup), the next race starts anyway
   ROUND_SLACK: 15,               // the CS2 round clock runs this much longer than the race can, so the script ends it
 
@@ -59,6 +60,7 @@ const CONFIG = {
   FLYOVER_CUT: 4,                // ... and cuts to the chase camera this many seconds before the lights
   FLYOVER_FROM: 5000,            // ... starting this far ahead of the start line
   CAM_SHAKE: 1.0,                // camera shake on hits / landings / wrecks (0 = off, 2 = double)
+  ROLL_SIGN: -1,                 // which way a roll angle tilts in CS2 (tested 17 Oct: -1); flip to 1 if banking leans the wrong way
   CAM_BANK: 0.6,                 // how much of a banked bend's lean the camera copies
   CAM_TUBE_UP: 150, CAM_TUBE_BACK: 300,   // camera height / distance limits inside tubes
   HIDE_OWN_BODY: true,
