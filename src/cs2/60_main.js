@@ -519,8 +519,14 @@ function frame(dt) {
     if (pe.bot) continue;
     const pk = parked.get(pe.slot);
     if (!pk) {
-      // no pawn (CS2 spectator team, not joined yet, or dead): no camera of ours, but the status lines still show
-      guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); });
+      // no pawn (CS2 spectator team, not joined yet, or dead): no camera of ours, but the HUD still shows - the race
+      // HUD (results board included) for someone who raced and is waiting for CS2's respawn, else the status lines
+      guard('nopawnhud', () => {
+        hudOptions(pe.slot, pe);
+        if (pe.car && pe.arena && views.has(pe.arena)) { if (hudTurn(pe.slot)) hudRace(pe.slot, pe.car, pe.arena, raceInfo(pe, pe.car, pe.arena, now, false)); }
+        else hudLobby(pe.slot, lobbyInfo(pe, now));
+        hudPicker(pe.slot, pe, false);
+      });
       continue;
     }
     hudOptions(pe.slot, pe);
