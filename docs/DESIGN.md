@@ -178,14 +178,16 @@ Chat: `!car 1-4`, `!cam` (high / far / near view), `!tilt` (camera lean on/off),
 ## HUD
 
 Panorama custom HUD, per player, all game text in the pixel font: a big position ("3RD/32", green on the podium,
-gold when leading) and the lap ("FINAL LAP" blinks red) top-centre with the bend-ahead arrows under them, the race
-clock top-right, segmented pixel bars for shield and charge bottom-left (shield blinks red when low; charge turns
+gold when leading; it pops each time you gain a place), the lap ("FINAL LAP" blinks red), the live team score
+("T 5 - 3 CT": top-8 places per side across all arenas, the thing that decides the CS2 round) and the bend-ahead
+arrows top-centre, the race clock with the running lap time and your best lap top-right, segmented pixel bars for shield and charge bottom-left (shield blinks red when low; charge turns
 gold when boosting and pink on a charge platform), speed bottom-right, the top-8 standings down the right edge (a
 side-coloured tab per row, you highlighted), a pixelated track map top-left with a dot for every car in the race
 (T orange, CT blue, the leader gold, yours blinking white), centre messages (countdown, GO!, FINAL LAP, WRONG WAY
-blinking, WRECKED, FINISHED 3RD, LAP RECORD!), the car picker (four framed cards, each with a pixel picture of the
+blinking, WRECKED, FINISHED 3RD, LAP RECORD!; each new one pops in), the car picker (four framed cards, each with a pixel picture of the
 car in your side's colour, its perk and five stat bars; the chosen one gold and pulsing) in the lobby and on the
-grid, the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner at the end, flickering
+grid, the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a results board at the end
+(top 8 with the winner's time and everyone else's gap, your own line swapped in if you placed lower), flickering
 pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette over everything (`!crt`
 turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.
 

@@ -324,12 +324,17 @@ for side in ('l', 'r'):
 POS_W = row_w(2, 'XXL') + 6 + row_w(2, 'L') + 10 + row_w(3, 'M')
 TB_W = 620
 px0 = (TB_W - POS_W) // 2
-top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=200), [
+# the live team score under the lap: "T 5 - 3 CT" (top-8 places per side, all arenas), T in gold, CT in cyan
+TT_W, TC_W = row_w(4, 'S'), row_w(5, 'S')
+top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=224), [
     gtext('spr_pos', 2, 'XXL', 'W', align='right', x=px0, y=0),
     gtext('spr_suf', 2, 'L', 'W', align='left', x=px0 + row_w(2, 'XXL') + 6, y=84 - 40 - 10),
     gtext('spr_posof', 3, 'M', 'P', align='left', x=px0 + row_w(2, 'XXL') + 6 + row_w(2, 'L') + 10, y=84 - 30 - 10),
-    gtext('spr_lap', 9, 'M', 'Y', center=True, y=92),
-    P('spr_turn', 'Turn ' + place(center=True, y=130, w=128, h=64)),
+    gtext('spr_lap', 9, 'M', 'Y', center=True, y=90),
+    gtext('spr_tt', 4, 'S', 'Y', align='right', x=TB_W // 2 - 18 - TT_W, y=126),
+    stext('-', 'S', 'W', center=True, y=126),
+    gtext('spr_tct', 5, 'S', 'C', align='left', x=TB_W // 2 + 18, y=126),
+    P('spr_turn', 'Turn ' + place(center=True, y=158, w=128, h=64)),
 ])
 clock = P(None, box('ClockBox', 'pink', 216, 118, right=24, y=24), [
     stext('TIME', 'XS', 'P', right=10, y=6),

@@ -227,6 +227,9 @@ function hudRace(slot, car, arena, info) {
   hudText(slot, 'spr_pos', num, posCol, ps.flip ? 'pop2' : 'pop');
   hudText(slot, 'spr_suf', ord.slice(num.length), posCol);
   hudText(slot, 'spr_posof', '/' + arena.order.filter((c) => !c.left).length, 'cP');
+  const tl = info.tally || { t: 0, ct: 0 };
+  hudText(slot, 'spr_tt', 'T ' + tl.t, 'cY');
+  hudText(slot, 'spr_tct', tl.ct + ' CT', 'cC');
   const lap = Math.min(arena.laps, car.lapsDone + 1);
   if (lap === arena.laps && arena.laps > 1 && car.state === 'racing') hudText(slot, 'spr_lap', 'FINAL LAP', 'cR', 'blink');
   else hudText(slot, 'spr_lap', 'LAP ' + lap + '/' + arena.laps, 'cY');

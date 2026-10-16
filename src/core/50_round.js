@@ -263,12 +263,13 @@ class RoundManager {
   }
 
   // ------------------------------------------------------------------ results
-  // per arena: with 8+ cars, how many of the top 8 are T / CT; with fewer, 1 point to the winner's side
-  teamPoints() {
+  // per arena: with 8+ cars, how many of the top 8 are T / CT; with fewer, 1 point to the winner's side.
+  // live = true counts the running order of arenas still racing too (the HUD's team score)
+  teamPoints(live) {
     const pts = { 2: 0, 3: 0, best: { 2: 99, 3: 99 }, detail: [] };
     for (const a of this.arenas) {
-      if (!a.result) continue;
-      const r = a.result.ranking;
+      if (!a.result && !live) continue;
+      const r = a.result ? a.result.ranking : a.ranking.filter((c) => !c.left);
       const d = { track: a.track.title, t: 0, ct: 0 };
       if (r.length >= 8) {
         r.slice(0, 8).forEach((c) => { if (c.team === 0) d.t++; else if (c.team === 1) d.ct++; });

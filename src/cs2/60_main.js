@@ -338,8 +338,15 @@ function standingsFor(a, now) {
   return list;
 }
 
+// the live team score (all arenas): refreshed with the standings
+let tallyAt = -1, tally = { t: 0, ct: 0 };
+function liveTally(now) {
+  if (now >= tallyAt) { const p = rm.teamPoints(true); tally = { t: p[2], ct: p[3] }; tallyAt = now + CONFIG.STANDINGS_PERIOD; }
+  return tally;
+}
+
 function raceInfo(pe, car, a, now, spectating) {
-  const info = { rows: [], spectating };
+  const info = { rows: [], spectating, tally: liveTally(now) };
   const rows = standingsFor(a, now);
   info.rows = rows.map((r) => ({ text: r.text, team: r.team, me: r.slot === car.slot }));
   info.clock = a.state === 'grid' ? 'GRID' : a.state === 'over' ? 'RESULTS' : fmtTime(a.raceTic / TICRATE).slice(0, -3);

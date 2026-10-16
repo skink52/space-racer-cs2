@@ -229,6 +229,7 @@ def race_state(grid=False, results=False):
     if results: add('spr_root', 'stRes')
     add('spr_mmimg', 'mm_oval')
     text('spr_pos', '3', 'green'); text('spr_suf', 'RD', 'green'); text('spr_posof', '/32', 'pink')
+    text('spr_tt', 'T 5', 'gold'); text('spr_tct', '3 CT', 'cyan')
     text('spr_lap', 'FINAL LAP' if not grid else 'LAP 1/3', 'red' if not grid else 'gold')
     text('spr_clock', 'GRID' if grid else '1:42', 'gold' if grid else 'white')
     text('spr_laptime', '-' if grid else '0:31.2', 'white'); text('spr_best', '-' if grid else '0:29.8', 'gold')
