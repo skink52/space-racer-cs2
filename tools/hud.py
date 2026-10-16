@@ -70,6 +70,7 @@ for ck, col in COLORS.items():
         save(up(img, GS), 'f/%s_%d.png' % (ck, ord(ch)))
 SIZES = {'XXL': 84, 'XL': 52, 'L': 40, 'M': 30, 'S': 22, 'XS': 17}
 TEXT_SLOTS = {}
+TEXT_ALIGN = {}
 
 def gtext(id_, n, size, color='W', static=None, extra_cls='', align='center'):
     """a pixel-text row: n glyph panels (ids id_0..id_n-1); `static` text fixes the glyph classes in the layout"""
@@ -80,7 +81,7 @@ def gtext(id_, n, size, color='W', static=None, extra_cls='', align='center'):
             ch = static[k].upper()
             g = ' g%d' % ord(ch if ch in CHARSET else '?')
         kids.append(P('%s_%d' % (id_, k) if id_ and static is None else None, 'G' + g))
-    if id_ and static is None: TEXT_SLOTS[id_] = n
+    if id_ and static is None: TEXT_SLOTS[id_] = n; TEXT_ALIGN[id_] = align
     return P(id_, ('Txt s%s c%s %s a%s' % (size, color, extra_cls, align)).strip(), kids)
 
 def stext(text, size, color='W', extra_cls='', align='center'):
@@ -91,20 +92,20 @@ rule('.Txt', flow_children='right', height='fit-children')
 rule('.Txt.acenter', horizontal_align='center')
 rule('.Txt.aleft', horizontal_align='left')
 rule('.Txt.aright', horizontal_align='right')
-rule('.G', visibility='collapse', background_size='100% 100%', background_repeat='no-repeat')
-rule('.G.g32', visibility='visible')
-for ch in CHARSET:
-    if ch != ' ': rule('.G.g%d' % ord(ch), visibility='visible')
+# every cell is always there (blank without a glyph class), so a row never changes size: Panorama doesn't always
+# re-place panels when a class changes their layout, but it always redraws a changed background picture.
+# Centring / right-aligning is done by the script, padding the text with spaces.
+rule('.G', background_size='100% 100%', background_repeat='no-repeat')
 for s, px in SIZES.items():
     rule('.s%s .G' % s, width='%dpx' % px, height='%dpx' % px, margin_right='-%dpx' % (px // 10))
 for ck in COLORS:
     for ch in CHARSET:
         if ch != ' ': rule('.c%s .G.g%d' % (ck, ord(ch)), background_image='url("%sf/%s_%d.png")' % (IMG, ck, ord(ch)))
-raw('@keyframes SprBlink { 0% { opacity: 1; } 55% { opacity: 1; } 56% { opacity: 0; } 100% { opacity: 0; } }')
-raw('@keyframes SprPulse { 0% { transform: scale3d(1.0, 1.0, 1); } 50% { transform: scale3d(1.06, 1.06, 1); } 100% { transform: scale3d(1.0, 1.0, 1); } }')
-raw('@keyframes SprPop { 0% { transform: scale3d(1.6, 1.6, 1); opacity: 0.2; } 100% { transform: scale3d(1.0, 1.0, 1); opacity: 1; } }')
-rule('.Txt.blink', animation_name='SprBlink', animation_duration='0.6s', animation_iteration_count='infinite', animation_timing_function='linear')
-rule('.Txt.pulse', animation_name='SprPulse', animation_duration='0.5s', animation_iteration_count='infinite')
+raw("@keyframes 'sprblink' { 0% { opacity: 1; } 55% { opacity: 1; } 56% { opacity: 0; } 100% { opacity: 0; } }")
+raw("@keyframes 'sprpulse' { 0% { transform: scale3d(1.0, 1.0, 1); } 50% { transform: scale3d(1.06, 1.06, 1); } 100% { transform: scale3d(1.0, 1.0, 1); } }")
+raw("@keyframes 'sprpop' { 0% { transform: scale3d(1.6, 1.6, 1); opacity: 0.2; } 100% { transform: scale3d(1.0, 1.0, 1); opacity: 1; } }")
+rule('.Txt.blink', animation_name='sprblink', animation_duration='0.6s', animation_iteration_count='infinite', animation_timing_function='linear')
+rule('.Txt.pulse', animation_name='sprpulse', animation_duration='0.5s', animation_iteration_count='infinite')
 
 # ---------------------------------------------------------------- pictures: bars, scanlines, frames, logo, minimap dots
 def seg_bar(color, segs=20, h=6, w=4):
@@ -211,7 +212,7 @@ rule('.Vig', width='100%', height='100%', background_image='url("%svignette.png"
 rule('.SprOpts.nocrt .Crt', visibility='collapse')
 for k in (0, 1):
     rule('.Speed%d' % k, width='100%', height='100%', background_image='url("%sspeed%d.png")' % (IMG, k), background_size='100% 100%',
-         visibility='collapse', animation_name='SprBlink', animation_duration='0.16s', animation_iteration_count='infinite',
+         visibility='collapse', animation_name='sprblink', animation_duration='0.16s', animation_iteration_count='infinite',
          animation_delay='%.2fs' % (k * 0.08))
     rule('.SprRoot.Boost .Speed%d' % k, visibility='visible')
 rule('.SprOpts.nocrt .Vig', visibility='collapse')
@@ -234,13 +235,16 @@ rule('.MiniMap', width='%dpx' % (MM + 16), height='%dpx' % (MM + 16), margin_lef
 rule('.MapImg', width='%dpx' % MM, height='%dpx' % MM, margin='8px', background_size='100% 100%', background_repeat='no-repeat')
 for tid in [t['id'] for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))]:
     rule('.MapImg.mm_%s' % tid, background_image='url("%smm_%s.png")' % (IMG, tid))
-rule('.Dot', width='12px', height='12px', background_color='#ffffff', border='2px solid #000000', visibility='collapse')
+# dots are moved with transforms (a margin change through a class isn't always re-laid out): x on the outer panel,
+# y on the inner square
+rule('.Dot', width='12px', height='12px', visibility='collapse')
 rule('.Dot.On', visibility='visible')
-rule('.Dot.me', animation_name='SprBlink', animation_duration='0.5s', animation_iteration_count='infinite')
-rule('.Dot.Lead', background_color='#ffbe28')
+rule('.DotSq', width='12px', height='12px', background_color='#ffffff', border='2px solid #000000')
+rule('.Dot.me .DotSq', animation_name='sprblink', animation_duration='0.5s', animation_iteration_count='infinite')
+rule('.Dot.Lead .DotSq', background_color='#ffbe28')
 for i in range(24):
-    rule('.Dot.dx%d' % i, margin_left='%dpx' % int(i * MM / 23 - 6))
-    rule('.Dot.dy%d' % i, margin_top='%dpx' % int(i * MM / 23 - 6))
+    rule('.Dot.dx%d' % i, transform='translatex(%dpx)' % int(i * MM / 23 - 6))
+    rule('.DotSq.dy%d' % i, transform='translatey(%dpx)' % int(i * MM / 23 - 6))
 
 # top block: big position + suffix + of, and the lap line
 rule('.TopBlock', horizontal_align='center', margin_top='14px', flow_children='down', width='620px')
@@ -248,14 +252,14 @@ rule('.PosRow', horizontal_align='center', flow_children='right')
 rule('.PosRow .Txt', vertical_align='bottom')
 rule('#spr_suf', margin_bottom='12px', margin_left='4px')
 rule('#spr_posof', margin_bottom='12px', margin_left='12px')
-rule('#spr_pos', animation_name='SprPop', animation_duration='0.25s')
+rule('#spr_pos', animation_name='sprpop', animation_duration='0.25s')
 rule('#spr_lap', margin_top='4px')
 rule('.Turn', horizontal_align='center', margin_top='6px', height='64px', width='128px', background_size='contain', background_repeat='no-repeat', background_position='center', visibility='collapse')
 for side in ('l', 'r'):
     for n in (1, 2):
         rule('.Turn.%s%d' % (side, n), visibility='visible', background_image='url("%sturn_%s%d.png")' % (IMG, side, n))
-rule('.Turn.l2', animation_name='SprBlink', animation_duration='0.4s', animation_iteration_count='infinite')
-rule('.Turn.r2', animation_name='SprBlink', animation_duration='0.4s', animation_iteration_count='infinite')
+rule('.Turn.l2', animation_name='sprblink', animation_duration='0.4s', animation_iteration_count='infinite')
+rule('.Turn.r2', animation_name='sprblink', animation_duration='0.4s', animation_iteration_count='infinite')
 rule('.ClockBox', horizontal_align='right', margin_right='26px', margin_top='22px', flow_children='down', padding='10px 14px 8px 14px', **framed('pink'))
 rule('.ClockBox .Txt', horizontal_align='right')
 
@@ -274,7 +278,7 @@ for i in range(21): rule('.Fill.w%d' % i, width='%dpx' % (20 * i + 2) if i else 
 def barimg(key): return 'url("%sbar_%s.png")' % (IMG, key)
 rule('#spr_shfill', background_image=barimg('green'))
 rule('#spr_shield.low #spr_shfill', background_image=barimg('red'))
-rule('#spr_shield.low', animation_name='SprBlink', animation_duration='0.8s', animation_iteration_count='infinite')
+rule('#spr_shield.low', animation_name='sprblink', animation_duration='0.8s', animation_iteration_count='infinite')
 rule('#spr_chfill', background_image=barimg('cyan'))
 rule('#spr_charge.boosting #spr_chfill', background_image=barimg('gold'))
 rule('#spr_charge.charging #spr_chfill', background_image=barimg('pink'))
@@ -303,7 +307,7 @@ rule('.Pick', horizontal_align='center', vertical_align='bottom', margin_bottom=
 rule('.Cards', horizontal_align='center', flow_children='right', margin_top='10px')
 rule('.Card', width='270px', height='350px', margin_left='8px', margin_right='8px', flow_children='down', padding='12px', **framed('white'))
 rule('.Card.sel', transform='scale3d(1.07, 1.07, 1)', **framed('gold'))
-rule('.Card.sel .CarPic', animation_name='SprPulse', animation_duration='0.9s', animation_iteration_count='infinite')
+rule('.Card.sel .CarPic', animation_name='sprpulse', animation_duration='0.9s', animation_iteration_count='infinite')
 rule('.CarPic', width='200px', height='200px', horizontal_align='center', background_size='100% 100%', background_repeat='no-repeat')
 for k in KEYS:
     for side in ('neutral', 't', 'ct'):
@@ -327,11 +331,11 @@ for k in KEYS:
 # lobby: the logo and three pixel lines
 rule('.Logo', horizontal_align='center', vertical_align='top', margin_top='80px', width='%dpx' % (LOGO.shape[1] * 1.1), height='%dpx' % (LOGO.shape[0] * 1.1),
      background_image='url("%slogo.png")' % IMG, background_size='100% 100%', background_repeat='no-repeat',
-     animation_name='SprPulse', animation_duration='2.4s', animation_iteration_count='infinite')
+     animation_name='sprpulse', animation_duration='2.4s', animation_iteration_count='infinite')
 RES = pixfont.logo('RESULTS', 6)
 save(RES, 'logo_results.png')
 rule('.ResLogo', visibility='collapse', horizontal_align='center', vertical_align='top', margin_top='150px', width='%dpx' % RES.shape[1], height='%dpx' % RES.shape[0],
-     background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%', animation_name='SprPulse', animation_duration='1.2s', animation_iteration_count='infinite')
+     background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%', animation_name='sprpulse', animation_duration='1.2s', animation_iteration_count='infinite')
 rule('.SprRoot.Res .ResLogo', visibility='visible')
 rule('.SprRoot.Res .TopBlock', visibility='collapse')
 rule('.LobbyLines', horizontal_align='center', vertical_align='bottom', margin_bottom='34px', flow_children='down', width='1600px')
@@ -368,9 +372,9 @@ root = P('spr_root', 'SprRoot', [
     P(None, 'Speed0'), P(None, 'Speed1'),
     P(None, 'Logo'),
     P(None, 'ResLogo'),
-    P('spr_mm', 'MiniMap', [P('spr_mmimg', 'MapImg', [P('spr_ldot', 'Dot Lead'), P('spr_dot', 'Dot me')])]),
+    P('spr_mm', 'MiniMap', [P('spr_mmimg', 'MapImg', [P('spr_ldot', 'Dot Lead', [P('spr_ldoty', 'DotSq')]), P('spr_dot', 'Dot me', [P('spr_doty', 'DotSq')])])]),
     P(None, 'TopBlock', [
-        P(None, 'PosRow', [gtext('spr_pos', 2, 'XXL', 'W'), gtext('spr_suf', 2, 'L', 'W'), gtext('spr_posof', 3, 'M', 'P')]),
+        P(None, 'PosRow', [gtext('spr_pos', 2, 'XXL', 'W', align='right'), gtext('spr_suf', 2, 'L', 'W', align='left'), gtext('spr_posof', 3, 'M', 'P', align='left')]),
         gtext('spr_lap', 9, 'M', 'Y'),
         P('spr_turn', 'Turn'),
     ]),
@@ -399,5 +403,5 @@ open(os.path.join(OUT, 'panorama/layout/custom_game/%s.xml' % NAME), 'w', newlin
 open(os.path.join(OUT, 'panorama/styles/custom_game/%s.css' % NAME), 'w', newline='\n').write('\n'.join(css) + '\n')
 ids = re.findall(r'id="([^"]+)"', doc)
 json.dump(sorted(set(ids)), open(os.path.join(OUT, '_gen/hud_ids.json'), 'w'))
-json.dump(dict(slots=TEXT_SLOTS, charset=CHARSET, colors=sorted(COLORS)), open(os.path.join(OUT, '_gen/hud_text.json'), 'w'))
+json.dump(dict(slots=TEXT_SLOTS, align=TEXT_ALIGN, charset=CHARSET, colors=sorted(COLORS)), open(os.path.join(OUT, '_gen/hud_text.json'), 'w'))
 print('hud: %d css rules, %d panel ids, %d text rows, %d glyph pictures' % (len(css), len(set(ids)), len(TEXT_SLOTS), len(COLORS) * (len(CHARSET) - 1)))

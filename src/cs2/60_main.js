@@ -20,7 +20,7 @@ let lobbyNext = 0;
 function buildCfg() {
   return {
     layout: CONFIG.ARENA_LAYOUT, arenaMin: CONFIG.ARENA_MIN, minPlayers: CONFIG.MIN_PLAYERS,
-    afkWarnTics: CONFIG.AFK_WARN * TICRATE, afkKickTics: CONFIG.AFK_KICK * TICRATE,
+    afkWarnTics: CONFIG.AFK_WARN * TICRATE, afkKickTics: CONFIG.AFK_KICK * TICRATE, afkLobbyTics: CONFIG.AFK_LOBBY * TICRATE,
     countdownTics: CONFIG.COUNTDOWN * TICRATE, finishWindow: CONFIG.FINISH_WINDOW, raceCap: CONFIG.RACE_CAP, endHold: CONFIG.RESULTS_HOLD, laps: CONFIG.LAPS,
     botSkill: CONFIG.BOT_SKILL, podium: CONFIG.PODIUM, shares: CONFIG.SHARES.slice(), koCredit: CONFIG.KO_CREDIT_TO_ATTACKER, tiebreak: CONFIG.TIEBREAK,
     trackBlacklist: CONFIG.TRACK_BLACKLIST.slice(), staggerArenas: true, defaultCar: CONFIG.DEFAULT_CAR,
@@ -53,7 +53,12 @@ function scanPeople(force) {
     seen.add(slot);
     const bot = c.IsBot();
     if (bot && !CONFIG.CS2_BOTS_PLAY) continue;
-    rm.addPerson(slot, c.GetPlayerName(), c.GetTeamNumber(), bot);
+    const name = c.GetPlayerName();
+    // the slot now holds someone else (a bot kicked for a joining player, a quick leave + join): start them fresh,
+    // so the newcomer never inherits the old car, kill credit, HUD state or options
+    const old = rm.person(slot);
+    if (old && (old.bot !== bot || old.name !== name)) { log(`slot ${slot}: ${old.name} -> ${name}`); dropPerson(slot); }
+    rm.addPerson(slot, name, c.GetTeamNumber(), bot);
   }
   for (const slot of Array.from(rm.people.keys())) if (!seen.has(slot)) dropPerson(slot);
 }
@@ -63,10 +68,11 @@ function dropPerson(slot) {
   parked.delete(slot);
   hudReset(slot);
   centerMsgs.delete(slot); subMsgs.delete(slot); botMsgs.delete(slot);
+  awaitRespawn.delete(slot);
   for (let i = pendingKills.length - 1; i >= 0; i--) {
     const k = pendingKills[i];
     if (k.victim === slot) pendingKills.splice(i, 1);
-    else if (k.killer === slot) k.killer = null;
+    else if (k.killer === slot) { k.killer = null; k.kpe = null; }
   }
 }
 
@@ -100,9 +106,10 @@ function onArenaBuilt(a) {
   }
 }
 
+let endedAt = 0, roundEndSeen = false;
 function endRace() {
   if (phase !== 'running') return;
-  phase = 'ending';
+  phase = 'ending'; endedAt = Instance.GetGameTime(); roundEndSeen = false;
   const pts = rm.teamPoints();
   const lines = pts.detail.map((d) => `${d.track}: T ${d.t} - CT ${d.ct}`);
   const who = pts.winner === 2 ? 'T WIN' : pts.winner === 3 ? 'CT WIN' : 'DRAW';
@@ -129,6 +136,7 @@ function cleanupRound(entitiesGone) {
   rm.endRoundCleanup();
   rm.state = 'idle';
   pendingKills.length = 0;
+  awaitRespawn.clear();
   standingsCache.clear();
   phase = 'lobby';
 }
@@ -158,7 +166,8 @@ function queueKill(victimSlot, killerSlot, delay) {
     if (CONFIG.ADD_SCORE && killerSlot !== null && killerSlot !== undefined) { const c = controllerOf(killerSlot); if (c) guard('addscore', () => c.AddScore(1)); }
     return;
   }
-  pendingKills.push({ at: Instance.GetGameTime() + delay, victim: victimSlot, killer: killerSlot });
+  const kp = killerSlot === null || killerSlot === undefined ? null : rm.person(killerSlot);
+  pendingKills.push({ at: Instance.GetGameTime() + delay, victim: victimSlot, killer: killerSlot, vpe: rm.person(victimSlot), kpe: kp });
 }
 
 function processKills(now) {
@@ -166,11 +175,30 @@ function processKills(now) {
     const k = pendingKills[i];
     if (now < k.at) continue;
     pendingKills.splice(i, 1); i--;
+    // only for the same people who raced: a slot can change hands between the race and the kill
     const pe = rm.person(k.victim);
-    if (!pe) continue;
-    if (csKill(k.victim, k.killer)) parked.delete(k.victim);
+    if (!pe || (k.vpe && pe !== k.vpe)) continue;
+    let killer = k.killer;
+    if (killer !== null && killer !== undefined && k.kpe && rm.person(killer) !== k.kpe) killer = null;
+    if (csKill(k.victim, killer)) {
+      parked.delete(k.victim);
+      if (k.mid) awaitRespawn.set(k.victim, { at: now, pe });
+    }
+  }
+  // knock-out kills during a race need CS2 to respawn the pawn (the player keeps watching through it);
+  // if it doesn't, stop killing mid-race and credit knock-outs at the end of the race instead
+  for (const [slot, w] of awaitRespawn) {
+    if (now - w.at < 8) continue;
+    awaitRespawn.delete(slot);
+    const c = controllerOf(slot);
+    if (rm.person(slot) !== w.pe || !c || !c.IsConnected()) continue;
+    respawnFailures++;
+    log(`CS2 did not respawn ${w.pe.name} within 8 s after a scripted kill (${respawnFailures} in a row)`);
+    if (respawnFailures >= 2 && !koDeferred) { koDeferred = true; log('WARNING: CS2 is not respawning killed players (mp_respawn_on_death_t/ct?) - knock-out kills now wait for the end of each race'); }
   }
 }
+const awaitRespawn = new Map();   // slot -> { at, pe }: killed mid-race, waiting for CS2's respawn
+let respawnFailures = 0, koDeferred = false;
 
 // ---------------------------------------------------------------- events from the race
 function sfxCar(view, sfx, car, gap) {
@@ -199,7 +227,11 @@ function handleArenaEvents(a, now) {
         if (e.attacker) {
           const ap = e.attacker.person;
           if (ap && !ap.bot) bottom(ap.slot, 'YOU WRECKED ' + e.car.name.slice(0, 20).toUpperCase(), 3);
-          if (CONFIG.KO_CREDIT_TO_ATTACKER && pe && ap) { e.car.koApplied = true; queueKill(pe.slot, ap.slot, 0.4); }
+          e.car.koBy = e.attacker;      // credited at the end of the race unless it goes out now
+          if (CONFIG.KO_CREDIT_TO_ATTACKER && !koDeferred && pe && ap && !Instance.IsWarmupPeriod()) {
+            e.car.koApplied = true; queueKill(pe.slot, ap.slot, 0.4);
+            const k = pendingKills[pendingKills.length - 1]; if (k) k.mid = true;
+          }
         }
         break;
       }
@@ -274,8 +306,10 @@ function onArenaEnd(a, result, now) {
   // the losers die, credited to the podium, one every few ticks
   const plan = rm.killPlan(a);
   plan.forEach((k, i) => {
-    if (!k.victim.person) return;
-    queueKill(k.victim.person.slot, k.killer && k.killer.person ? k.killer.person.slot : null, 1.0 + i * CONFIG.KILL_CASCADE_TICKS / 64);
+    const vp = k.victim.person, kp = k.killer && k.killer.person;
+    if (!vp || rm.person(vp.slot) !== vp) return;            // gone since the race
+    const killerSlot = kp && rm.person(kp.slot) === kp ? kp.slot : null;
+    queueKill(vp.slot, killerSlot, 1.0 + i * CONFIG.KILL_CASCADE_TICKS / 64);
   });
   log(`${a.track.id} over (${result.reason}): ${r.slice(0, 3).map((c) => c.name).join(', ')}; ${plan.length} deaths credited`);
 }
@@ -385,7 +419,7 @@ function lobbyFrame(now, dt) {
   for (const pe of rm.people.values()) {
     if (pe.bot) { if (!parked.has(pe.slot)) park(pe.slot); continue; }   // bots stand frozen in the booth too
     const pk = park(pe.slot);
-    if (!pk) continue;
+    if (!pk) { guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); }); continue; }
     if (pickerInput(pe, pk)) rm.markActive(pe.slot);
     guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); });
     // nothing to look at yet: a slow look around the first track from above
@@ -434,6 +468,13 @@ function frame(dt) {
     if (now >= startAt && !Instance.IsFreezePeriod()) startRace();
     return;
   }
+  if (phase === 'ending' && !roundEndSeen && now - endedAt > CONFIG.ROUND_END_WAIT) {
+    // CS2 didn't end the round (warmup, or something blocked FireWinCondition): carry on with the next race
+    log(Instance.IsWarmupPeriod() ? 'warmup: next race without a CS2 round change' : 'WARNING: the CS2 round did not end after the race - starting the next race anyway');
+    cleanupRound(false);
+    startAt = now + 3;
+    return;
+  }
   if (phase !== 'running' && phase !== 'ending') return;
   // input
   for (const pe of rm.people.values()) {
@@ -470,7 +511,11 @@ function frame(dt) {
   for (const pe of rm.people.values()) {
     if (pe.bot) continue;
     const pk = parked.get(pe.slot);
-    if (!pk) continue;
+    if (!pk) {
+      // no pawn (CS2 spectator team, not joined yet, or dead): no camera of ours, but the status lines still show
+      guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); });
+      continue;
+    }
     hudOptions(pe.slot, pe);
     guard('view', () => {
       if (pe.status === 'racing' && pe.car && pe.arena) {
@@ -479,6 +524,7 @@ function frame(dt) {
         if (a.state === 'over') placeOverviewCamera(pk, a, v);
         else if (a.state === 'grid' && CONFIG.FLYOVER && a.countdown > CONFIG.FLYOVER_CUT * TICRATE) placeFlyover(pk, a, v, now);
         else placeCamera(pk, pe.car, v, dt, pe.cam);
+        if (!hudTurn(pe.slot)) return;
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
         hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE);
       } else {
@@ -487,7 +533,7 @@ function frame(dt) {
         const a = rm.arenas[pe.spec ? pe.spec.arena : 0], v = a && views.get(a);
         const t = a && pe.spec && pe.spec.target !== null ? a.cars.get(pe.spec.target) : null;
         if (!a || !v) { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); return; }
-        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam); hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
+        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam); if (hudTurn(pe.slot)) hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
         else { placeOverviewCamera(pk, a, v); if (pe.car && pe.arena === a) hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false)); else { hudLobby(pe.slot, lobbyInfo(pe, now)); } rm.fixSpectate(pe, 0); }
         hudPicker(pe.slot, pe, pe.status !== 'racing' && (!pe.car || a.state === 'over'));
       }
@@ -495,7 +541,12 @@ function frame(dt) {
   }
 }
 
+// HUDs refresh at half the tick rate, half the players on even ticks and half on odd (cameras still move every tick)
+let tickNo = 0;
+function hudTurn(slot) { return ((slot + tickNo) & 1) === 0; }
+
 function think() {
+  tickNo++;
   hudBudget = CONFIG.HUD_BUDGET;
   flushSays();
   const now = Instance.GetGameTime();
@@ -520,6 +571,7 @@ Instance.OnRoundStart(() => guard('roundstart', () => {
 }));
 Instance.OnRoundEnd((ev) => guard('roundend', () => {
   if (phase === 'running') endRace();
+  roundEndSeen = true;
   const w = ev && ev.winningTeam;
   log(`CS2 round ended: ${w === 2 ? 'T win' : w === 3 ? 'CT win' : 'no winner (team ' + w + ')'}, reason ${ev ? ev.reason : '?'}`);
 }));
@@ -537,6 +589,7 @@ Instance.OnPlayerTeamChanged(({ player }) => guard('team', () => {
 Instance.OnPlayerReset(({ player }) => guard('reset', () => {
   const slot = slotOfEntity(player);
   if (slot === undefined) return;
+  if (awaitRespawn.delete(slot)) respawnFailures = 0;
   const pe = rm.person(slot);
   if (!pe) return;
   // a fresh pawn (spawn, or the respawn after a scripted kill): park it again and keep the camera

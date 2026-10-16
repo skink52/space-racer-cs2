@@ -67,13 +67,17 @@ function hudText(slot, id, text, color, fx) {
   if (!ids) return;
   text = String(text === undefined || text === null ? '' : text);
   if (text.length > ids.length) text = text.slice(0, ids.length);
+  // the row has a fixed number of cells: centre or right-align by padding
+  const align = HUD_TEXT.align ? HUD_TEXT.align[id] : 'left';
+  if (align === 'center') text = ' '.repeat(Math.floor((ids.length - text.length) / 2)) + text;
+  else if (align === 'right') text = text.padStart(ids.length, ' ');
   // the whole row is cached: nothing to do when it shows this already
   const c = cacheFor(slot);
   const key = id + '@';
   const want = text + '|' + (color || '') + '|' + (fx || '');
   if (c.get(key) === want) return;
   let ok = true;
-  for (let k = 0; k < ids.length; k++) if (!hudSwap(slot, ids[k], k < text.length ? glyphClass(text[k]) : null)) ok = false;
+  for (let k = 0; k < ids.length; k++) if (!hudSwap(slot, ids[k], k < text.length && text[k] !== ' ' ? glyphClass(text[k]) : null)) ok = false;
   if (color !== undefined && !hudSwap(slot, id, TEXT_COLOR[color] || color || null, 'col')) ok = false;
   if (!hudSwap(slot, id, fx || null, 'fx')) ok = false;
   if (ok) c.set(key, want);       // (a row cut short by the budget is finished on a later tick)
@@ -136,7 +140,7 @@ function hudRaceCommon(slot, arena, info) {
   }
   // leader dot
   const lead = arena.ranking[0];
-  if (lead && lead.racing) { const dc = dotClasses(arena.track, lead.x, lead.y); hudSwap(slot, 'spr_ldot', dc[0], 'x'); hudSwap(slot, 'spr_ldot', dc[1], 'y'); hudSwap(slot, 'spr_ldot', 'On', 'on'); }
+  if (lead && lead.racing) { const dc = dotClasses(arena.track, lead.x, lead.y); hudSwap(slot, 'spr_ldot', dc[0], 'x'); hudSwap(slot, 'spr_ldoty', dc[1], 'y'); hudSwap(slot, 'spr_ldot', 'On', 'on'); }
   else hudSwap(slot, 'spr_ldot', null, 'on');
 }
 
@@ -158,12 +162,12 @@ function hudRace(slot, car, arena, info) {
   hudSwap(slot, 'spr_chfill', pct(car.charge, car.spec.charge));
   hudSwap(slot, 'spr_charge', car.boosting ? 'boosting' : car.onCharge ? 'charging' : null, 'st');
   // "km/h" for the dial (units/s x 0.36 reads like a racing speedo), 8 updates a second in steps of 2
-  if ((arena.tic & 7) === 0 || car.speed < 10) hudText(slot, 'spr_spd', String(Math.round(car.speed * 0.18) * 2).padStart(4, ' '), car.boosting || car.padTimer > 0 ? 'cY' : 'cW');
+  if ((arena.tic & 7) < 2 || car.speed < 10) hudText(slot, 'spr_spd', String(Math.round(car.speed * 0.18) * 2).padStart(4, ' '), car.boosting || car.padTimer > 0 ? 'cY' : 'cW');
   hudSwap(slot, 'spr_spfill', pct(car.speed, car.spec.maxSpeed * 1.5));
   hudSwap(slot, 'spr_speed', car.padTimer > 0 ? 'pad' : null, 'pad');
   // the bend ahead: an arrow (two blinking ones for a hairpin), looking further ahead the faster the car goes
   let turnCls = null;
-  if (car.state === 'racing' && (arena.tic & 3) === 0) {
+  if (car.state === 'racing' && (arena.tic & 3) < 2) {
     const look = 500 + car.speed * 0.9;
     const turn = arena.track.turnAhead(car.s, look * 0.3, look + 900);
     const a = Math.abs(turn);
@@ -171,7 +175,7 @@ function hudRace(slot, car, arena, info) {
     hudSwap(slot, 'spr_turn', turnCls, 'dir');
   } else if (car.state !== 'racing') hudSwap(slot, 'spr_turn', null, 'dir');
   hudSwap(slot, 'spr_root', (car.boosting || car.padTimer > 0) && car.state === 'racing' && !info.spectating ? 'Boost' : null, 'boost');
-  if (car.visible) { const dc = dotClasses(arena.track, car.x, car.y); hudSwap(slot, 'spr_dot', dc[0], 'x'); hudSwap(slot, 'spr_dot', dc[1], 'y'); hudSwap(slot, 'spr_dot', 'On', 'on'); }
+  if (car.visible) { const dc = dotClasses(arena.track, car.x, car.y); hudSwap(slot, 'spr_dot', dc[0], 'x'); hudSwap(slot, 'spr_doty', dc[1], 'y'); hudSwap(slot, 'spr_dot', 'On', 'on'); }
   else hudSwap(slot, 'spr_dot', null, 'on');
   hudSwap(slot, 'spr_root', info.spectating ? 'Spec' : null, 'spec');
   hudSwap(slot, 'spr_root', null, 'lobby');

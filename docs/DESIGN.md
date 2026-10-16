@@ -143,9 +143,20 @@ Racing has no kills, so the script makes them at the end so the CS2 scoreboard a
 
 ### AFK
 
-No input for 20 s during a race: warning on your own HUD. 30 s: your car withdraws (it counts as a loser), you
-watch the rest, and you sit out the next round until you press a key or type `!back`. Idle through the whole
-lobby: the same.
+No input for 20 s while driving: warning on your own HUD. 30 s: your car withdraws (it counts as a loser), you
+watch the rest, and you sit out the next round until you press a key or type `!back`. Waiting after you finish or
+wreck, or watching as a late joiner, is not idling. Idle through 2 minutes of lobby: the same as AFK.
+
+### Joins, leaves and slots (robustness)
+
+- Every CS2 slot is checked once a second; a slot that now holds a different player (bot kicked for a joining
+  human, a quick leave and rejoin) is treated as a new person: no inherited car, kill credit, HUD state or options.
+- Every queued CS2 kill remembers who the victim and killer were; if either slot changed hands, the kill is dropped
+  or goes to the world. A killer who left gives a world kill.
+- Knock-out kills mid-race need CS2 to respawn the pawn. If CS2 doesn't (two failures), knock-outs are credited
+  to the attacker in the end-of-race cascade instead.
+- If CS2 doesn't end the round after a race (warmup, or a plugin), the next race starts on its own after 20 s.
+- HUDs refresh at 32 Hz (half the players each tick); cameras every tick.
 
 ## Controls
 

@@ -85,6 +85,21 @@ Valve's type declarations. These are the things only the real game can show, in 
 - Boosting (or on a pad): flickering pixel speed lines round the edges of the screen.
 - Two race songs take turns ("Neon Overdrive", "Starlight Circuit").
 
+## C4. Multiplayer checks (lessons from FreeDM)
+
+- Someone joins mid-race: they watch (Mouse 1 / 2, E) and are on the next grid. If CS2 kicks a bot to make room,
+  that bot's car leaves the race. Console: `slot N: <old> -> <new>` when a slot changes hands without a disconnect
+  event - the newcomer must never drive the old car or get its kills.
+- Knock-out kills mid-race: the wrecked player's pawn should respawn within ~2 s. If not, the console says
+  `CS2 did not respawn ... within 8 s`, and after two of those `knock-out kills now wait for the end of each race`
+  (the kills are then credited in the end-of-race cascade instead). Check `mp_respawn_on_death_t/ct 1` and plugins.
+- Warmup: races run, nothing reaches the scoreboard, and about 20 s after each race the next one starts by itself
+  (`warmup: next race without a CS2 round change`). Same fallback if a plugin blocks the round end.
+- AFK: only idling while you drive counts (20 s warning, 30 s out). Watching after you finish / wreck, or as a
+  late joiner, never marks you AFK. `!afk` sits you out until `!back` or a key.
+- CS2 spectators / players not on a team see the lobby lines (no camera of ours without a pawn).
+- Panorama: if the console reports CSS errors about `@keyframes`, the HUD still works, just without blinking.
+
 ## D. Things to look at and tune
 
 - Speed feel: `CARS[*].maxSpeed`, `RULES.padSpeed`, the camera presets in `CONFIG.CAMERAS`.

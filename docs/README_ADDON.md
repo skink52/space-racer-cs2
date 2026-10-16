@@ -89,3 +89,18 @@ cvars the map applies, the camera presets (`CAMERAS`, `CAM_LOOKAHEAD`, `CAM_BANK
 When `APPLY_CVARS` is on the map sets: `mp_respawn_on_death_t/ct 1`, `mp_respawn_immunitytime 0`,
 `mp_teammates_are_enemies 1` (no teamkill penalties for same-side kills), `mp_ignore_round_win_conditions 1`
 while a race runs, `mp_death_drop_gun 0`, `mp_buy_anywhere 0`, `mp_buytime 0`, `sv_disable_radar 1`.
+
+## Servers with plugins (CounterStrikeSharp etc.)
+
+Same risks as FreeDM. On this map, turn off or exempt:
+- **AFK managers**: every racer's body stands frozen in a hidden booth, so position-based AFK plugins flag everyone.
+  The map has its own AFK check (input while driving).
+- **No-respawn / spawn-protection / godmode-on-spawn plugins**: the end-of-race kills need `mp_respawn_on_death_t/ct 1`
+  and `mp_respawn_immunitytime 0`. If respawns are blocked, knock-out kills switch to the end of the race by themselves.
+- **Teamkill punishment / plugins forcing `mp_teammates_are_enemies 0`**: same-side kills would count as teamkills.
+- **Plugins that set round cvars on round start** (`mp_ignore_round_win_conditions`, round time) or end rounds.
+- **Weapon / loadout / knife plugins**: parked bodies are stripped of weapons every round; a plugin re-giving them
+  shows a viewmodel over the race.
+- **Anti-stuck / noblock / third-person plugins** that move or unfreeze bodies or change the camera.
+- **Chat commands** `!car !cam !crt !music !spec !afk !back !race` may clash with plugin commands.
+- **Team balancers**: balance at round start only; a mid-race team change takes the player out of the race.

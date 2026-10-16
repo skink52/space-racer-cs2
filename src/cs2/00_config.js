@@ -27,7 +27,8 @@ const CONFIG = {
   ADD_SCORE: false,              // only when REAL_KILLS is off: AddScore(+1) per credited kill
 
   // ---- AFK
-  AFK_WARN: 20, AFK_KICK: 30,    // seconds without input during a race
+  AFK_WARN: 20, AFK_KICK: 30,    // seconds without input while driving a race
+  AFK_LOBBY: 120,                // seconds without any input at all (lobby + watching) before you sit out the next race
 
   // ---- bots
   CS2_BOTS_PLAY: true,
@@ -39,6 +40,7 @@ const CONFIG = {
     'mp_respawn_immunitytime 0', 'mp_death_drop_gun 0', 'mp_buy_anywhere 0', 'mp_buytime 0', 'sv_disable_radar 1',
     'mp_respawn_on_death_t 1', 'mp_respawn_on_death_ct 1', 'mp_teammates_are_enemies 1',
   ],
+  ROUND_END_WAIT: 20,            // seconds after a race: if CS2 hasn't ended the round by then (warmup), the next race starts anyway
   ROUND_SLACK: 15,               // the CS2 round clock runs this much longer than the race can, so the script ends it
 
   // ---- camera

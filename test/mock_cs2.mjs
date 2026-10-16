@@ -1,7 +1,9 @@
 // Runs the real out/addon/maps/scripts/space_racer.js against a stand-in for CS2's cs_script API.
 // Simulates players (humans with random input + CS2 bots), the round timer, freeze time, scripted kills and
 // respawns, people joining and leaving, and checks the script keeps working.
-// usage: node test/mock_cs2.mjs [humans=10] [bots=22] [seconds=400] [opts: v,churn,afk,prof]
+// usage: node test/mock_cs2.mjs [humans=10] [bots=22] [seconds=400] [opts: v,churn,afk,prof,silent,norespawn,warmup,hudstats]
+//   silent: churn without disconnect events (slots change hands unannounced); norespawn: CS2 never respawns killed
+//   players; warmup: the whole run is warmup (FireWinCondition ends nothing)
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -100,7 +102,7 @@ class Pawn extends Entity {
       else k.kills++;
     }
     hooks.OnPlayerKill && hooks.OnPlayerKill({ player: this, attacker });
-    const respawn = cvar(this.ctrl.team === 2 ? 'mp_respawn_on_death_t' : 'mp_respawn_on_death_ct') === '1';
+    const respawn = !OPTS.includes('norespawn') && cvar(this.ctrl.team === 2 ? 'mp_respawn_on_death_t' : 'mp_respawn_on_death_ct') === '1';
     if (respawn) later(1.5, () => this.ctrl.respawn());
   }
 }
@@ -119,7 +121,7 @@ const hooks = {};
 let thinkFn = null, nextThink = 0;
 const timers = [];
 function later(dt, fn) { timers.push({ at: time + dt, fn }); }
-let freezeUntil = 2, roundEnd = 600, roundEnded = false, warmup = false, winFired = null; const winReasons = {};
+let freezeUntil = 2, roundEnd = 600, roundEnded = false, warmup = OPTS.includes('warmup'), winFired = null; const winReasons = {};
 const Instance = {
   Msg: (m) => { const s = String(m); stats.msgs.push(s); if (/error|WARNING/.test(s)) stats.errors.push(s); if (OPTS.includes('v')) console.log(s); },
   GetGameTime: () => time,
@@ -189,7 +191,8 @@ while (time < SECONDS) {
     p.buttons = bt;
   }
   for (let i = timers.length - 1; i >= 0; i--) if (timers[i].at <= time) { const t = timers.splice(i, 1)[0]; t.fn(); }
-  if (!roundEnded && time >= roundEnd && (winFired !== null || cvar('mp_ignore_round_win_conditions') !== '1')) {
+  if (warmup) winFired = null;     // in warmup FireWinCondition ends nothing
+  if (!roundEnded && !warmup && time >= roundEnd && (winFired !== null || cvar('mp_ignore_round_win_conditions') !== '1')) {
     roundEnded = true; rounds++; winReasons[winFired] = (winReasons[winFired] || 0) + 1;
     hooks.OnRoundEnd && hooks.OnRoundEnd({ winningTeam: winFired === 9 ? 2 : winFired === 8 ? 3 : 0, reason: winFired === null ? 0 : winFired }); winFired = null;
     later(3, () => {
@@ -210,7 +213,7 @@ while (time < SECONDS) {
   if (Math.floor(time) !== Math.floor(time - TICK)) { const ph = ctx.__dbg().phase; phases[ph] = (phases[ph] || 0) + 1; }
   if (OPTS.includes('churn') && time > 15 && Math.floor(time / 5) !== Math.floor((time - TICK) / 5)) churn();
 }
-function disconnect(c) { c.connected = false; if (c.pawn) c.pawn.valid = false; hooks.OnPlayerDisconnect && hooks.OnPlayerDisconnect({ playerSlot: c.slot }); }
+function disconnect(c) { c.connected = false; if (c.pawn) c.pawn.valid = false; if (!OPTS.includes('silent')) hooks.OnPlayerDisconnect && hooks.OnPlayerDisconnect({ playerSlot: c.slot }); }
 function churn() {
   const live = players.filter((c) => c.connected);
   const r = Math.random();
@@ -220,10 +223,15 @@ function churn() {
     if (bots.length) { const victim = bots[Math.floor(Math.random() * bots.length)]; disconnect(victim); stats.churn.kick++; slot = victim.slot; }
     else { const used = new Set(live.map((c) => c.slot)); for (let i = 0; i < 64; i++) if (!used.has(i)) { slot = i; break; } }
     if (slot < 0) return;
-    const c = new Controller(slot, 'late' + slot, 0, false, true);
+    const c = new Controller(slot, 'late' + slot + '_' + stats.churn.join, 0, false, true);
     players.push(c); stats.churn.join++;
-    hooks.OnPlayerActivate && hooks.OnPlayerActivate({ player: c });
-    later(2, () => { if (!c.connected) return; c.team = Math.random() < 0.5 ? 2 : 3; hooks.OnPlayerTeamChanged && hooks.OnPlayerTeamChanged({ player: c, newTeam: c.team }); later(1, () => c.respawn()); });
+    if (OPTS.includes('silent')) {
+      // unannounced: the newcomer is already on a team with a pawn when the script next looks
+      c.team = Math.random() < 0.5 ? 2 : 3; c.pawn = new Pawn(c); c.joinedAt = time;
+    } else {
+      hooks.OnPlayerActivate && hooks.OnPlayerActivate({ player: c });
+      later(2, () => { if (!c.connected) return; c.team = Math.random() < 0.5 ? 2 : 3; hooks.OnPlayerTeamChanged && hooks.OnPlayerTeamChanged({ player: c, newTeam: c.team }); later(1, () => c.respawn()); });
+    }
   } else if (r < 0.75) {
     const humans = live.filter((c) => !c.bot && c.slot !== 0);
     const c = humans[Math.floor(Math.random() * humans.length)];

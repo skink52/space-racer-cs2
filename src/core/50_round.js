@@ -5,7 +5,7 @@
 
 const DEFAULT_CFG = {
   arenaMax: 32, maxArenas: 2, minPlayers: 1, layout: '2x32', arenaMin: 8,
-  afkWarnTics: 20 * TICRATE, afkKickTics: 30 * TICRATE,
+  afkWarnTics: 20 * TICRATE, afkKickTics: 30 * TICRATE, afkLobbyTics: 120 * TICRATE,
   countdownTics: 10 * TICRATE, finishWindow: 30, raceCap: 300, endHold: 6, laps: 0,
   botSkill: 0.5,
   podium: 3, shares: [50, 30, 20], koCredit: true, tiebreak: true,
@@ -109,7 +109,8 @@ class RoundManager {
     const eligible = [];
     for (const pe of this.people.values()) {
       if (pe.csTeam !== 2 && pe.csTeam !== 3) continue;
-      if (!pe.bot && this.clock - pe.lastActive > this.cfg.afkKickTics) { pe.afk = true; }
+      // idle through the whole lobby and the race before it (watching counts as idle only for this long)
+      if (!pe.bot && this.clock - pe.lastActive > this.cfg.afkLobbyTics) { pe.afk = true; }
       if (pe.afk && !pe.bot) { pe.status = 'none'; continue; }
       eligible.push(pe);
     }
@@ -231,6 +232,9 @@ class RoundManager {
 
   checkAfk() {
     for (const pe of this.people.values()) {
+      // people waiting for the next race (finished, wrecked, joined mid-race and watching) aren't idle: only an idle
+      // driver, or someone idle through a whole lobby, sits out. (!afk and an AFK verdict while driving still stick.)
+      if (!pe.bot && !pe.afk && (!pe.car || (!pe.car.racing && pe.car.state !== 'grid'))) pe.lastActive = this.clock;
       if (pe.bot || pe.status !== 'racing' || !pe.arena || pe.arena.state !== 'racing' || !pe.car || !pe.car.racing) continue;
       const idle = this.clock - pe.lastActive;
       if (idle === this.cfg.afkWarnTics) this.events.push({ type: 'afkWarn', person: pe });
@@ -284,9 +288,12 @@ class RoundManager {
   killPlan(a) {
     const r = a.result ? a.result.ranking : [];
     const podium = r.slice(0, this.cfg.podium).filter((c) => c);
-    const losers = r.slice(this.cfg.podium).filter((c) => !c.koApplied && !c.left);
-    const counts = splitShares(losers.length, this.cfg.shares.slice(0, Math.max(1, podium.length)));
     const plan = [];
+    // wrecked by someone's attack but not credited yet: the attacker gets that kill now (if still in the race's result)
+    const deferred = r.slice(this.cfg.podium).filter((c) => !c.koApplied && !c.left && c.koBy && r.includes(c.koBy));
+    for (const c of deferred) plan.push({ victim: c, killer: c.koBy });
+    const losers = r.slice(this.cfg.podium).filter((c) => !c.koApplied && !c.left && !deferred.includes(c));
+    const counts = splitShares(losers.length, this.cfg.shares.slice(0, Math.max(1, podium.length)));
     let k = 0;
     counts.forEach((n, i) => { for (let j = 0; j < n && k < losers.length; j++, k++) plan.push({ victim: losers[k], killer: podium[i] || null }); });
     while (k < losers.length) plan.push({ victim: losers[k++], killer: podium[0] || null });
