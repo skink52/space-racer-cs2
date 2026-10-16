@@ -56,7 +56,7 @@ function sampleInput(slot, car, pk) {
   const fwd = pressed('FORWARD'), back = pressed('BACK'), left = pressed('LEFT'), right = pressed('RIGHT');
   const c = car.cmd;
   c.throttle = fwd ? 1 : back ? -1 : 0;
-  c.steer = (right ? 1 : 0) - (left ? 1 : 0);
+  c.steer = (left ? 1 : 0) - (right ? 1 : 0);      // + = turn left (yaw grows anticlockwise, seen from above)
   c.boost = pressed('ATTACK');
   c.drift = pressed('JUMP') || pressed('DUCK');
   if (pawn.WasInputJustPressed(CSInputs.ATTACK2)) c.spin = true;
@@ -73,6 +73,7 @@ function pickerInput(pe, pk) {
   let any = false;
   if (pawn.WasInputJustPressed(CSInputs.LEFT)) { rm.cycleCar(pe, -1); any = true; }
   if (pawn.WasInputJustPressed(CSInputs.RIGHT)) { rm.cycleCar(pe, 1); any = true; }
+  if (any) pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;     // watchers see the cards for a moment
   if (pawn.IsInputPressed(CSInputs.FORWARD | CSInputs.BACK | CSInputs.ATTACK | CSInputs.JUMP | CSInputs.USE)) any = true;
   const ang = pawn.GetEyeAngles();
   if (Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2) any = true;
@@ -109,7 +110,7 @@ function shakeOffset(pk) {
 
 // chase camera behind a car (own or watched). The yaw eases towards the car's heading, turned a little into the bend
 // ahead so the upcoming track stays in view; it pulls back at speed; a little roll in corners.
-function placeCamera(pk, car, view, dt, preset) {
+function placeCamera(pk, car, view, dt, preset, tilt) {
   if (!live(pk.cam)) return;
   const cp = CONFIG.CAMERAS[preset] || CONFIG.CAMERAS[CONFIG.CAM_DEFAULT] || { back: 300, up: 175, pitch: 16, speedBack: 70 };
   const T = view.arena.track;
@@ -130,13 +131,11 @@ function placeCamera(pk, car, view, dt, preset) {
   const pos = view.world(car.x - Math.cos(cy) * back, car.y - Math.sin(cy) * back, cz + up);
   const sh = shakeOffset(pk);
   if (sh) { pos.x += sh.x; pos.y += sh.y; pos.z += sh.z; }
-  let roll = car.state === 'falling' ? 0 : clamp(-car.vl / 30, -CONFIG.CAM_ROLL, CONFIG.CAM_ROLL);
-  // lean with banked bends (smoothed), a share of the road's angle
-  const bankDeg = car.air || car.state === 'falling' ? 0 : -deg(Math.atan(car.bank)) * CONFIG.CAM_BANK;
-  pk.bankRoll = (pk.bankRoll || 0) + (bankDeg - (pk.bankRoll || 0)) * Math.min(1, dt * 4);
-  roll += pk.bankRoll;
-  roll *= CONFIG.ROLL_SIGN;
-  if (car.spinTimer > 0) roll = 0;
+  // lean (+ = tilt right): a share of a banked road's angle plus a little into the turn, smoothed; !tilt turns it off
+  const lean = car.air || car.state === 'falling' || car.spinTimer > 0 || tilt === false ? 0
+    : -deg(Math.atan(car.bank)) * CONFIG.CAM_BANK + clamp(-(car.yawRate || 0) * CONFIG.CAM_LEAN, -CONFIG.CAM_ROLL, CONFIG.CAM_ROLL);
+  pk.bankRoll = (pk.bankRoll || 0) + (lean - (pk.bankRoll || 0)) * Math.min(1, dt * 4);
+  const roll = pk.bankRoll * CONFIG.CAM_ROLL_SIGN;
   const pitch = cp.pitch + (car.state === 'falling' ? Math.min(40, car.stateTime * 30) : 0);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
   pk.cam.Move({ position: pos, angles: { pitch, yaw: deg(cy), roll } });

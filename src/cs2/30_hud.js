@@ -98,13 +98,17 @@ function hudReset(slot) {
   if (h) { try { h.ResetForPlayer(slot); } catch (err) { /* ignore */ } }
 }
 
-function hudOff(slot) { hudSwap(slot, 'spr_root', null); }
+// state classes on spr_root all start with "st" (stOn, stLobby, stPick, stHelp, stRes, stSpec, stBoost): a state
+// class must never share its name with a panel's class, or the root picks up that panel's layout
+function hudOff(slot) {
+  for (const g of ['on', 'lobby', 'pick', 'help', 'res', 'spec', 'boost']) hudSwap(slot, 'spr_root', null, g);
+}
 
 function pct(v, max) { return 'w' + clamp(Math.round(v / Math.max(1, max) * 20), 0, 20); }
 
 // the car picker: four cards, the chosen one highlighted; pictures in the player's side colour
 function hudPicker(slot, pe, show) {
-  hudSwap(slot, 'spr_root', show ? 'Pick' : null, 'pick');
+  hudSwap(slot, 'spr_root', show ? 'stPick' : null, 'pick');
   if (!show) return;
   const side = pe.csTeam === 2 ? 't' : pe.csTeam === 3 ? 'ct' : 'neutral';
   CAR_KEYS.forEach((k, i) => {
@@ -113,17 +117,46 @@ function hudPicker(slot, pe, show) {
   });
 }
 
-// minimap dot position classes for a track-local point
-function dotClasses(track, x, y) {
+// minimap: the track picture is 48 x 48 big pixels; dots snap to them. x / y position classes for a track-local point
+const MM_CELLS = HUD_TEXT.mm_cells || 48;
+const MAX_DOTS = HUD_TEXT.max_dots || 32;
+function dotCells(track, x, y) {
   const mm = track.mm, half = mm.size / 2;
   const px = half + x * mm.scale, py = half - y * mm.scale;
-  const gx = clamp(Math.round(px / mm.size * 23), 0, 23), gy = clamp(Math.round(py / mm.size * 23), 0, 23);
-  return ['dx' + gx, 'dy' + gy];
+  return [clamp(Math.floor(px / mm.size * MM_CELLS), 0, MM_CELLS - 1), clamp(Math.floor(py / mm.size * MM_CELLS), 0, MM_CELLS - 1)];
+}
+function hudDot(slot, outer, inner, car, track, colorCls, step) {
+  if (!car) { hudSwap(slot, outer, null, 'on'); return; }
+  const c = dotCells(track, car.x, car.y);
+  if (step > 1) { c[0] -= c[0] % step; c[1] -= c[1] % step; }
+  hudSwap(slot, outer, 'x' + c[0], 'x');
+  hudSwap(slot, inner, 'y' + c[1], 'y');
+  if (colorCls !== undefined) hudSwap(slot, inner, colorCls, 'col');
+  hudSwap(slot, outer, 'On', 'on');
+}
+// every car in the race on the minimap (grid order = dot number), the leader in gold and the watched car blinking
+// white on top. To keep the class traffic down the other cars move in 2-pixel steps and a quarter of them is
+// refreshed on each HUD update.
+const dotTurn = new Map();
+function hudDots(slot, arena, me) {
+  const T = arena.track;
+  const n = (dotTurn.get(slot) || 0) + 1;
+  dotTurn.set(slot, n);
+  const per = Math.ceil(MAX_DOTS / 4), from = (n & 3) * per;
+  for (let k = from; k < Math.min(MAX_DOTS, from + per); k++) {
+    const car = arena.order[k];
+    const show = car && car !== me && car.visible && !car.left;
+    hudDot(slot, 'spr_md' + k, 'spr_mdy' + k, show ? car : null, T,
+      show ? (car.state === 'wrecked' || car.state === 'finished' ? 'Out' : car.team === 0 ? 'T' : car.team === 1 ? 'CT' : null) : undefined, 2);
+  }
+  const lead = arena.ranking[0];
+  hudDot(slot, 'spr_ldot', 'spr_ldoty', lead && lead !== me && lead.racing ? lead : null, T, undefined, 1);
+  hudDot(slot, 'spr_dot', 'spr_doty', me && me.visible ? me : null, T, undefined, 1);
 }
 
 function hudRaceCommon(slot, arena, info) {
-  hudSwap(slot, 'spr_root', 'On', 'on');
-  hudSwap(slot, 'spr_root', arena.state === 'over' ? 'Res' : null, 'res');
+  hudSwap(slot, 'spr_root', 'stOn', 'on');
+  hudSwap(slot, 'spr_root', arena.state === 'over' ? 'stRes' : null, 'res');
   hudSwap(slot, 'spr_mmimg', 'mm_' + arena.track.id, 'map');
   hudText(slot, 'spr_clock', info.clock || '', info.clock === 'GRID' || info.clock === 'RESULTS' ? 'cY' : 'cW');
   hudCenter(slot, info.center, info.centerCls);
@@ -138,10 +171,6 @@ function hudRaceCommon(slot, arena, info) {
     hudSwap(slot, 'spr_st' + i, r ? (r.team === 0 ? 'T' : r.team === 1 ? 'CT' : 'N') : null, 'side');
     hudSwap(slot, 'spr_st' + i, r && r.me ? 'me' : null, 'me');
   }
-  // leader dot
-  const lead = arena.ranking[0];
-  if (lead && lead.racing) { const dc = dotClasses(arena.track, lead.x, lead.y); hudSwap(slot, 'spr_ldot', dc[0], 'x'); hudSwap(slot, 'spr_ldoty', dc[1], 'y'); hudSwap(slot, 'spr_ldot', 'On', 'on'); }
-  else hudSwap(slot, 'spr_ldot', null, 'on');
 }
 
 // a racing player's own HUD (or a spectator looking through `car`)
@@ -174,16 +203,15 @@ function hudRace(slot, car, arena, info) {
     if (a > 0.75) turnCls = (turn > 0 ? 'l' : 'r') + (a > 1.9 ? '2' : '1');
     hudSwap(slot, 'spr_turn', turnCls, 'dir');
   } else if (car.state !== 'racing') hudSwap(slot, 'spr_turn', null, 'dir');
-  hudSwap(slot, 'spr_root', (car.boosting || car.padTimer > 0) && car.state === 'racing' && !info.spectating ? 'Boost' : null, 'boost');
-  if (car.visible) { const dc = dotClasses(arena.track, car.x, car.y); hudSwap(slot, 'spr_dot', dc[0], 'x'); hudSwap(slot, 'spr_doty', dc[1], 'y'); hudSwap(slot, 'spr_dot', 'On', 'on'); }
-  else hudSwap(slot, 'spr_dot', null, 'on');
-  hudSwap(slot, 'spr_root', info.spectating ? 'Spec' : null, 'spec');
+  hudSwap(slot, 'spr_root', (car.boosting || car.padTimer > 0) && car.state === 'racing' && !info.spectating ? 'stBoost' : null, 'boost');
+  hudDots(slot, arena, car);
+  hudSwap(slot, 'spr_root', info.spectating ? 'stSpec' : null, 'spec');
   hudSwap(slot, 'spr_root', null, 'lobby');
 }
 
 // lobby: status lines only (plus the picker)
 function hudLobby(slot, info) {
-  hudSwap(slot, 'spr_root', 'Lobby', 'lobby');
+  hudSwap(slot, 'spr_root', 'stLobby', 'lobby');
   hudSwap(slot, 'spr_root', null, 'on');
   hudSwap(slot, 'spr_root', null, 'res');
   hudSwap(slot, 'spr_root', null, 'boost');
@@ -197,6 +225,6 @@ function hudLobby(slot, info) {
   hudSwap(slot, 'spr_flash', null);
 }
 
-function hudHelp(slot, on) { hudSwap(slot, 'spr_root', on ? 'Help' : null, 'help'); }
+function hudHelp(slot, on) { hudSwap(slot, 'spr_root', on ? 'stHelp' : null, 'help'); }
 // player options on the outer panel: CRT scanlines off
 function hudOptions(slot, pe) { hudSwap(slot, 'spr_opts', pe.crt === false ? 'nocrt' : null, 'crt'); }

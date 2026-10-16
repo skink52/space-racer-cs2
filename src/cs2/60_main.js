@@ -350,8 +350,8 @@ function raceInfo(pe, car, a, now, spectating) {
   else if (car.offLine && car.state === 'racing') { info.center = 'MISSED CHECKPOINT'; info.centerCls = 'red'; }
   const sm = timed(subMsgs, pe.slot, now);
   if (sm) info.sub = sm.text;
-  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 16).toUpperCase() + '  M1/M2 CAR  E ARENA';
-  else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'A / D CHOOSE YOUR CAR - ' + car.spec.name + ' - ' + car.spec.perk : 'PRESS W ON THE LAST BEEP FOR A TURBO START';
+  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  A/D CAR';
+  else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : 'PRESS W ON THE LAST BEEP FOR A TURBO START';
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
   else if (pe.helpUntil > now) info.sub = 'W/S DRIVE  A/D STEER  M1 BOOST  M2 SPIN  SPACE DRIFT';
   const bm = timed(botMsgs, pe.slot, now);
@@ -523,7 +523,7 @@ function frame(dt) {
         if (!v) return;
         if (a.state === 'over') placeOverviewCamera(pk, a, v);
         else if (a.state === 'grid' && CONFIG.FLYOVER && a.countdown > CONFIG.FLYOVER_CUT * TICRATE) placeFlyover(pk, a, v, now);
-        else placeCamera(pk, pe.car, v, dt, pe.cam);
+        else placeCamera(pk, pe.car, v, dt, pe.cam, pe.tilt);
         if (!hudTurn(pe.slot)) return;
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
         hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE);
@@ -533,9 +533,10 @@ function frame(dt) {
         const a = rm.arenas[pe.spec ? pe.spec.arena : 0], v = a && views.get(a);
         const t = a && pe.spec && pe.spec.target !== null ? a.cars.get(pe.spec.target) : null;
         if (!a || !v) { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); return; }
-        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam); if (hudTurn(pe.slot)) hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
+        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam, pe.tilt); if (hudTurn(pe.slot)) hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
         else { placeOverviewCamera(pk, a, v); if (pe.car && pe.arena === a) hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false)); else { hudLobby(pe.slot, lobbyInfo(pe, now)); } rm.fixSpectate(pe, 0); }
-        hudPicker(pe.slot, pe, pe.status !== 'racing' && (!pe.car || a.state === 'over'));
+        // watchers get the cards while the results are up, or for a moment after pressing A / D
+        hudPicker(pe.slot, pe, pe.status !== 'racing' && (!pe.car || a.state === 'over') && (a.state === 'over' || (pe.pickUntil || 0) > now));
       }
     });
   }
@@ -632,6 +633,9 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
     const cur = pe.cam || CONFIG.CAM_DEFAULT;
     pe.cam = names.includes(want) ? want : names[(names.indexOf(cur) + 1) % names.length];
     bottom(slot, 'CAMERA: ' + pe.cam.toUpperCase() + '   (!CAM ' + names.join(' / ').toUpperCase() + ')', 3);
+  } else if (t === '!tilt') {
+    pe.tilt = pe.tilt === false;
+    bottom(slot, 'CAMERA TILT ' + (pe.tilt === false ? 'OFF' : 'ON') + '   (!TILT)', 3);
   } else if (t === '!crt') {
     pe.crt = pe.crt === false;
     bottom(slot, 'SCANLINES ' + (pe.crt ? 'ON' : 'OFF') + '   (!CRT)', 3);

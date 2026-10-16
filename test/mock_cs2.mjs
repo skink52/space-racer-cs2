@@ -34,7 +34,14 @@ class Entity {
   GetEntityName() { return this.name; }
   SetEntityName(n) { this.name = n; }
   GetClassName() { return this.cls; }
-  Teleport(o) { stats.teleports++; if (o.position) this.pos = { ...o.position }; if (o.angles) this.ang = { ...o.angles }; check(o.position, o.angles); }
+  Teleport(o) {
+    stats.teleports++;
+    // CS2 stops drawing a prop that is teleported every tick: count runs of 3+ ticks in a row
+    const tk = Math.round(time * 64);
+    if (this.tpTick === tk - 1) { this.tpRun = (this.tpRun || 0) + 1; if (this.tpRun === 2) stats.tpRuns = (stats.tpRuns || 0) + 1; } else this.tpRun = 0;
+    this.tpTick = tk;
+    if (o.position) this.pos = { ...o.position }; if (o.angles) this.ang = { ...o.angles }; check(o.position, o.angles);
+  }
   Move(o) { stats.moves++; if (o.position) this.pos = { ...o.position }; if (o.angles) this.ang = { ...o.angles }; check(o.position, o.angles); }
   SetModel(m) { stats.setModel++; if (!models.has(m)) throw new Error('missing model ' + m); this.model = m; }
   SetColor(c) { this.color = c; }
@@ -260,5 +267,11 @@ console.log(`scoreboard kills ${players.reduce((n, c) => n + c.kills, 0)} deaths
 const unknownCls = [...classesUsed.keys()].filter((c) => c && !hudCss.includes('.' + c));
 if (OPTS.includes('hudstats')) console.log('HUD calls by panel:', JSON.stringify(Object.entries(stats.hudBy || {}).sort((a, b) => b[1] - a[1]).slice(0, 14)));
 console.log('HUD classes not in the css:', unknownCls.join(' ') || 'none');
+// a class the script switches must not have a lone rule of its own (".Pick { }"): the panel would take that rule's layout
+const loneCls = [...classesUsed.keys()].filter((c) => c && new RegExp('(^|\\n)\\.' + c + ' \\{').test(hudCss));
+console.log('switched HUD classes with a rule of their own:', loneCls.join(' ') || 'none');
+if (loneCls.length) stats.errors.push('HUD state classes collide with panel classes: ' + loneCls.join(' '));
+console.log('props teleported 3+ ticks in a row:', stats.tpRuns || 0);
+if (stats.tpRuns) stats.errors.push('props teleported every tick (CS2 hides them): ' + stats.tpRuns);
 if (stats.errors.length) { console.log('ERRORS/WARNINGS:'); for (const e of [...new Set(stats.errors)].slice(0, 20)) console.log('  ' + e); }
 console.log('log:', stats.msgs.filter((m) => !/chat command/.test(m)).slice(0, 12).join(' | '));

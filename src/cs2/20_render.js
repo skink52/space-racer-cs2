@@ -98,13 +98,18 @@ class ArenaView {
       const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50)
         : car.air ? clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25)
         : -deg(Math.atan2(T.z[j] - T.z[i], T.step)) + rampTilt;
-      // roll: the lean of a banked bend plus a little from sliding (CONFIG.ROLL_SIGN sets which way CS2 turns a roll)
-      const roll = CONFIG.ROLL_SIGN * (car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18) - (car.air ? 0 : deg(Math.atan(car.bank))));
+      // roll (+ = right side down): the lean of a banked road (bank > 0 = left side low) plus leaning into the turn
+      // (turning right = yaw falling = lean right)
+      const bankRoll = car.air ? 0 : -deg(Math.atan(car.bank));
+      const turnRoll = clamp(-(car.yawRate || 0) * CONFIG.CAR_LEAN, -CONFIG.CAR_LEAN_MAX, CONFIG.CAR_LEAN_MAX);
+      const roll = car.state === 'falling' ? 0 : CONFIG.PROP_ROLL_SIGN * (bankRoll + turnRoll);
       const yaw = deg(car.yaw + car.spinYaw);
       const pos = this.world(car.x, car.y, car.z);
       if (car.state === 'wrecked') pos.z -= Math.min(8, car.stateTime * 6);
       const ang = { pitch, yaw, roll };
-      if (!p.lastPos || car.state === 'grid' || (car.fx & 128)) { p.ent.Teleport({ position: pos, angles: ang }); }
+      // Teleport only for the first placement and real jumps (respawns); everything else Moves, the grid included
+      const lp = p.lastPos;
+      if (!lp || (car.fx & 128) || Math.abs(pos.x - lp.x) + Math.abs(pos.y - lp.y) + Math.abs(pos.z - lp.z) > CONFIG.TELEPORT_DIST) p.ent.Teleport({ position: pos, angles: ang });
       else p.ent.Move({ position: pos, angles: ang });
       p.lastPos = pos;
     }
@@ -116,7 +121,9 @@ class ArenaView {
         propModel(pp, CAR_MODELS.fx.pulse);
         const pt = T.point(a.pulse.total);
         const pos = this.world(pt.x, pt.y, pt.z + 2);
-        const ang = { pitch: 0, yaw: deg(Math.atan2(pt.ty, pt.tx)), roll: 0 };
+        // follow the road: its slope and its bank (the fence and floor strip lie on the surface)
+        const j = (pt.i + 1) % T.n;
+        const ang = { pitch: -deg(Math.atan2(T.z[j] - T.z[pt.i], T.step)), yaw: deg(Math.atan2(pt.ty, pt.tx)), roll: CONFIG.PROP_ROLL_SIGN * -deg(Math.atan(T.bk[pt.i])) };
         if (!pp.lastPos) pp.ent.Teleport({ position: pos, angles: ang }); else pp.ent.Move({ position: pos, angles: ang });
         pp.lastPos = pos;
       }

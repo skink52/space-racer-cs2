@@ -20,9 +20,11 @@ Everything here is original work: the name, cars, tracks, art, sounds and rules.
 
 ![the racer's view on all eight tracks](preview/chase_all.png)
 
-![the HUD](preview/hud_mock.png)
+![the HUD while racing](preview/hud_race.png)
 
-![the lobby and car picker](preview/hud_lobby.png)
+![the grid: car picker over the flyover](preview/hud_grid.png)
+
+![the lobby](preview/hud_lobby.png)
 
 ![tracks](preview/tracks.png)
 
@@ -38,7 +40,7 @@ Everything here is original work: the name, cars, tracks, art, sounds and rules.
 | `src/cs2/` | The CS2 side: pawn parking and the chase camera, input, prop-pool rendering, HUD, sounds, CS2 kills, round control, chat commands. |
 | `tools/` | Generators: `trackdefs.py` (the eight track designs and colour themes), `tracks.py` (tracks → data, road / tube / scenery models, minimaps), `retro.py` (the palette and dithering), `pixfont.py` (the pixel font and logo), `skies.py` (pixel-art skies), `cars.py` (voxel cars, pixel effects, renders), `loading.py` (loading screen, radar, map icon), `hud.py` (Panorama layout/css and glyph pictures), `sounds.py` (chiptune sounds, music and sound events), `vmap.py` (writes the whole map into the Hammer template), `build.mjs` (assembles the script), `build_all.sh`. |
 | `test/` | `sim.cjs` runs bot races on the pure game; `mock_cs2.mjs` runs the real script on a stand-in cs_script API; `tsconfig.json` + `point_script.d.ts` type-check it against Valve's API. |
-| `preview/` | Pictures of the tracks, skies, cars (`car_angles.png`), loading screen, HUD (`hud_mock.py` composes the real HUD pictures), and `chase_view.py`: a software render of the racer's view from the chase camera (sky, banking and all). |
+| `preview/` | Pictures of the tracks, skies, cars (`car_angles.png`), loading screen, HUD (`hud_render.py` lays the real HUD out like Panorama would, draws it at 16:9, ultrawide and 4:3, and fails the build if a panel breaks the layout rules), and `chase_view.py`: a software render of the racer's view from the chase camera (sky, banking and all). |
 | `docs/` | `DESIGN.md` (the game), `TESTING.md` (first run in CS2), `WORKSHOP_COMPLIANCE.md`, the notes that ship with the addon. |
 | `ref/` | The Hammer map template the build writes into, and the stock sound-events file. |
 

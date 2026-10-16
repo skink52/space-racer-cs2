@@ -14,7 +14,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 ## B. First run (listen server, `bot_quota 0`)
 
-1. Console on map load: `[spr] v0.3.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
+1. Console on map load: `[spr] v0.3.1 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too.
 3. About 2 s after the round starts (mp_freezetime 0): `RACE 1: <track> (1)` in chat, a 10-second countdown on the grid, your car on the grid
@@ -68,7 +68,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 - Tracks are about twice as big, in two layers. The skies: each track has its own pixel-art panorama on the
   moondome. If a sky shows black or stretched, the moondome shader may want a different texture layout.
 - Banked bends: the road leans, the car leans with it (prop roll) and the camera leans 60% as much. If the lean
-  looks backwards, flip the sign in `20_render.js` (prop) and `40_players.js` (camera).
+  looks backwards, flip `PROP_ROLL_SIGN` (cars) or `CAM_ROLL_SIGN` (camera) in CONFIG.
 - Tubes (Solar Oval back straight, Hairpin Harbour, Ringworld under the bridge, Spire and Helix descents): the
   camera drops lower inside. Check it never pokes through the roof.
 - Scenery: towers, asteroids, crystals, rings, clouds, the synth-grid floor, billboards, the voxel-letter start
@@ -101,6 +101,30 @@ Valve's type declarations. These are the things only the real game can show, in 
 - CS2 spectators / players not on a team see the lobby lines (no camera of ours without a pawn).
 - Panorama: if the console reports CSS errors about `@keyframes`, the HUD still works, just without blinking.
 
+## C5. Fixes from the 17 Oct test (check these first)
+
+Rebuild fully after copying the files (`disconnect`, then load the map again) so the HUD and the script recompile.
+
+- **HUD placement.** Everything should now sit where `preview/hud_race.png` shows it: minimap top-left (all of it,
+  with a dot for every car: T orange, CT blue, the leader gold, yours blinking white), position + lap top-centre
+  under CS2's own top bar, clock top-right, standings on the right, shield/charge bottom-left and speed
+  bottom-right, a little above CS2's money / health row. Cause of the jumble: the HUD root's "Pick" state used the
+  same class name as the picker panel, so the whole HUD took the picker's layout. The layout is also fixed-size now.
+- **Car picker.** Lobby (`preview/hud_lobby.png`): logo, three lines, then four cards with a picture of each car in
+  your side's colour, its perk and five stat bars; A / D moves the gold highlight. Grid (`preview/hud_grid.png`):
+  the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", the cards; they go 3 seconds before the lights and the
+  bars / speed / standings come back. Watching a race: the cards show for 4 seconds after you press A / D.
+- **Countdown.** 3 / 2 / 1 in big red pixel digits in the middle of the screen, then GO!.
+- **Cars on the grid.** All cars visible on the grid from the moment the flyover reaches them (they were being
+  teleported every tick, which CS2 doesn't draw).
+- **Steering.** A turns left, D turns right.
+- **Lean.** On a banked bend the car sits level with the road (dips into the inside of the bend) and leans into
+  every turn; the camera leans the same way, less. `!tilt` turns the camera lean off for you. If the cars still
+  dip the wrong way, set `PROP_ROLL_SIGN: -1`; if only the camera is backwards, `CAM_ROLL_SIGN: -1`.
+- **The Pulse** (the wave that sweeps from the back of the field to the front each time the leader starts a new
+  lap, topping up everyone's charge): now a low pixel laser fence
+  with chevrons on the road under it, instead of a tall see-through sheet that washed out the screen.
+
 ## D. Things to look at and tune
 
 - Speed feel: `CARS[*].maxSpeed`, `RULES.padSpeed`, the camera presets in `CONFIG.CAMERAS`.
@@ -117,8 +141,8 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 - Whether `Move` on 32 props every tick plus the camera `Move` looks smooth at 1000+ units/s.
 - Whether the client interpolates the custom camera in CONTROLLED mode (FreeDM used it for spectators only).
-- Whether Panorama renders the HUD as laid out (fonts, bar widths by class, the minimap image per track, the
-  picker pictures). `HUD classes not in the css: none` is the mock's check; the look is not.
+- Whether Panorama renders the HUD exactly like `preview/hud_render.py` lays it out (the 17 Oct fixes below).
+  `HUD classes not in the css: none` and `switched HUD classes with a rule of their own: none` are the mock's checks.
 - Whether `TakeDamage` with `damageTypes: VEHICLE` shows a sensible killfeed icon (FreeDM used BULLET).
 - The translucent effects (wreck, warp, the Pulse wave, hover shadow) and the alpha-blended materials.
 - Sound spatialisation relative to the custom camera, and whether the music events stay un-positioned.

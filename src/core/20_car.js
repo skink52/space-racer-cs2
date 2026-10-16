@@ -22,12 +22,13 @@ class Car {
     this.pulsed = 0; this.noDamage = 0; this.calm = 0;   // seconds of no-damage after the start
     this.air = false; this.tz = 0; this.lift = 0; this.airTime = 0;   // jumps: airborne flag, track height, ramp height under the car
     this.bank = 0;                 // tan of the road's lean under the car (banked bends)
+    this.yawRate = 0;              // how fast the car is turning (radians per second, smoothed; + = left)
     this.gasAt = null; this.stall = 0;   // turbo start: when the gas went down on the grid; seconds of stalled engine
   }
 
   placeAt(x, y, z, yaw, track) {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.vx = 0; this.vy = 0; this.vz = 0; this.speed = 0; this.vf = 0; this.vl = 0;
-    this.air = false; this.tz = z; this.lift = 0;
+    this.air = false; this.tz = z; this.lift = 0; this.yawRate = 0;
     const p = track.locateAll(x, y, z);
     this.seg = p.i; this.t = p.t; this.d = p.d; this.s = p.s; this.prevS = p.s;
   }
@@ -45,6 +46,7 @@ class Car {
     if (this.ghost > 0) this.ghost -= dt;
     if (this.noDamage > 0) this.noDamage -= dt;
     this.stateTime += dt;
+    if (this.state !== 'racing' && this.state !== 'finished') this.yawRate *= 0.9;
     if (this.state === 'falling') { this.fallStep(track, dt); return; }
     if (this.state !== 'racing' && this.state !== 'finished') return;
     const finished = this.state === 'finished';
@@ -71,7 +73,9 @@ class Car {
     if (this.spinTimer > 0) turnRate *= 0.3;
     if (!air) turnRate *= 1 + Math.abs(this.bank) * RULES.bankTurn;   // banked bends turn tighter
     if (air) turnRate *= RULES.airControl;
-    this.yaw += turnRate * steer * dt * (this.vf < 0 ? -1 : 1);
+    const yawRate = turnRate * steer * (this.vf < 0 ? -1 : 1);       // radians per second, + = turning left
+    this.yaw += yawRate * dt;
+    this.yawRate += (yawRate - this.yawRate) * Math.min(1, dt * 8);   // smoothed, for the cars' and cameras' lean
     fx = Math.cos(this.yaw); fy = Math.sin(this.yaw);
     const lx = -fy, ly = fx;
     let vf = this.vx * fx + this.vy * fy, vl = this.vx * lx + this.vy * ly;

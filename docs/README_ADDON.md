@@ -76,8 +76,9 @@ Loading screen, radar and map icon are in `panorama/images/` and compile with th
 | Mouse | nothing while racing - the camera follows the car and turns a little into the bend ahead |
 | Mouse 1 / 2, E (watching) | next car / previous car / next arena |
 
-Chat (`!` or `/`): `!car 1-4` (or a name), `!cam` (camera: high = default, far, near), `!crt` (CRT scanlines on /
-off for you), `!music`, `!spec`, `!afk`, `!back`, `!race` (controls on your own screen).
+Chat (`!` or `/`): `!car 1-4` (or a name), `!cam` (camera: high = default, far, near), `!tilt` (camera lean in
+corners on / off for you), `!crt` (CRT scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!race`
+(controls on your own screen).
 
 ## Settings
 
@@ -102,5 +103,5 @@ Same risks as FreeDM. On this map, turn off or exempt:
 - **Weapon / loadout / knife plugins**: parked bodies are stripped of weapons every round; a plugin re-giving them
   shows a viewmodel over the race.
 - **Anti-stuck / noblock / third-person plugins** that move or unfreeze bodies or change the camera.
-- **Chat commands** `!car !cam !crt !music !spec !afk !back !race` may clash with plugin commands.
+- **Chat commands** `!car !cam !tilt !crt !music !spec !afk !back !race` may clash with plugin commands.
 - **Team balancers**: balance at round start only; a mid-race team change takes the player out of the race.

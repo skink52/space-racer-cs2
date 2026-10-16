@@ -7,6 +7,17 @@ small image panels, one per character; the script sets each panel's glyph class 
 class (cW white, cY gold, cC cyan, cR red, cG green, cP pink), so only characters that change are sent. Static text
 is written straight into the layout the same way. Player names in the standings stay as Labels.
 Bars are segmented pixel bars, the minimap is pixelated, and a CRT scanline overlay can be toggled with !crt.
+
+Layout rules (from the first CS2 test, 17 Oct: CS2 put the top panels at the bottom of the screen, stacked the centre
+text, squashed the bars and never showed the car cards). The layout is now static, so Panorama lays it out once:
+- one Screen panel, a fixed 1080 px high (Panorama scales every screen to 1080 high) and the full width, holds it all;
+- every panel has a fixed size and is pinned from the top (margin-top) and from the left edge, the centre or the
+  right edge. No vertical centre/bottom alignment, no negative margins, no fit-children containers;
+- panels are shown and hidden with opacity, never visibility: collapse, so nothing is laid out again at runtime;
+- the script only swaps classes that change pictures, colours, opacity and transforms (the minimap dots move with
+  transforms; bar fills change width, which Panorama does redo);
+- state classes on spr_root start with "st" and no panel class may share a name with a state class (see below).
+preview/hud_render.py lays this out like Panorama would and flags anything that breaks these rules.
 """
 import os, sys, re, json
 import numpy as np
@@ -29,7 +40,6 @@ def rule(sel, **props):
     css.append('%s { %s }' % (sel, body))
 def raw(text): css.append(text)
 
-xml = []
 def P(id_=None, cls=None, children=None, tag='Panel', extra=''):
     a = []
     if id_: a.append('id="%s"' % id_)
@@ -38,11 +48,10 @@ def P(id_=None, cls=None, children=None, tag='Panel', extra=''):
     if extra: a.append(extra)
     if children is None: return '<%s %s />' % (tag, ' '.join(a))
     return '<%s %s>\n%s\n</%s>' % (tag, ' '.join(a), '\n'.join(children), tag)
-def L(id_, cls, text='{s:v}'):
-    return P(id_, cls, tag='Label', extra='text="%s"' % text)
 def save(img, rel):
     Image.fromarray(np.ascontiguousarray(img)).save(os.path.join(IMGDIR, rel))
     return IMG + rel
+def px(v): return '%dpx' % int(round(v))
 
 # ---------------------------------------------------------------- the car table (picker stats) from the game's source
 defs = open(os.path.join(os.path.dirname(__file__), '..', 'src/core/00_defs.js')).read()
@@ -53,6 +62,23 @@ for m in re.finditer(r"(\w+):\s*\{ key: '(\w+)',\s*name: '(\w+)',(.*?)perk: '([^
     cars[key] = dict(name=name, perk=perk, desc=desc, **kv)
 KEYS = ['hornet', 'meteor', 'comet', 'bastion']
 assert all(k in cars for k in KEYS), cars.keys()
+
+# ---------------------------------------------------------------- placement
+_pl = [0]
+def place(x=None, y=0, w=None, h=None, right=None, center=False):
+    """a class that pins a panel inside its parent: from the left edge (x), centred, or from the right edge (right);
+    always from the top (y); with a fixed size"""
+    _pl[0] += 1
+    c = 'L%d' % _pl[0]
+    props = {}
+    if w is not None: props['width'] = px(w)
+    if h is not None: props['height'] = px(h)
+    if center: props['horizontal_align'] = 'center'
+    elif right is not None: props['horizontal_align'] = 'right'; props['margin_right'] = px(right)
+    else: props['margin_left'] = px(x or 0)
+    props['margin_top'] = px(y)
+    rule('.' + c, **props)
+    return c
 
 # ---------------------------------------------------------------- glyph images
 COLORS = {'W': WHITE, 'Y': GOLD, 'C': ICE, 'R': SALMON, 'G': LIME, 'P': PINK}
@@ -69,11 +95,14 @@ for ck, col in COLORS.items():
                 if m[y, x]: img[y + 1, x + 1, :3] = np.array(shade(col, 0.78), np.uint8)
         save(up(img, GS), 'f/%s_%d.png' % (ck, ord(ch)))
 SIZES = {'XXL': 84, 'XL': 52, 'L': 40, 'M': 30, 'S': 22, 'XS': 17}
+def adv(size): return SIZES[size] - SIZES[size] // 10
+def row_w(n, size): return n * adv(size) + SIZES[size] // 10      # n cells, each overlapping the next by a tenth
 TEXT_SLOTS = {}
 TEXT_ALIGN = {}
 
-def gtext(id_, n, size, color='W', static=None, extra_cls='', align='center'):
-    """a pixel-text row: n glyph panels (ids id_0..id_n-1); `static` text fixes the glyph classes in the layout"""
+def gtext(id_, n, size, color='W', static=None, extra='', align='center', **pl):
+    """a pixel-text row of n glyph panels (ids id_0..id_n-1), pinned with place(**pl); `static` text fixes the
+    glyph classes in the layout. Rows always keep all their cells, so they never change size."""
     kids = []
     for k in range(n):
         g = ''
@@ -82,22 +111,18 @@ def gtext(id_, n, size, color='W', static=None, extra_cls='', align='center'):
             g = ' g%d' % ord(ch if ch in CHARSET else '?')
         kids.append(P('%s_%d' % (id_, k) if id_ and static is None else None, 'G' + g))
     if id_ and static is None: TEXT_SLOTS[id_] = n; TEXT_ALIGN[id_] = align
-    return P(id_, ('Txt s%s c%s %s a%s' % (size, color, extra_cls, align)).strip(), kids)
+    cls = 'Txt s%s c%s' % (size, color) + (' ' + extra if extra else '')
+    cls += ' ' + place(w=row_w(n, size), h=SIZES[size], **pl)
+    return P(id_, cls, kids)
 
-def stext(text, size, color='W', extra_cls='', align='center'):
-    return gtext(None, len(text), size, color, static=text, extra_cls=extra_cls, align=align)
+def stext(text, size, color='W', extra='', **pl):
+    return gtext(None, len(text), size, color, static=text, extra=extra, **pl)
 
 # glyph css
-rule('.Txt', flow_children='right', height='fit-children')
-rule('.Txt.acenter', horizontal_align='center')
-rule('.Txt.aleft', horizontal_align='left')
-rule('.Txt.aright', horizontal_align='right')
-# every cell is always there (blank without a glyph class), so a row never changes size: Panorama doesn't always
-# re-place panels when a class changes their layout, but it always redraws a changed background picture.
-# Centring / right-aligning is done by the script, padding the text with spaces.
+rule('.Txt', flow_children='right')
 rule('.G', background_size='100% 100%', background_repeat='no-repeat')
-for s, px in SIZES.items():
-    rule('.s%s .G' % s, width='%dpx' % px, height='%dpx' % px, margin_right='-%dpx' % (px // 10))
+for s, sz in SIZES.items():
+    rule('.s%s .G' % s, width=px(sz), height=px(sz), margin_right='-%dpx' % (sz // 10))
 for ck in COLORS:
     for ch in CHARSET:
         if ch != ' ': rule('.c%s .G.g%d' % (ck, ord(ch)), background_image='url("%sf/%s_%d.png")' % (IMG, ck, ord(ch)))
@@ -146,16 +171,18 @@ def speedlines(seed):
     return up(img, 4)
 save(speedlines(1), 'speed0.png'); save(speedlines(2), 'speed1.png')
 
-# turn-ahead arrows: one or two chevrons, left or right, blinking for hairpins
+# turn-ahead arrows: one or two chevrons, left or right, centred in a 32 x 16 picture (saved 4x: 128 x 64) so every
+# arrow fills the same panel
 def turn_arrow(n, right, col):
     G = 16
-    img = np.zeros((G, G * n, 4), np.uint8)
+    img = np.zeros((G, 32, 4), np.uint8)
+    x0 = 16 - n * 8
     for k in range(n):
         for y in range(G):
             dx = abs(y - (G - 1) / 2)
             for t in range(4):
-                x = int(k * G + 4 + dx * 0.7 + t)
-                if x < (k + 1) * G:
+                x = int(x0 + k * G + 4 + dx * 0.7 + t)
+                if x0 + k * G <= x < x0 + (k + 1) * G:
                     img[y, x, :3] = col; img[y, x, 3] = 255
     # outline
     a_ = img[..., 3] > 0
@@ -168,18 +195,21 @@ for n in (1, 2):
     for right in (0, 1):
         save(turn_arrow(n, right, GOLD if n == 1 else SALMON), 'turn_%s%d.png' % ('r' if right else 'l', n))
 
-# the SPACE RACER logo: chrome-gradient pixel letters with an outline and a deep drop shadow, synthwave stripes
-logo = pixfont.logo
-LOGO = logo('SPACE RACER')
+# the SPACE RACER logo: chrome-gradient pixel letters with an outline and a deep drop shadow
+LOGO = pixfont.logo('SPACE RACER')
 save(LOGO, 'logo.png')
+RES = pixfont.logo('RESULTS', 6)
+save(RES, 'logo_results.png')
 
-# picker car pictures: pixelated versions of cars.py's renders (they are smooth); quantised to the palette
+# picker car pictures: pixelated versions of cars.py's renders (they are smooth), quantised to the palette and saved
+# at exactly the size the card shows them (64 x 64 pixels, 3x = 192) so they stay crisp
+PIC = 192
 for k in KEYS:
     for side in ('neutral', 't', 'ct'):
         p = os.path.join(IMGDIR, 'car_%s_%s.png' % (k, side))
         if not os.path.exists(p): continue
         im = Image.open(p).convert('RGBA')
-        small = np.array(im.resize((64, 64), Image.NEAREST if False else Image.BILINEAR))
+        small = np.array(im.resize((64, 64), Image.BILINEAR))
         q = quantize_rgba(small, 14)
         # 1-px black outline round the car
         a = q[..., 3] > 0
@@ -187,93 +217,124 @@ for k in KEYS:
         for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)): o |= np.roll(np.roll(a, dy, 0), dx, 1)
         edge = o & ~a
         q[edge, :3] = BLACK; q[edge, 3] = 255
-        save(up(q, 4), 'pcar_%s_%s.png' % (k, side))
+        save(up(q, PIC // 64), 'pcar_%s_%s.png' % (k, side))
 
-# ---------------------------------------------------------------- base
+# ---------------------------------------------------------------- base: wrappers, the Screen, full-screen layers
+# The script puts state classes on spr_root: stOn (racing / watching), stLobby, stPick (car picker), stHelp, stRes
+# (results), stSpec (watching someone), stBoost. They all start with "st" so they can never match a panel's own class:
+# in the first CS2 test the root's "Pick" state picked up the picker panel's .Pick rule (a narrow flow-down box
+# aligned to the bottom), which is what threw the whole HUD around.
+# The HUD is invisible (opacity 0) until the script gives spr_root stOn / stLobby / stPick / stHelp.
 rule('.SprWrap', width='100%', height='100%')
 rule('.SprOpts', width='100%', height='100%')
-rule('.SprRoot', width='100%', height='100%', visibility='collapse')
-rule('.SprRoot.On', visibility='visible')
-rule('.SprRoot.Lobby', visibility='visible')
-rule('.SprRoot.Pick', visibility='visible')
-rule('.SprRoot.Help', visibility='visible')
+rule('.SprRoot', width='100%', height='100%', opacity='0')
+for c in ('stOn', 'stLobby', 'stPick', 'stHelp'):
+    rule('.SprRoot.' + c, opacity='1')
+rule('.Screen', width='100%', height='1080px')
+rule('.Full', width='100%', height='100%')
 rule('.SprRoot Label', font_family=FONT, color='#ffffff', text_shadow='2px 2px 0px #000000', text_transform='uppercase', letter_spacing='2px', font_weight='bold')
-for c in ('MiniMap', 'TopBlock', 'ClockBox', 'Bars', 'Speed', 'Stand'):
-    rule('.' + c, visibility='collapse')
-    rule('.SprRoot.On .' + c, visibility='visible')
-rule('.LobbyLines', visibility='collapse'); rule('.SprRoot.Lobby .LobbyLines', visibility='visible')
-rule('.Logo', visibility='collapse'); rule('.SprRoot.Lobby .Logo', visibility='visible')
-rule('.Pick', visibility='collapse'); rule('.SprRoot.Pick .Pick', visibility='visible')
-rule('.Help', visibility='collapse'); rule('.SprRoot.Help .Help', visibility='visible')
-rule('.SprRoot.Spec .Bars', opacity='0.75')
-# CRT overlay (on unless the player turns it off with !crt)
-rule('.Crt', width='100%', height='100%', background_image='url("%sscan.png")' % IMG, background_size='6px 6px', background_repeat='repeat', opacity='0.55')
-rule('.Vig', width='100%', height='100%', background_image='url("%svignette.png")' % IMG, background_size='100% 100%', opacity='0.9')
-rule('.SprOpts.nocrt .Crt', visibility='collapse')
-for k in (0, 1):
-    rule('.Speed%d' % k, width='100%', height='100%', background_image='url("%sspeed%d.png")' % (IMG, k), background_size='100% 100%',
-         visibility='collapse', animation_name='sprblink', animation_duration='0.16s', animation_iteration_count='infinite',
-         animation_delay='%.2fs' % (k * 0.08))
-    rule('.SprRoot.Boost .Speed%d' % k, visibility='visible')
-rule('.SprOpts.nocrt .Vig', visibility='collapse')
 
+def show_when(cls, *states):
+    """`cls` panels are hidden unless spr_root has one of the states"""
+    rule('.' + cls, opacity='0')
+    for s in states: rule('.SprRoot.%s .%s' % (s, cls), opacity='1')
+for c in ('MiniMap', 'TopBlock', 'ClockBox', 'Bars', 'Speed', 'Stand'):
+    show_when(c, 'stOn')
+rule('.SprRoot.stOn.stSpec .Bars', opacity='0.75')
+# while the car picker is up the bottom boxes and the standings make way for the cards (after stSpec: this one wins)
+for c in ('Bars', 'Speed', 'Stand'):
+    rule('.SprRoot.stOn.stPick .' + c, opacity='0')
+show_when('LobbyLines', 'stLobby')
+show_when('Logo', 'stLobby')
+show_when('Pick', 'stPick')
+show_when('Help', 'stHelp')
+show_when('ResLogo', 'stRes')
+rule('.SprRoot.stOn.stRes .TopBlock', opacity='0')
+show_when('SpeedFx', 'stBoost')
+
+# CRT overlay (on unless the player turns it off with !crt)
+rule('.Crt', background_image='url("%sscan.png")' % IMG, background_size='6px 6px', background_repeat='repeat', opacity='0.55')
+rule('.Vig', background_image='url("%svignette.png")' % IMG, background_size='100% 100%', opacity='0.9')
+rule('.SprOpts.nocrt .Crt', opacity='0')
+rule('.SprOpts.nocrt .Vig', opacity='0')
+for k in (0, 1):
+    rule('.Speed%d' % k, background_image='url("%sspeed%d.png")' % (IMG, k), background_size='100% 100%',
+         animation_name='sprblink', animation_duration='0.16s', animation_iteration_count='infinite',
+         animation_delay='%.2fs' % (k * 0.08))
 # full-screen flash
-rule('.Flash', width='100%', height='100%', background_color='#00000000', transition_property='background-color', transition_duration='0.08s')
+rule('.Flash', background_color='#00000000', transition_property='background-color', transition_duration='0.08s')
 rule('.Flash.hit', background_color='#ff303040')
 rule('.Flash.pulse', background_color='#40e0ff38')
 rule('.Flash.wreck', background_color='#ff600080')
 
 FRAME = {'cyan': TEAL, 'gold': GOLD, 'pink': MAGENTA, 'white': LILAC, 'orange': ORANGE, 'blue': SKYBLUE}
 def hexc(c, a=None): return '#%02x%02x%02x' % tuple(c) + ('%02x' % a if a is not None else '')
-def framed(key):
-    """a hard pixel frame: a 4-px border in a palette colour round a dark see-through box"""
-    return dict(border='4px solid %s' % hexc(FRAME[key]), background_color=hexc(INK, 216))
+BORDER = 4
+_framed = set()
+def box(cls, key, w, h, **pl):
+    """a hard pixel frame (4-px border in a palette colour round a dark see-through box); w x h is the inside,
+    children are pinned inside it"""
+    if cls not in _framed:
+        _framed.add(cls)
+        rule('.' + cls, border='%dpx solid %s' % (BORDER, hexc(FRAME[key])), background_color=hexc(INK, 216))
+    return cls + ' ' + place(w=w, h=h, **pl)
 
-# minimap: the pixel track (per track image) with a square dot for the player and the leader
-MM = 200
-rule('.MiniMap', width='%dpx' % (MM + 16), height='%dpx' % (MM + 16), margin_left='24px', margin_top='24px', **framed('cyan'))
-rule('.MapImg', width='%dpx' % MM, height='%dpx' % MM, margin='8px', background_size='100% 100%', background_repeat='no-repeat')
+# ---------------------------------------------------------------- minimap: the pixel track and a dot for every car
+MM = 192                     # the track picture (48 x 48 pixels, 4x)
+MMCELLS = 48                 # dots snap to the picture's own pixels
+MAXDOTS = 32
 for tid in [t['id'] for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))]:
     rule('.MapImg.mm_%s' % tid, background_image='url("%smm_%s.png")' % (IMG, tid))
-# dots are moved with transforms (a margin change through a class isn't always re-laid out): x on the outer panel,
-# y on the inner square
-rule('.Dot', width='12px', height='12px', visibility='collapse')
-rule('.Dot.On', visibility='visible')
-rule('.DotSq', width='12px', height='12px', background_color='#ffffff', border='2px solid #000000')
-rule('.Dot.me .DotSq', animation_name='sprblink', animation_duration='0.5s', animation_iteration_count='infinite')
-rule('.Dot.Lead .DotSq', background_color='#ffbe28')
-for i in range(24):
-    rule('.Dot.dx%d' % i, transform='translatex(%dpx)' % int(i * MM / 23 - 6))
-    rule('.DotSq.dy%d' % i, transform='translatey(%dpx)' % int(i * MM / 23 - 6))
+rule('.MapImg', background_size='100% 100%', background_repeat='no-repeat')
+# dots are moved with transforms: x on the outer panel, y on the inner square (both start at the map's corner)
+DOT, DOTL = 8, 12
+rule('.Dot', width=px(DOT), height=px(DOT), opacity='0')
+rule('.DotL', width=px(DOTL), height=px(DOTL), opacity='0')
+rule('.Dot.On', opacity='1'); rule('.DotL.On', opacity='1')
+rule('.DotSq', width=px(DOT - 2), height=px(DOT - 2), border='1px solid #000000', background_color=hexc(LILAC))
+rule('.DotSqL', width=px(DOTL - 4), height=px(DOTL - 4), border='2px solid #000000', background_color='#ffffff')
+rule('.DotSq.T', background_color=hexc(ORANGE))
+rule('.DotSq.CT', background_color=hexc(SKYBLUE))
+rule('.DotSq.Out', background_color=hexc(PLUM))
+rule('.DotL.me .DotSqL', animation_name='sprblink', animation_duration='0.5s', animation_iteration_count='infinite')
+rule('.DotL.Lead .DotSqL', background_color=hexc(GOLD))
+for i in range(MMCELLS):
+    c = i * (MM // MMCELLS) + MM // MMCELLS / 2          # centre of picture pixel i
+    rule('.Dot.x%d' % i, transform='translatex(%dpx)' % int(round(c - DOT / 2)))
+    rule('.DotSq.y%d' % i, transform='translatey(%dpx)' % int(round(c - DOT / 2)))
+    rule('.DotL.x%d' % i, transform='translatex(%dpx)' % int(round(c - DOTL / 2)))
+    rule('.DotSqL.y%d' % i, transform='translatey(%dpx)' % int(round(c - DOTL / 2)))
+dots = [P('spr_md%d' % k, 'Dot', [P('spr_mdy%d' % k, 'DotSq')]) for k in range(MAXDOTS)]
+dots += [P('spr_ldot', 'DotL Lead', [P('spr_ldoty', 'DotSqL')]), P('spr_dot', 'DotL me', [P('spr_doty', 'DotSqL')])]
+minimap = P('spr_mm', box('MiniMap', 'cyan', MM + 12, MM + 12, x=24, y=24), [
+    P('spr_mmimg', 'MapImg ' + place(x=6, y=6, w=MM, h=MM), dots)])
 
-# top block: big position + suffix + of, and the lap line
-rule('.TopBlock', horizontal_align='center', margin_top='14px', flow_children='down', width='620px')
-rule('.PosRow', horizontal_align='center', flow_children='right')
-rule('.PosRow .Txt', vertical_align='bottom')
-rule('#spr_suf', margin_bottom='12px', margin_left='4px')
-rule('#spr_posof', margin_bottom='12px', margin_left='12px')
+# ---------------------------------------------------------------- top centre: position, lap, the bend ahead
 rule('#spr_pos', animation_name='sprpop', animation_duration='0.25s')
-rule('#spr_lap', margin_top='4px')
-rule('.Turn', horizontal_align='center', margin_top='6px', height='64px', width='128px', background_size='contain', background_repeat='no-repeat', background_position='center', visibility='collapse')
+rule('.Turn', background_size='100% 100%', background_repeat='no-repeat', opacity='0')
 for side in ('l', 'r'):
     for n in (1, 2):
-        rule('.Turn.%s%d' % (side, n), visibility='visible', background_image='url("%sturn_%s%d.png")' % (IMG, side, n))
-rule('.Turn.l2', animation_name='sprblink', animation_duration='0.4s', animation_iteration_count='infinite')
-rule('.Turn.r2', animation_name='sprblink', animation_duration='0.4s', animation_iteration_count='infinite')
-rule('.ClockBox', horizontal_align='right', margin_right='26px', margin_top='22px', flow_children='down', padding='10px 14px 8px 14px', **framed('pink'))
-rule('.ClockBox .Txt', horizontal_align='right')
+        rule('.Turn.%s%d' % (side, n), opacity='1', background_image='url("%sturn_%s%d.png")' % (IMG, side, n))
+        if n == 2: rule('.Turn.%s%d' % (side, n), animation_name='sprblink', animation_duration='0.4s', animation_iteration_count='infinite')
+POS_W = row_w(2, 'XXL') + 6 + row_w(2, 'L') + 10 + row_w(3, 'M')
+TB_W = 620
+px0 = (TB_W - POS_W) // 2
+top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=200), [
+    gtext('spr_pos', 2, 'XXL', 'W', align='right', x=px0, y=0),
+    gtext('spr_suf', 2, 'L', 'W', align='left', x=px0 + row_w(2, 'XXL') + 6, y=84 - 40 - 10),
+    gtext('spr_posof', 3, 'M', 'P', align='left', x=px0 + row_w(2, 'XXL') + 6 + row_w(2, 'L') + 10, y=84 - 30 - 10),
+    gtext('spr_lap', 9, 'M', 'Y', center=True, y=92),
+    P('spr_turn', 'Turn ' + place(center=True, y=130, w=128, h=64)),
+])
+clock = P(None, box('ClockBox', 'pink', 216, 66, right=24, y=24), [
+    stext('TIME', 'XS', 'P', right=10, y=6),
+    gtext('spr_clock', 7, 'M', 'W', align='right', right=8, y=28),
+])
 
-# centre messages
-rule('.Ctr', horizontal_align='center', vertical_align='center', margin_top='-170px')
-rule('.Ctr2', horizontal_align='center', vertical_align='center', margin_top='-150px')
-rule('.Sub', horizontal_align='center', vertical_align='center', margin_top='-90px')
-rule('.Msg', horizontal_align='center', vertical_align='bottom', margin_bottom='128px')
-
-# bars (bottom left): segmented pixel bars, clipped by width classes
-rule('.Bars', vertical_align='bottom', margin_left='30px', margin_bottom='36px', flow_children='down', padding='12px 14px 6px 14px', **framed('cyan'))
-rule('.BarRow', flow_children='down', margin_bottom='8px')
-rule('.Bar', width='%dpx' % BAR_W, height='%dpx' % BAR_H, background_image='url("%sbar_dark.png")' % IMG, background_size='%dpx %dpx' % (BAR_W, BAR_H), margin_top='3px')
-rule('.Fill', height='100%', width='0%', background_size='%dpx %dpx' % (BAR_W, BAR_H), background_repeat='no-repeat', background_position='0px 0px')
+# ---------------------------------------------------------------- bars (bottom left) and speed (bottom right)
+# (bottoms at y 984, clear of CS2's own money / health row along the bottom edge)
+rule('.Bar', background_image='url("%sbar_dark.png")' % IMG, background_size='%dpx %dpx' % (BAR_W, BAR_H))
+rule('.Fill', height='100%', width='0px', background_size='%dpx %dpx' % (BAR_W, BAR_H), background_repeat='no-repeat', background_position='0px 0px')
 for i in range(21): rule('.Fill.w%d' % i, width='%dpx' % (20 * i + 2) if i else '0px')     # whole segments: 20 px each at 4x
 def barimg(key): return 'url("%sbar_%s.png")' % (IMG, key)
 rule('#spr_shfill', background_image=barimg('green'))
@@ -282,38 +343,46 @@ rule('#spr_shield.low', animation_name='sprblink', animation_duration='0.8s', an
 rule('#spr_chfill', background_image=barimg('cyan'))
 rule('#spr_charge.boosting #spr_chfill', background_image=barimg('gold'))
 rule('#spr_charge.charging #spr_chfill', background_image=barimg('pink'))
-
-# speed (bottom right)
-rule('.Speed', vertical_align='bottom', horizontal_align='right', margin_right='30px', margin_bottom='36px', flow_children='down', padding='12px 14px 8px 14px', **framed('gold'))
-rule('.SpdRow', flow_children='right', horizontal_align='right')
-rule('.SpdRow .Txt', vertical_align='bottom')
 rule('#spr_spfill', background_image=barimg('white'))
 rule('.Speed.pad #spr_spfill', background_image=barimg('orange'))
-rule('.Speed.pad', **framed('orange'))
+rule('.Speed.pad', border='%dpx solid %s' % (BORDER, hexc(ORANGE)))
+BOX_Y = 852
+bars = P(None, box('Bars', 'cyan', 432, 124, x=24, y=BOX_Y), [
+    stext('SHIELD', 'S', 'G', x=14, y=8),
+    P('spr_shield', 'Bar ' + place(x=14, y=34, w=BAR_W, h=BAR_H), [P('spr_shfill', 'Fill')]),
+    stext('CHARGE', 'S', 'C', x=14, y=66),
+    P('spr_charge', 'Bar ' + place(x=14, y=92, w=BAR_W, h=BAR_H), [P('spr_chfill', 'Fill')]),
+])
+speed = P('spr_speed', box('Speed', 'gold', 432, 124, right=24, y=BOX_Y), [
+    gtext('spr_spd', 4, 'XL', 'W', align='right', right=14 + row_w(4, 'S') + 6, y=8),
+    stext('KM/H', 'S', 'Y', right=14, y=8 + 52 - 22 - 2),
+    P(None, 'Bar ' + place(right=14, y=92, w=BAR_W, h=BAR_H), [P('spr_spfill', 'Fill')]),
+])
 
-# standings (right): rows with a side-coloured tab; names are Labels
-rule('.Stand', horizontal_align='right', vertical_align='center', margin_right='24px', margin_top='-30px', flow_children='down', width='340px', padding='10px', **framed('white'))
-rule('.StRow', width='320px', height='32px', margin_bottom='3px', flow_children='right', background_color='#14102480')
-rule('.StTab', width='8px', height='100%', background_color='#5a4670')
+# ---------------------------------------------------------------- standings (right): rows with a side-coloured tab; names are Labels
+rule('.StRow', background_color='#14102480')
+rule('.StTab', background_color='#5a4670')
 rule('.StRow.T .StTab', background_color='#dc781e')
 rule('.StRow.CT .StTab', background_color='#3c78dc')
 rule('.StRow.me', background_color='#ffffff38')
 rule('.StRow.me .StTab', background_color='#ffffff')
-rule('.StName', font_size='19px', color='#ffffff', margin_top='5px', margin_left='8px')
+rule('.StName', font_size='19px', color='#ffffff')
 rule('.StRow.me .StName', color='#ffbe28')
+stand = P(None, box('Stand', 'white', 340, 296, right=24, y=330), [
+    P('spr_st%d' % i, 'StRow ' + place(x=10, y=6 + i * 36, w=320, h=32), [
+        P(None, 'StTab ' + place(x=0, y=0, w=8, h=32)),
+        P('spr_stn%d' % i, 'StName ' + place(x=16, y=4, w=300, h=26), tag='Label', extra='text="{s:v}"'),
+    ]) for i in range(8)])
 
-# the car picker
-rule('.Pick', horizontal_align='center', vertical_align='bottom', margin_bottom='160px', flow_children='down', width='1180px')
-rule('.Cards', horizontal_align='center', flow_children='right', margin_top='10px')
-rule('.Card', width='270px', height='350px', margin_left='8px', margin_right='8px', flow_children='down', padding='12px', **framed('white'))
-rule('.Card.sel', transform='scale3d(1.07, 1.07, 1)', **framed('gold'))
+# ---------------------------------------------------------------- the car picker: four cards with the car, its perk and stats
+CARD_W, CARD_H, CARD_GAP = 292, 412, 12
+rule('.Card.sel', transform='scale3d(1.06, 1.06, 1)', border='%dpx solid %s' % (BORDER, hexc(FRAME['gold'])), background_color='#2a1f3ae0')
 rule('.Card.sel .CarPic', animation_name='sprpulse', animation_duration='0.9s', animation_iteration_count='infinite')
-rule('.CarPic', width='200px', height='200px', horizontal_align='center', background_size='100% 100%', background_repeat='no-repeat')
+rule('.CarPic', background_size='100% 100%', background_repeat='no-repeat')
 for k in KEYS:
     for side in ('neutral', 't', 'ct'):
         rule('.CarPic.pic_%s_%s' % (k, side), background_image='url("%spcar_%s_%s.png")' % (IMG, k, side))
-rule('.StatRow', flow_children='right', margin_top='4px', horizontal_align='center')
-rule('.StatBar', width='130px', height='12px', margin_top='4px', margin_left='6px', background_image='url("%sbar_dark.png")' % IMG, background_size='%dpx 12px' % (BAR_W // 3 + 1))
+rule('.StatBar', background_image='url("%sbar_dark.png")' % IMG, background_size='%dpx 12px' % (BAR_W // 3 + 1))
 rule('.StatFill', height='100%', background_image=barimg('gold'), background_size='%dpx 12px' % (BAR_W // 3 + 1), background_repeat='no-repeat')
 def stat(lo, hi, v): return int(100 * (v - lo) / (hi - lo))
 for k in KEYS:
@@ -323,78 +392,69 @@ for k in KEYS:
     c['s_turn'] = stat(1.9, 2.9, c['turn'])
     c['s_shield'] = stat(70, 140, c['shield'])
     c['s_charge'] = stat(90, 150, c['charge'])
+STATS = ('speed', 'accel', 'turn', 'shield', 'charge')
 for k in KEYS:
-    for nm in ('speed', 'accel', 'turn', 'shield', 'charge'):
+    for nm in STATS:
         v = max(10, min(100, cars[k]['s_' + nm]))
         rule('.StatFill.%s_%s' % (k, nm), width='%dpx' % int(round(v / 5) * 5 * 1.3))
-
-# lobby: the logo and three pixel lines
-rule('.Logo', horizontal_align='center', vertical_align='top', margin_top='80px', width='%dpx' % (LOGO.shape[1] * 1.1), height='%dpx' % (LOGO.shape[0] * 1.1),
-     background_image='url("%slogo.png")' % IMG, background_size='100% 100%', background_repeat='no-repeat',
-     animation_name='sprpulse', animation_duration='2.4s', animation_iteration_count='infinite')
-RES = pixfont.logo('RESULTS', 6)
-save(RES, 'logo_results.png')
-rule('.ResLogo', visibility='collapse', horizontal_align='center', vertical_align='top', margin_top='150px', width='%dpx' % RES.shape[1], height='%dpx' % RES.shape[0],
-     background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%', animation_name='sprpulse', animation_duration='1.2s', animation_iteration_count='infinite')
-rule('.SprRoot.Res .ResLogo', visibility='visible')
-rule('.SprRoot.Res .TopBlock', visibility='collapse')
-rule('.LobbyLines', horizontal_align='center', vertical_align='bottom', margin_bottom='34px', flow_children='down', width='1600px')
-rule('.LobbyLines .Txt', margin_bottom='8px')
-
-# help box
-rule('.Help', horizontal_align='center', vertical_align='center', margin_top='110px', flow_children='down', padding='22px', **framed('cyan'))
-rule('.Help .Txt', margin_bottom='6px')
-
-# ---------------------------------------------------------------- xml
 cards = []
 for i, k in enumerate(KEYS):
     c = cars[k]
-    cards.append(P('spr_card%d' % i, 'Card', [
-        P('spr_cimg%d' % i, 'CarPic pic_%s_neutral' % k),
-        stext(c['name'], 'L', 'W'),
-        stext(c['perk'], 'XS', 'C'),
-    ] + [P(None, 'StatRow', [stext(nm.upper().ljust(6), 'XS', 'C'), P(None, 'StatBar', [P(None, 'StatFill %s_%s' % (k, nm))])])
-         for nm in ('speed', 'accel', 'turn', 'shield', 'charge')]))
-pick = P('spr_pick', 'Pick', [stext('CHOOSE YOUR MACHINE   A / D', 'M', 'Y', 'blink'), P(None, 'Cards', cards)])
-stand = P(None, 'Stand', [P('spr_st%d' % i, 'StRow', [P(None, 'StTab'), L('spr_stn%d' % i, 'StName')]) for i in range(8)])
+    kids = [P('spr_cimg%d' % i, 'CarPic pic_%s_neutral ' % k + place(center=True, y=6, w=PIC, h=PIC)),
+            stext(c['name'], 'L', 'W', center=True, y=PIC + 12),
+            stext(c['perk'], 'XS', 'C', center=True, y=PIC + 58)]
+    for j, nm in enumerate(STATS):
+        y = PIC + 84 + j * 26
+        kids.append(stext(nm.upper(), 'XS', 'C', x=16, y=y))
+        kids.append(P(None, 'StatBar ' + place(x=128, y=y + 3, w=130, h=12), [P(None, 'StatFill %s_%s' % (k, nm))]))
+    cards.append(P('spr_card%d' % i, box('Card', 'white', CARD_W, CARD_H, x=i * (CARD_W + 2 * BORDER + CARD_GAP), y=46), kids))
+PICK_W = 4 * (CARD_W + 2 * BORDER) + 3 * CARD_GAP
+pick = P('spr_pick', 'Pick ' + place(center=True, y=430, w=PICK_W, h=46 + CARD_H + 2 * BORDER + 20),
+         [stext('CHOOSE YOUR MACHINE   A / D', 'M', 'Y', extra='blink', center=True, y=0)] + cards)
+
+# ---------------------------------------------------------------- lobby: the logo and three pixel lines; results banner; help
+logo = P(None, 'Logo ' + place(center=True, y=70, w=LOGO.shape[1], h=LOGO.shape[0]))
+rule('.Logo', background_image='url("%slogo.png")' % IMG, background_size='100% 100%', background_repeat='no-repeat',
+     animation_name='sprpulse', animation_duration='2.4s', animation_iteration_count='infinite')
+res = P(None, 'ResLogo ' + place(center=True, y=160, w=RES.shape[1], h=RES.shape[0]))
+rule('.ResLogo', background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%',
+     animation_name='sprpulse', animation_duration='1.2s', animation_iteration_count='infinite')
+lobby = P(None, 'LobbyLines ' + place(center=True, y=246, w=row_w(60, 'S'), h=3 * 34), [
+    gtext('spr_lob1', 60, 'S', 'W', center=True, y=0),
+    gtext('spr_lob2', 60, 'S', 'Y', center=True, y=34),
+    gtext('spr_lob3', 60, 'S', 'C', center=True, y=68)])
 HELP = [('SPACE RACER - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
         ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !MUSIC', 'P'), ('!SPEC  !AFK  !BACK  !RACE', 'P')]
-help_ = P('spr_help', 'Help', [stext(t or ' ', 'S', c, align='left') for t, c in HELP])
+        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SPEC  !AFK  !BACK  !RACE', 'P')]
+help_ = P('spr_help', box('Help', 'cyan', 640, 14 * 28 + 24, center=True, y=210),
+          [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
+
+# ---------------------------------------------------------------- centre messages and the bottom message line
+centre = [
+    gtext('spr_ctr', 20, 'XL', 'W', center=True, y=310),
+    gtext('spr_ctr2', 40, 'M', 'W', center=True, y=322),
+    gtext('spr_sub', 52, 'S', 'W', center=True, y=392),
+    gtext('spr_msg', 48, 'S', 'C', center=True, y=822),
+]
+
 # never shown: these make CS2 compile the loading screen picture, the radar and the map icon along with the HUD
 for cls, src in (('SprPre1', 'map_icons/screenshots/1080p/%s.png' % MAP), ('SprPre2', 'overheadmaps/%s_radar.psd' % MAP),
                  ('SprPre3', 'map_icons/map_icon_%s.svg' % MAP)):
     rule('.' + cls, width='1px', height='1px', opacity='0', visibility='collapse', background_image='url("file://{images}/%s")' % src)
 rule('.SprPreload', width='1px', height='1px', visibility='collapse')
-root = P('spr_root', 'SprRoot', [
+
+# ---------------------------------------------------------------- xml
+screen = P(None, 'Screen', [
     P(None, 'SprPreload', [P(None, 'SprPre1'), P(None, 'SprPre2'), P(None, 'SprPre3')]),
-    P('spr_flash', 'Flash'),
-    P(None, 'Speed0'), P(None, 'Speed1'),
-    P(None, 'Logo'),
-    P(None, 'ResLogo'),
-    P('spr_mm', 'MiniMap', [P('spr_mmimg', 'MapImg', [P('spr_ldot', 'Dot Lead', [P('spr_ldoty', 'DotSq')]), P('spr_dot', 'Dot me', [P('spr_doty', 'DotSq')])])]),
-    P(None, 'TopBlock', [
-        P(None, 'PosRow', [gtext('spr_pos', 2, 'XXL', 'W', align='right'), gtext('spr_suf', 2, 'L', 'W', align='left'), gtext('spr_posof', 3, 'M', 'P', align='left')]),
-        gtext('spr_lap', 9, 'M', 'Y'),
-        P('spr_turn', 'Turn'),
-    ]),
-    P(None, 'ClockBox', [stext('TIME', 'XS', 'P', align='right'), gtext('spr_clock', 7, 'M', 'W', align='right')]),
-    gtext('spr_ctr', 20, 'XL', 'W', extra_cls='Ctr'),
-    gtext('spr_ctr2', 40, 'M', 'W', extra_cls='Ctr2'),
-    gtext('spr_sub', 52, 'S', 'W', extra_cls='Sub'),
-    gtext('spr_msg', 48, 'S', 'C', extra_cls='Msg'),
-    P(None, 'Bars', [
-        P(None, 'BarRow', [stext('SHIELD', 'S', 'G', align='left'), P('spr_shield', 'Bar', [P('spr_shfill', 'Fill')])]),
-        P(None, 'BarRow', [stext('CHARGE', 'S', 'C', align='left'), P('spr_charge', 'Bar', [P('spr_chfill', 'Fill')])]),
-    ]),
-    P('spr_speed', 'Speed', [P(None, 'SpdRow', [gtext('spr_spd', 4, 'XL', 'W', align='right'), stext(' KM/H', 'S', 'Y')]), P(None, 'Bar', [P('spr_spfill', 'Fill')])]),
-    stand,
-    pick,
-    P(None, 'LobbyLines', [gtext('spr_lob1', 60, 'S', 'W'), gtext('spr_lob2', 60, 'S', 'Y'), gtext('spr_lob3', 60, 'S', 'C')]),
-    help_,
-    P(None, 'Vig'),
-    P(None, 'Crt'),
+    P('spr_flash', 'Flash Full'),
+    P(None, 'SpeedFx Full', [P(None, 'Speed0 Full'), P(None, 'Speed1 Full')]),
+    logo, res, minimap, top, clock,
+    *centre,
+    bars, speed, stand, lobby, pick, help_,
+    P(None, 'Vig Full'),
+    P(None, 'Crt Full'),
 ])
+root = P('spr_root', 'SprRoot', [screen])
 doc = ('<root>\n\t<styles>\n\t\t<include src="file://{resources}/styles/custom_game/%s.css" />\n\t</styles>\n'
        '\t<Panel class="SprWrap" hittest="false">\n' % NAME + P('spr_opts', 'SprOpts', [root]) + '\n\t</Panel>\n</root>\n')
 os.makedirs(os.path.join(OUT, 'panorama/layout/custom_game'), exist_ok=True)
@@ -402,6 +462,16 @@ os.makedirs(os.path.join(OUT, 'panorama/styles/custom_game'), exist_ok=True)
 open(os.path.join(OUT, 'panorama/layout/custom_game/%s.xml' % NAME), 'w', newline='\n').write(doc)
 open(os.path.join(OUT, 'panorama/styles/custom_game/%s.css' % NAME), 'w', newline='\n').write('\n'.join(css) + '\n')
 ids = re.findall(r'id="([^"]+)"', doc)
+assert len(ids) == len(set(ids)), 'duplicate panel ids'
+# classes the script switches on and off must never have a rule of their own (a lone ".Name { }"): the panel getting
+# the class would pick up that rule's layout (the first CS2 test's bug)
+DYNAMIC = re.compile(r'^(st[A-Z]\w*|On|sel|low|boosting|charging|pad|me|T|CT|N|Out|Lead|blink|pulse|hit|wreck|nocrt|[lr][12]|[xyw]\d+|mm_\w+|pic_\w+|g\d+|c[WYCRGP])$')
+lone = [m.group(1) for m in (re.match(r'^\.([\w-]+) \{', c) for c in css) if m]
+bad = sorted(set(c for c in lone if DYNAMIC.match(c)))
+assert not bad, 'switched classes with rules of their own: %s' % bad
 json.dump(sorted(set(ids)), open(os.path.join(OUT, '_gen/hud_ids.json'), 'w'))
-json.dump(dict(slots=TEXT_SLOTS, align=TEXT_ALIGN, charset=CHARSET, colors=sorted(COLORS)), open(os.path.join(OUT, '_gen/hud_text.json'), 'w'))
+json.dump(dict(slots=TEXT_SLOTS, align=TEXT_ALIGN, charset=CHARSET, colors=sorted(COLORS), mm_cells=MMCELLS, max_dots=MAXDOTS),
+          open(os.path.join(OUT, '_gen/hud_text.json'), 'w'))
+# the layout, for the preview: every pinned class's box
+json.dump(dict(pl=_pl[0]), open(os.path.join(OUT, '_gen/hud_layout.json'), 'w'))
 print('hud: %d css rules, %d panel ids, %d text rows, %d glyph pictures' % (len(css), len(set(ids)), len(TEXT_SLOTS), len(COLORS) * (len(CHARSET) - 1)))

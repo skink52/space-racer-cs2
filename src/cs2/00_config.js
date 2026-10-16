@@ -55,18 +55,27 @@ const CONFIG = {
   CAM_DEFAULT: 'high',
   CAM_TURN: 6.0,                 // how quickly the camera swings round behind the car
   CAM_LOOKAHEAD: 0.35,           // 0..1: how much the camera turns into the bend ahead (shows more of the upcoming track)
-  CAM_ROLL: 8,                   // max degrees of lean in corners
+  CAM_ROLL: 8,                   // max degrees the camera leans into a turn (on top of a banked bend's lean)
+  CAM_LEAN: 1.6,                 // camera lean per unit of turning (degrees per radian/second)
   FLYOVER: true,                 // on the grid the camera first swoops along the track towards the field
   FLYOVER_CUT: 4,                // ... and cuts to the chase camera this many seconds before the lights
   FLYOVER_FROM: 5000,            // ... starting this far ahead of the start line
   CAM_SHAKE: 1.0,                // camera shake on hits / landings / wrecks (0 = off, 2 = double)
-  ROLL_SIGN: -1,                 // which way a roll angle tilts in CS2 (tested 17 Oct: -1); flip to 1 if banking leans the wrong way
+  // roll angles: + tilts the right side down (Source's convention). The car copies a banked road and leans into its
+  // turn; the camera copies part of the bank and leans a little into the turn. Flip a sign to 1 / -1 if CS2 shows
+  // that one leaning the wrong way (17 Oct test: cars dipped the wrong way into banked bends with -1).
+  PROP_ROLL_SIGN: 1,
+  CAM_ROLL_SIGN: 1,
+  CAR_LEAN: 6,                   // car lean per unit of turning (degrees per radian/second) ...
+  CAR_LEAN_MAX: 16,              // ... up to this many degrees
   CAM_BANK: 0.6,                 // how much of a banked bend's lean the camera copies
   CAM_TUBE_UP: 150, CAM_TUBE_BACK: 300,   // camera height / distance limits inside tubes
   HIDE_OWN_BODY: true,
 
   // ---- rendering
   MAX_EFFECT_PROPS: 40,          // per arena
+  TELEPORT_DIST: 400,            // a car prop jumping further than this in one tick is teleported, otherwise moved (CS2 stops
+                                 // drawing a prop that is teleported every tick - the 17 Oct test's invisible grid)
   MAX_SOUNDS_PER_TICK: 24,
   SPAWN_BUDGET: 24,              // new props per server tick at most
   HUD_BUDGET: 900,               // HUD changes per server tick at most (pixel text sends one per changed letter)
@@ -75,6 +84,7 @@ const CONFIG = {
   // ---- input
   CHAT_COMMANDS: true,
   HELP_SECONDS: 10,
+  PICK_SHOW: 4,                  // seconds the car cards stay up for someone watching a race after they press A / D
   SAY_GAP: 1.0,
 
   // ---- entity names in the map
@@ -87,4 +97,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';

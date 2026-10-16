@@ -107,9 +107,11 @@ under a second.
    "race starts in N".
 2. **Grid.** When freeze time ends, everyone on T or CT who is not AFK is assigned to an arena and put on its grid
    in a random order, 4 abreast. 10-second countdown; the car picker stays live until 3 seconds before the start,
-   so you can still swap cars on the grid.
+   so you can still swap cars on the grid (the line under the track name says your grid slot and the time to the
+   lights).
 3. **Race.** Rounds are **locked**: nobody joins a race in progress. Someone connecting mid-round watches
-   (Mouse 1 / Mouse 2 change the car you follow, E changes arena) and is in the next round.
+   (Mouse 1 / Mouse 2 change the car you follow, E changes arena) and is in the next round; A / D picks their car
+   for it (the cards show for a few seconds after each press, and again at the results).
 4. **Results.** Each arena shows its top 8 and your own placing for 6 seconds. The CS2 kills are applied in a
    cascade (one every few ticks, so the killfeed rolls). When every arena is done the script ends the CS2 round
    with the team result below. A race that somehow runs past 5 minutes is cut off and ranked by distance.
@@ -170,24 +172,42 @@ wreck, or watching as a late joiner, is not idling. Idle through 2 minutes of lo
 | Mouse (look) | nothing — the camera follows the car |
 | Mouse 1 / Mouse 2 / E (spectating) | next car / previous car / next arena |
 
-Chat: `!car 1-4`, `!cam` (high / far / near view), `!crt` (scanlines on/off), `!music`, `!spec`, `!afk`, `!back`,
-`!race` (controls on your own HUD).
+Chat: `!car 1-4`, `!cam` (high / far / near view), `!tilt` (camera lean on/off), `!crt` (scanlines on/off),
+`!music`, `!spec`, `!afk`, `!back`, `!race` (controls on your own HUD).
 
 ## HUD
 
 Panorama custom HUD, per player, all game text in the pixel font: a big position ("3RD/32", green on the podium,
-gold when leading) and the lap ("FINAL LAP" blinks red) top-centre, the race clock top-right, segmented pixel bars
-for shield and charge bottom-left (shield blinks red when low; charge turns gold when boosting and pink on a charge
-platform), speed bottom-right, the top-8 standings down the right edge (a side-coloured tab per row, you
-highlighted), a pixelated track map with square dots (yours blinks), centre messages (countdown, GO!, FINAL LAP,
-WRONG WAY blinking, WRECKED, FINISHED 3RD, LAP RECORD!), the car picker (four framed cards with pixelated car
-pictures and stat bars, the chosen one pulsing) in the lobby and on the grid, the SPACE RACER logo and three
-status lines in the lobby, a pulsing RESULTS banner at the end, flickering pixel speed lines round the screen
-edges while boosting, and CRT scanlines plus a vignette over everything (`!crt` turns them off for you).
+gold when leading) and the lap ("FINAL LAP" blinks red) top-centre with the bend-ahead arrows under them, the race
+clock top-right, segmented pixel bars for shield and charge bottom-left (shield blinks red when low; charge turns
+gold when boosting and pink on a charge platform), speed bottom-right, the top-8 standings down the right edge (a
+side-coloured tab per row, you highlighted), a pixelated track map top-left with a dot for every car in the race
+(T orange, CT blue, the leader gold, yours blinking white), centre messages (countdown, GO!, FINAL LAP, WRONG WAY
+blinking, WRECKED, FINISHED 3RD, LAP RECORD!), the car picker (four framed cards, each with a pixel picture of the
+car in your side's colour, its perk and five stat bars; the chosen one gold and pulsing) in the lobby and on the
+grid, the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner at the end, flickering
+pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette over everything (`!crt`
+turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.
 
 How the pixel text works: each text row is a line of small image panels, one per character. The script sets each
 panel's glyph class (`g65` = A) and the row's colour class, and only for characters that changed; whole rows are
-cached, so an unchanged HUD costs nothing. Player names in the standings stay as ordinary Labels.
+cached, so an unchanged HUD costs nothing. Player names in the standings stay as ordinary Labels. The minimap dots
+move with transforms; the other cars' dots step two map pixels at a time and a quarter of them refresh per HUD
+update, which halves their class traffic.
+
+Layout rules (from the first CS2 test, 17 Oct, where the HUD was thrown around: top panels at the bottom of the
+screen, centre text stacked, the bars squashed, no car cards):
+- The cause: the script's state class on the root ("Pick") had the same name as the picker panel's class, so the
+  whole HUD root took the picker's rule (a narrow flow-down box aligned to the bottom). State classes on `spr_root`
+  now all start with `st` (stOn, stLobby, stPick, stHelp, stRes, stSpec, stBoost), `tools/hud.py` refuses to build
+  if a switched class has a rule of its own, and the mock test checks it too.
+- The layout is also static now, so nothing depends on Panorama laying things out again at runtime: one fixed
+  1080-high Screen panel (Panorama scales every screen to 1080 high), every panel a fixed size pinned from the top
+  and from the left edge, the centre or the right edge (no vertical centring, no negative margins, no fit-children
+  boxes), and panels are shown and hidden with opacity instead of collapsing.
+- `preview/hud_render.py` is a small stand-in for Panorama: it lays the HUD out from the generated xml/css, draws it
+  with the real pictures at 1920, 2333 (ultrawide) and 1440 (4:3) wide, and fails the build if any panel breaks
+  those rules.
 
 ## Tracks (eight, all original)
 
@@ -232,11 +252,12 @@ tools/      generators: trackdefs.py (the eight designs + colour themes), tracks
             vmap.py (writes the whole map into the Hammer template), build.mjs (assembles the script), build_all.sh
 test/       sim.cjs (bot races on the pure game), mock_cs2.mjs (the real script on a stand-in cs_script API),
             tsconfig.json + point_script.d.ts (type check against Valve's API)
-preview/    PNG renders of tracks and cars for checking without CS2
+preview/    PNG renders of tracks, cars and the HUD for checking without CS2 (hud_render.py: the HUD layout check)
 ```
 
 - The sim runs at 64 Hz, one step per CS2 server tick (64 cars cost about 0.05 ms per tick in Node), so props are moved with `Move` every tick and the client
-  interpolates; no sub-tick interpolation needed.
+  interpolates; no sub-tick interpolation needed. `Teleport` only for a prop's first placement and real jumps
+  (respawns): CS2 stops drawing a prop that is teleported every tick (the first test's invisible grid).
 - Cars are pooled `prop_dynamic` entities spawned from one `point_template` (model = car class + state:
   normal / boosting / wreck frames; skin = T or CT colour).
 - Camera: `CustomPlayerCamera` in CONTROLLED mode. Presets per player (`!cam`): high (default, 290 back / 165 up /
@@ -247,8 +268,14 @@ preview/    PNG renders of tracks and cars for checking without CS2
   chevron sign on the outside of every real corner, facing the approaching cars. No fog, nothing fades out.
 - On the grid the camera first does a flyover: a low swoop along the track towards the waiting field, cutting to
   the chase camera 4 seconds before the lights. At the results it circles the start gantry.
-- The camera leans with banked bends (60% of the road's angle), shakes a little on hits, rail strikes, landings and
-  wrecks (`CAM_SHAKE`), and drops lower inside tubes.
+- The camera leans with banked bends (60% of the road's angle) plus a few degrees into each turn (`!tilt` turns
+  the lean off for you), shakes a little on hits, rail strikes, landings and wrecks (`CAM_SHAKE`), and drops lower
+  inside tubes. Cars sit level with a banked road and lean into their turns (up to 16 degrees, from how fast they
+  are turning). Roll angles follow Source's convention, + = right side down; `PROP_ROLL_SIGN` / `CAM_ROLL_SIGN`
+  flip either one if CS2 ever shows it the other way.
+- The Pulse is drawn as a low pixel laser fence across the road with a strip of forward chevrons under it, tilted
+  with the road's slope and bank (the first version, a 160-tall see-through sheet, washed out the screen as it
+  passed the chase camera).
 - Cars are true 3D voxel models (about 115 units long), so every viewing angle is drawn correctly - the chase camera
   shows them from behind like a classic racer, and each car's tail has its own silhouette and lights.
   `preview/car_angles.png` shows all four from eight directions.

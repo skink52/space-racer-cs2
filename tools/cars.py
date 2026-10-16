@@ -326,20 +326,34 @@ def write_effects():
         alpha = ((dx < (7 if f == 0 else 3.5)) & ~((yy % 3 == 0) & (dx > 4))).astype(np.uint8) * 255
         mat = s2.write_material(OUT, '%s/warp%d' % (PAL_DIR, f), up(img, 4), up(alpha, 4), blend=2, backfaces=True, comment='warp-out %d' % f)
         out['warp%d' % f] = s2.write_model(OUT, MDIR, 'warp%d' % f, star_tris('spr_fx', 90 if f == 0 else 50, 220 if f == 0 else 320, 0), {'spr_fx': mat})
-    # the Pulse: a translucent vertical wave across the track (two-sided), 760 wide, 160 tall
+    # the Pulse: a low pixel laser fence across the track (40 tall, so it slides under the chase camera instead of
+    # washing out the screen like the first, 160-tall see-through sheet did) and a strip of forward chevrons on the road.
+    # Alpha-tested pixels (crisp, nothing see-through), both faces drawn.
+    W_, Hh = 32, 8
+    img = np.zeros((Hh, W_, 3), np.uint8); a = np.zeros((Hh, W_), np.uint8)
+    img[:] = ICE
+    img[0] = WHITE; a[0] = 255                       # top rail
+    img[1] = FROST; a[1] = 255
+    for x in range(W_):
+        if x % 4 in (0, 1): a[2:7, x] = 255; img[2:7, x] = SKYBLUE if x % 8 < 2 else ICE   # the laser bars
+    img[7] = TEAL; a[7] = 255                        # bottom rail
+    fence = s2.write_material(OUT, PAL_DIR + '/pulse', up(img, 4), up(a, 4), blend=2, backfaces=True, comment='the Pulse: laser fence')
     G = 16
     yy, xx = np.mgrid[0:G, 0:G]
-    a = (np.floor((1 - yy / G) * 5) / 5) * (0.6 + 0.4 * ((xx // 2) % 2))       # stepped bands: brighter low down
-    img = np.zeros((G, G, 3), np.uint8); img[:] = ICE
-    img[yy % 4 == 0] = WHITE; img[yy > 11] = TEAL
-    mat = s2.write_material(OUT, PAL_DIR + '/pulse', up(img, 4), up((a * 210).astype(np.uint8), 4), blend=1, backfaces=True, comment='the Pulse')
-    w, h = 760, 160
-    p = [(0, -w / 2, 0, 0, 1), (0, w / 2, 0, 1, 1), (0, w / 2, h, 1, 0), (0, -w / 2, h, 0, 0)]
+    chev = np.abs(yy - (G - 1) / 2) * 0.8 + 2
+    m = ((xx + chev) % 8 < 3)                         # chevrons pointing along +u = forward
+    img2 = np.zeros((G, G, 3), np.uint8); img2[:] = ICE; img2[(xx + chev) % 8 < 1.5] = WHITE
+    strip = s2.write_material(OUT, PAL_DIR + '/pulse_floor', up(img2, 4), up(m.astype(np.uint8) * 255, 4), blend=2, backfaces=True, comment='the Pulse: road chevrons')
+    w, h, d, zf = 760, 40, 48, 3
+    reps = 6                                         # the fence pattern repeats across the road
+    p = [(0, -w / 2, 0, 0, 1), (0, w / 2, 0, reps, 1), (0, w / 2, h, reps, 0), (0, -w / 2, h, 0, 0)]
     tris = [('spr_fx', (p[0], p[1], p[2]), (1, 0, 0)), ('spr_fx', (p[0], p[2], p[3]), (1, 0, 0))]
-    out['pulse'] = s2.write_model(OUT, MDIR, 'pulse', tris, {'spr_fx': mat})
+    q = [(-d / 2, -w / 2, zf, 0, 0), (d / 2, -w / 2, zf, 1, 0), (d / 2, w / 2, zf, 1, w / d), (-d / 2, w / 2, zf, 0, w / d)]
+    tris += [('spr_fl', (q[0], q[1], q[2]), (0, 0, 1)), ('spr_fl', (q[0], q[2], q[3]), (0, 0, 1))]
+    out['pulse'] = s2.write_model(OUT, MDIR, 'pulse', tris, {'spr_fx': fence, 'spr_fl': strip})
     # null model (nothing visible) for idle props and sound anchors
     tiny = [('spr_fx', ((0, 0, 0, 0, 0), (0.01, 0, 0, 0, 0), (0, 0.01, 0, 0, 0)), (0, 0, 1))]
-    out['null'] = s2.write_model(OUT, 'models/spr', 'null', tiny, {'spr_fx': mat})
+    out['null'] = s2.write_model(OUT, 'models/spr', 'null', tiny, {'spr_fx': fence})
     return out
 
 # ---------------------------------------------------------------- pictures (HUD car picker + preview)

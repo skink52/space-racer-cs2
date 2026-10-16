@@ -11,6 +11,8 @@ rm -rf out/addon && mkdir -p out/addon/maps build
 python3 -I tools/tracks.py out/addon preview/tracks.png
 python3 -I tools/cars.py out/addon preview/car_angles.png
 python3 -I tools/hud.py out/addon "$NAME" "$MAP"
+# lay the HUD out like Panorama would and stop the build if it breaks the layout rules (see tools/hud.py)
+python3 -I preview/hud_render.py out/addon preview/chase_nullgap.png build/hud_check
 python3 -I tools/loading.py out/addon "$MAP"
 python3 -I tools/sounds.py out/addon "${SPR_SOUNDEVENTS:-ref/soundevents_addon_template.vsndevts}"
 SPR_NAME="$NAME" node tools/build.mjs
