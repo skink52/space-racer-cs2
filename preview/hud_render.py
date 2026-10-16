@@ -225,7 +225,7 @@ def dots(cells, me, lead):
 def race_state(grid=False, results=False):
     reset()
     add('spr_root', 'stOn')
-    if grid: add('spr_root', 'stPick')
+    if grid: add('spr_root', 'stPickMini')
     if results: add('spr_root', 'stRes')
     add('spr_mmimg', 'mm_oval')
     text('spr_pos', '3', 'green'); text('spr_suf', 'RD', 'green'); text('spr_posof', '/32', 'pink')
@@ -243,8 +243,8 @@ def race_state(grid=False, results=False):
         add('spr_rb7', 'me')
     if grid:
         text('spr_ctr', 'NULL GAP', 'gold'); text('spr_sub', 'YOU START 3RD OF 32  -  LIGHTS IN 6', 'white')
-        add('spr_card2', 'sel')
-        for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): swap('spr_cimg%d' % i, r'^pic_', 'pic_%s_ct' % k)
+        add('spr_mcard2', 'sel')
+        for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): swap('spr_mimg%d' % i, r'^pic_', 'pic_%s_ct' % k)
     elif not results:
         text('spr_ctr', 'WRONG WAY', 'red'); text('spr_msg', '+40 CHARGE FROM THE PULSE', 'cyan')
         add('spr_turn', 'l2')

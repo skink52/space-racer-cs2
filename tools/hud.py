@@ -207,7 +207,7 @@ save(RES, 'logo_results.png')
 
 # picker car pictures: pixelated versions of cars.py's renders (they are smooth), quantised to the palette and saved
 # at exactly the size the card shows them (64 x 64 pixels, 3x = 192) so they stay crisp
-PIC = 192
+PIC, MPIC = 192, 128
 for k in KEYS:
     for side in ('neutral', 't', 'ct'):
         p = os.path.join(IMGDIR, 'car_%s_%s.png' % (k, side))
@@ -222,6 +222,7 @@ for k in KEYS:
         edge = o & ~a
         q[edge, :3] = BLACK; q[edge, 3] = 255
         save(up(q, PIC // 64), 'pcar_%s_%s.png' % (k, side))
+        save(up(q, MPIC // 64), 'pcars_%s_%s.png' % (k, side))      # the small grid picker's picture
 
 # ---------------------------------------------------------------- base: wrappers, the Screen, full-screen layers
 # The script puts state classes on spr_root: stOn (racing / watching), stLobby, stPick (car picker), stHelp, stRes
@@ -232,7 +233,7 @@ for k in KEYS:
 rule('.SprWrap', width='100%', height='100%')
 rule('.SprOpts', width='100%', height='100%')
 rule('.SprRoot', width='100%', height='100%', opacity='0')
-for c in ('stOn', 'stLobby', 'stPick', 'stHelp'):
+for c in ('stOn', 'stLobby', 'stPick', 'stPickMini', 'stHelp'):
     rule('.SprRoot.' + c, opacity='1')
 rule('.Screen', width='100%', height='1080px')
 rule('.Full', width='100%', height='100%')
@@ -248,9 +249,11 @@ rule('.SprRoot.stOn.stSpec .Bars', opacity='0.75')
 # while the car picker is up the bottom boxes and the standings make way for the cards (after stSpec: this one wins)
 for c in ('Bars', 'Speed', 'Stand'):
     rule('.SprRoot.stOn.stPick .' + c, opacity='0')
+    rule('.SprRoot.stOn.stPickMini .' + c, opacity='0')
 show_when('LobbyLines', 'stLobby')
 show_when('Logo', 'stLobby')
 show_when('Pick', 'stPick')
+show_when('PickMini', 'stPickMini')
 show_when('Help', 'stHelp')
 show_when('ResLogo', 'stRes')
 rule('.SprRoot.stOn.stRes .TopBlock', opacity='0')
@@ -449,6 +452,26 @@ PICK_W = 4 * (CARD_W + 2 * BORDER) + 3 * CARD_GAP
 pick = P('spr_pick', 'Pick ' + place(center=True, y=430, w=PICK_W, h=46 + CARD_H + 2 * BORDER + 20),
          [stext('CHOOSE YOUR MACHINE   A / D', 'M', 'Y', extra='blink', center=True, y=0)] + cards)
 
+# the small picker on the grid: four little cards along the bottom so the flyover's view of the field stays clear
+MC_W, MC_H, MC_GAP = 200, 172, 10
+rule('.MCard.sel', transform='scale3d(1.06, 1.06, 1)', border='%dpx solid %s' % (BORDER, hexc(FRAME['gold'])), background_color='#2a1f3ae0')
+rule('.MCard.sel .MCarPic', animation_name='sprpulse', animation_duration='0.9s', animation_iteration_count='infinite')
+rule('.MCarPic', background_size='100% 100%', background_repeat='no-repeat')
+for k in KEYS:
+    for side in ('neutral', 't', 'ct'):
+        rule('.MCarPic.pic_%s_%s' % (k, side), background_image='url("%spcars_%s_%s.png")' % (IMG, k, side))
+mcards = []
+for i, k in enumerate(KEYS):
+    c = cars[k]
+    mcards.append(P('spr_mcard%d' % i, box('MCard', 'white', MC_W, MC_H, x=i * (MC_W + 2 * BORDER + MC_GAP), y=28), [
+        P('spr_mimg%d' % i, 'MCarPic pic_%s_neutral ' % k + place(center=True, y=0, w=MPIC, h=MPIC)),
+        stext(c['name'], 'S', 'W', center=True, y=MPIC),
+        stext(c['perk'], 'XS', 'C', center=True, y=MPIC + 24),
+    ]))
+MPICK_W = 4 * (MC_W + 2 * BORDER) + 3 * MC_GAP
+pickmini = P('spr_mpick', 'PickMini ' + place(center=True, y=1080 - 96 - (28 + MC_H + 2 * BORDER), w=MPICK_W, h=28 + MC_H + 2 * BORDER),
+             [stext('A / D  CHOOSE YOUR CAR', 'S', 'Y', extra='blink', center=True, y=0)] + mcards)
+
 # ---------------------------------------------------------------- lobby: the logo and three pixel lines; results banner; help
 logo = P(None, 'Logo ' + place(center=True, y=70, w=LOGO.shape[1], h=LOGO.shape[0]))
 rule('.Logo', background_image='url("%slogo.png")' % IMG, background_size='100% 100%', background_repeat='no-repeat',
@@ -487,7 +510,7 @@ screen = P(None, 'Screen', [
     P(None, 'SpeedFx Full', [P(None, 'Speed0 Full'), P(None, 'Speed1 Full')]),
     logo, res, minimap, top, clock,
     *centre,
-    bars, speed, stand, resboard, lobby, pick, help_,
+    bars, speed, stand, resboard, lobby, pick, pickmini, help_,
     P(None, 'Vig Full'),
     P(None, 'Crt Full'),
 ])

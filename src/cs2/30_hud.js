@@ -116,14 +116,17 @@ function hudOff(slot) {
 
 function pct(v, max) { return 'w' + clamp(Math.round(v / Math.max(1, max) * 20), 0, 20); }
 
-// the car picker: four cards, the chosen one highlighted; pictures in the player's side colour
+// the car picker: four cards, the chosen one highlighted; pictures in the player's side colour.
+// show: true / 'big' = the big cards (lobby, watching), 'mini' = the small row along the bottom (grid flyover),
+// false = none
 function hudPicker(slot, pe, show) {
-  hudSwap(slot, 'spr_root', show ? 'stPick' : null, 'pick');
+  const mini = show === 'mini';
+  hudSwap(slot, 'spr_root', show ? (mini ? 'stPickMini' : 'stPick') : null, 'pick');
   if (!show) return;
   const side = pe.csTeam === 2 ? 't' : pe.csTeam === 3 ? 'ct' : 'neutral';
   CAR_KEYS.forEach((k, i) => {
-    hudSwap(slot, 'spr_card' + i, pe.carChoice === k ? 'sel' : null);
-    hudSwap(slot, 'spr_cimg' + i, 'pic_' + k + '_' + side);
+    hudSwap(slot, (mini ? 'spr_mcard' : 'spr_card') + i, pe.carChoice === k ? 'sel' : null);
+    hudSwap(slot, (mini ? 'spr_mimg' : 'spr_cimg') + i, 'pic_' + k + '_' + side);
   });
 }
 

@@ -185,8 +185,8 @@ gold when boosting and pink on a charge platform), speed bottom-right, the top-8
 side-coloured tab per row, you highlighted), a pixelated track map top-left with a dot for every car in the race
 (T orange, CT blue, the leader gold, yours blinking white), centre messages (countdown, GO!, FINAL LAP, WRONG WAY
 blinking, WRECKED, FINISHED 3RD, LAP RECORD!; each new one pops in), the car picker (four framed cards, each with a pixel picture of the
-car in your side's colour, its perk and five stat bars; the chosen one gold and pulsing) in the lobby and on the
-grid, the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a results board at the end
+car in your side's colour, its perk and five stat bars; the chosen one gold and pulsing) in the lobby, and a row of
+four small cards along the bottom on the grid (so the flyover's view of the field stays clear), the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a results board at the end
 (top 8 with the winner's time and everyone else's gap, your own line swapped in if you placed lower), flickering
 pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette over everything (`!crt`
 turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.

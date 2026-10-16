@@ -539,7 +539,7 @@ function frame(dt) {
         else placeCamera(pk, pe.car, v, dt, pe.cam, pe.tilt);
         if (!hudTurn(pe.slot)) return;
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
-        hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE);
+        hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE ? 'mini' : false);
       } else {
         // spectators and people waiting for the next race
         if (!pe.spec) rm.spectate(pe);

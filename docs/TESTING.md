@@ -112,8 +112,9 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
   same class name as the picker panel, so the whole HUD took the picker's layout. The layout is also fixed-size now.
 - **Car picker.** Lobby (`preview/hud_lobby.png`): logo, three lines, then four cards with a picture of each car in
   your side's colour, its perk and five stat bars; A / D moves the gold highlight. Grid (`preview/hud_grid.png`):
-  the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", the cards; they go 3 seconds before the lights and the
-  bars / speed / standings come back. Watching a race: the cards show for 4 seconds after you press A / D.
+  the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", and a row of four small cards along the bottom (the
+  flyover's view of the field stays clear); they go 3 seconds before the lights and the bars / speed / standings
+  come back. Watching a race: the cards show for 4 seconds after you press A / D.
 - **Countdown.** 3 / 2 / 1 in big red pixel digits in the middle of the screen, then GO!.
 - **Cars on the grid.** All cars visible on the grid from the moment the flyover reaches them (they were being
   teleported every tick, which CS2 doesn't draw).
