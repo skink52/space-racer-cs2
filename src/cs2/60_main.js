@@ -296,12 +296,12 @@ function onArenaEnd(a, result, now) {
   const r = result.ranking;
   const top = r.slice(0, 3).map((c, i) => `${i + 1}. ${c.name}`).join('  ');
   sayAll(`${a.track.title}: ${top}`);
-  // results on everyone's screen
+  // results: the board in the middle of everyone's screen (hudResults); your own placing on the bottom line
   for (const c of a.order) {
     const pe = c.person;
     if (!pe || pe.bot) continue;
     const pos = r.indexOf(c) + 1;
-    if (pos > 0) center(pe.slot, (c.state === 'wrecked' ? 'WRECKED - ' : c.state === 'dnf' ? 'DNF - ' : '') + ordinal(pos) + ' OF ' + r.length, CONFIG.RESULTS_HOLD, pos <= 3 ? 'gold' : null);
+    if (pos > 0) bottom(pe.slot, (c.state === 'wrecked' ? 'WRECKED - ' : c.state === 'dnf' ? 'DNF - ' : '') + 'YOU: ' + ordinal(pos) + ' OF ' + r.length + (c.bestLap ? ' - BEST LAP ' + fmtTime(c.bestLap) : ''), CONFIG.RESULTS_HOLD + 2);
   }
   // the losers die, credited to the podium, one every few ticks
   const plan = rm.killPlan(a);

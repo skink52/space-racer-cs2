@@ -82,14 +82,24 @@ function hudText(slot, id, text, color, fx) {
   if (!hudSwap(slot, id, fx || null, 'fx')) ok = false;
   if (ok) c.set(key, want);       // (a row cut short by the budget is finished on a later tick)
 }
-// a centre message: short ones big, long ones in the smaller row
+// a pop (scale-in) each time a row shows something new: the class alternates pop / pop2 (two copies of the same
+// animation) because Panorama only replays an animation when its name changes
+const popState = new Map();     // slot + row -> { key, flip }
+function popFx(slot, row, key) {
+  const k = slot + row;
+  const st = popState.get(k) || { key: null, flip: false };
+  if (st.key !== key) { st.key = key; st.flip = !st.flip; popState.set(k, st); }
+  return st.flip ? 'pop2' : 'pop';
+}
+
+// a centre message: short ones big, long ones in the smaller row; new messages pop in, warnings blink
 function hudCenter(slot, text, cls) {
   text = text || '';
   const big = text.length <= (HUD_TEXT.slots.spr_ctr || 20);
   const color = cls ? TEXT_COLOR[cls] || 'cW' : 'cW';
-  const blink = cls === 'red' && /WRONG|MISSED/.test(text) ? 'blink' : null;
-  hudText(slot, 'spr_ctr', big ? text : '', color, blink);
-  hudText(slot, 'spr_ctr2', big ? '' : text, color, blink);
+  const fx = cls === 'red' && /WRONG|MISSED/.test(text) ? 'blink' : text ? popFx(slot, 'c', text) : null;
+  hudText(slot, 'spr_ctr', big ? text : '', color, big ? fx : null);
+  hudText(slot, 'spr_ctr2', big ? '' : text, color, big ? null : fx);
 }
 
 function hudReset(slot) {
@@ -154,7 +164,7 @@ function hudDots(slot, arena, me) {
   hudDot(slot, 'spr_dot', 'spr_doty', me && me.visible ? me : null, T, undefined, 1);
 }
 
-function hudRaceCommon(slot, arena, info) {
+function hudRaceCommon(slot, arena, info, car) {
   hudSwap(slot, 'spr_root', 'stOn', 'on');
   hudSwap(slot, 'spr_root', arena.state === 'over' ? 'stRes' : null, 'res');
   hudSwap(slot, 'spr_mmimg', 'mm_' + arena.track.id, 'map');
@@ -171,21 +181,58 @@ function hudRaceCommon(slot, arena, info) {
     hudSwap(slot, 'spr_st' + i, r ? (r.team === 0 ? 'T' : r.team === 1 ? 'CT' : 'N') : null, 'side');
     hudSwap(slot, 'spr_st' + i, r && r.me ? 'me' : null, 'me');
   }
+  if (arena.state === 'over') hudResults(slot, arena, car);
 }
+
+// the results board: the top 8 (your own line instead of the 8th if you placed lower), with finish times and gaps
+function hudResults(slot, arena, me) {
+  const r = (arena.result && arena.result.ranking) || arena.ranking;
+  const rows = r.slice(0, 8);
+  const mine = me ? r.indexOf(me) : -1;
+  if (mine >= 8) rows[7] = me;
+  const win = r[0];
+  for (let i = 0; i < 8; i++) {
+    const c = rows[i];
+    const pos = c ? r.indexOf(c) + 1 : 0;
+    let time = '';
+    if (c) {
+      if (c.finishPos) time = c === win || !win || !win.finishPos ? fmtTime(c.finishTime) : '+' + fmtTime(c.finishTime - win.finishTime);
+      else time = c.state === 'wrecked' ? 'WRECKED' : c.state === 'withdrawn' || c.left ? 'OUT' : 'DNF';
+    }
+    hudVar(slot, 'spr_rbp' + i, c ? ordinal(pos) : '');
+    hudVar(slot, 'spr_rbn' + i, c ? c.name.slice(0, 20).toUpperCase() : '');
+    hudVar(slot, 'spr_rbt' + i, time);
+    hudSwap(slot, 'spr_rb' + i, c ? (c.team === 0 ? 'T' : c.team === 1 ? 'CT' : null) : null, 'side');
+    hudSwap(slot, 'spr_rb' + i, c && c === me ? 'me' : null, 'me');
+    hudSwap(slot, 'spr_rb' + i, pos >= 1 && pos <= 3 ? 'p' + pos : null, 'pod');
+  }
+}
+
+// lap timer and best lap (tenths), under the race clock
+function lapText(sec) { return sec > 0 ? fmtTime(sec).slice(0, -1) : '-'; }
 
 // a racing player's own HUD (or a spectator looking through `car`)
 function hudRace(slot, car, arena, info) {
-  hudRaceCommon(slot, arena, info);
+  hudRaceCommon(slot, arena, info, car);
   // position: big digits (gold when leading), the suffix, and the field size
   const ord = car.pos ? ordinal(car.pos) : '-';
   const num = car.pos ? String(car.pos) : '-';
   const posCol = car.pos === 1 ? 'cY' : car.pos && car.pos <= 3 ? 'cG' : 'cW';
-  hudText(slot, 'spr_pos', num, posCol);
+  // the big number pops when you gain a place (or start watching another car)
+  let ps = popState.get(slot + 'pos');
+  if (!ps) { ps = { car: -1, pos: 99, flip: false }; popState.set(slot + 'pos', ps); }
+  const pos = car.pos || 99;
+  if (ps.car !== car.slot || pos < ps.pos) ps.flip = !ps.flip;
+  ps.car = car.slot; ps.pos = pos;
+  hudText(slot, 'spr_pos', num, posCol, ps.flip ? 'pop2' : 'pop');
   hudText(slot, 'spr_suf', ord.slice(num.length), posCol);
   hudText(slot, 'spr_posof', '/' + arena.order.filter((c) => !c.left).length, 'cP');
   const lap = Math.min(arena.laps, car.lapsDone + 1);
   if (lap === arena.laps && arena.laps > 1 && car.state === 'racing') hudText(slot, 'spr_lap', 'FINAL LAP', 'cR', 'blink');
   else hudText(slot, 'spr_lap', 'LAP ' + lap + '/' + arena.laps, 'cY');
+  // the running lap time ticks about 5 times a second (fewer class changes than every tenth)
+  if (car.state !== 'racing' || arena.tic % 12 < 2) hudText(slot, 'spr_laptime', arena.state === 'grid' ? '-' : car.state === 'racing' ? lapText(arena.raceTic / TICRATE - car.lapStart) : lapText(car.lastLap), 'cW');
+  hudText(slot, 'spr_best', lapText(car.bestLap), 'cY');
   hudSwap(slot, 'spr_shfill', pct(car.shield, car.spec.shield));
   hudSwap(slot, 'spr_shield', car.shield < car.spec.shield * 0.3 ? 'low' : null, 'low');
   hudSwap(slot, 'spr_chfill', pct(car.charge, car.spec.charge));

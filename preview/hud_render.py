@@ -178,8 +178,10 @@ def draw(items, img):
             fs = int(pxv(st.get('font-size', '18px'), 0) or 18)
             f = font_cache.get(fs) or ImageFont.truetype(FONT, fs); font_cache[fs] = f
             col = color(st.get('color', '#ffffff')) or (255, 255, 255, 255)
-            d.text((bw + 2, bw + 2), k.text.upper(), font=f, fill=(0, 0, 0, 255))
-            d.text((bw, bw), k.text.upper(), font=f, fill=col)
+            tx0 = bw
+            if st.get('text-align') == 'right': tx0 = w - bw - d.textlength(k.text.upper(), font=f) - 2
+            d.text((tx0 + 2, bw + 2), k.text.upper(), font=f, fill=(0, 0, 0, 255))
+            d.text((tx0, bw), k.text.upper(), font=f, fill=col)
         if op < 1:
             a = layer.getchannel('A').point(lambda v: int(v * op)); layer.putalpha(a)
         img.alpha_composite(layer, (int(round(x)), int(round(y))))
@@ -229,6 +231,15 @@ def race_state(grid=False, results=False):
     text('spr_pos', '3', 'green'); text('spr_suf', 'RD', 'green'); text('spr_posof', '/32', 'pink')
     text('spr_lap', 'FINAL LAP' if not grid else 'LAP 1/3', 'red' if not grid else 'gold')
     text('spr_clock', 'GRID' if grid else '1:42', 'gold' if grid else 'white')
+    text('spr_laptime', '-' if grid else '0:31.2', 'white'); text('spr_best', '-' if grid else '0:29.8', 'gold')
+    if results:
+        rows = [('1ST', 'SKINK52', '1:42.31'), ('2ND', 'BOT14', '+0.84'), ('3RD', 'MARLOW', '+2.10'), ('4TH', 'BOT3', '+3.95'),
+                ('5TH', 'VEXIS', '+5.02'), ('6TH', 'BOT28', '+9.77'), ('7TH', 'BOT9', 'WRECKED'), ('12TH', 'YOU', '+21.40')]
+        for i, (p_, n_, t_) in enumerate(rows):
+            BYID['spr_rbp%d' % i].text = p_; BYID['spr_rbn%d' % i].text = n_; BYID['spr_rbt%d' % i].text = t_
+            add('spr_rb%d' % i, 'T' if i % 2 == 0 else 'CT')
+            if i < 3: add('spr_rb%d' % i, 'p%d' % (i + 1))
+        add('spr_rb7', 'me')
     if grid:
         text('spr_ctr', 'NULL GAP', 'gold'); text('spr_sub', 'YOU START 3RD OF 32  -  LIGHTS IN 6', 'white')
         add('spr_card2', 'sel')

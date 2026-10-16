@@ -129,8 +129,12 @@ for ck in COLORS:
 raw("@keyframes 'sprblink' { 0% { opacity: 1; } 55% { opacity: 1; } 56% { opacity: 0; } 100% { opacity: 0; } }")
 raw("@keyframes 'sprpulse' { 0% { transform: scale3d(1.0, 1.0, 1); } 50% { transform: scale3d(1.06, 1.06, 1); } 100% { transform: scale3d(1.0, 1.0, 1); } }")
 raw("@keyframes 'sprpop' { 0% { transform: scale3d(1.6, 1.6, 1); opacity: 0.2; } 100% { transform: scale3d(1.0, 1.0, 1); opacity: 1; } }")
+# the same again under a second name: the script alternates pop / pop2 so every new message replays the pop
+raw("@keyframes 'sprpop2' { 0% { transform: scale3d(1.6, 1.6, 1); opacity: 0.2; } 100% { transform: scale3d(1.0, 1.0, 1); opacity: 1; } }")
 rule('.Txt.blink', animation_name='sprblink', animation_duration='0.6s', animation_iteration_count='infinite', animation_timing_function='linear')
 rule('.Txt.pulse', animation_name='sprpulse', animation_duration='0.5s', animation_iteration_count='infinite')
+rule('.Txt.pop', animation_name='sprpop', animation_duration='0.3s')
+rule('.Txt.pop2', animation_name='sprpop2', animation_duration='0.3s')
 
 # ---------------------------------------------------------------- pictures: bars, scanlines, frames, logo, minimap dots
 def seg_bar(color, segs=20, h=6, w=4):
@@ -250,6 +254,8 @@ show_when('Pick', 'stPick')
 show_when('Help', 'stHelp')
 show_when('ResLogo', 'stRes')
 rule('.SprRoot.stOn.stRes .TopBlock', opacity='0')
+show_when('ResBoard', 'stRes')
+rule('.SprRoot.stOn.stRes .Stand', opacity='0')       # the results board takes over from the standings
 show_when('SpeedFx', 'stBoost')
 
 # CRT overlay (on unless the player turns it off with !crt)
@@ -310,7 +316,6 @@ minimap = P('spr_mm', box('MiniMap', 'cyan', MM + 12, MM + 12, x=24, y=24), [
     P('spr_mmimg', 'MapImg ' + place(x=6, y=6, w=MM, h=MM), dots)])
 
 # ---------------------------------------------------------------- top centre: position, lap, the bend ahead
-rule('#spr_pos', animation_name='sprpop', animation_duration='0.25s')
 rule('.Turn', background_size='100% 100%', background_repeat='no-repeat', opacity='0')
 for side in ('l', 'r'):
     for n in (1, 2):
@@ -326,9 +331,13 @@ top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=200), [
     gtext('spr_lap', 9, 'M', 'Y', center=True, y=92),
     P('spr_turn', 'Turn ' + place(center=True, y=130, w=128, h=64)),
 ])
-clock = P(None, box('ClockBox', 'pink', 216, 66, right=24, y=24), [
+clock = P(None, box('ClockBox', 'pink', 216, 118, right=24, y=24), [
     stext('TIME', 'XS', 'P', right=10, y=6),
-    gtext('spr_clock', 7, 'M', 'W', align='right', right=8, y=28),
+    gtext('spr_clock', 7, 'M', 'W', align='right', right=8, y=26),
+    stext('LAP', 'XS', 'P', x=10, y=67),
+    gtext('spr_laptime', 7, 'S', 'W', align='right', right=8, y=63),
+    stext('BEST', 'XS', 'Y', x=10, y=93),
+    gtext('spr_best', 7, 'S', 'Y', align='right', right=8, y=89),
 ])
 
 # ---------------------------------------------------------------- bars (bottom left) and speed (bottom right)
@@ -373,6 +382,29 @@ stand = P(None, box('Stand', 'white', 340, 296, right=24, y=330), [
         P(None, 'StTab ' + place(x=0, y=0, w=8, h=32)),
         P('spr_stn%d' % i, 'StName ' + place(x=16, y=4, w=300, h=26), tag='Label', extra='text="{s:v}"'),
     ]) for i in range(8)])
+
+# ---------------------------------------------------------------- results board (centre, after the race): place, name, time
+RB_ROWS, RB_H = 8, 40
+rule('.RbRow', background_color='#14102480')
+rule('.RbTab', background_color='#5a4670')
+rule('.RbRow.T .RbTab', background_color='#dc781e')
+rule('.RbRow.CT .RbTab', background_color='#3c78dc')
+rule('.RbRow.me', background_color='#ffffff38')
+rule('.RbRow.me .RbTab', background_color='#ffffff')
+rule('.RbPos', font_size='24px', color='#c8b4d2')
+rule('.RbRow.p1 .RbPos', color='#ffbe28')
+rule('.RbRow.p2 .RbPos', color='#e6e6f0')
+rule('.RbRow.p3 .RbPos', color='#dc8c50')
+rule('.RbName', font_size='24px', color='#ffffff')
+rule('.RbRow.me .RbName', color='#ffbe28')
+rule('.RbTime', font_size='24px', color='#a0f0ff', text_align='right')
+resboard = P(None, box('ResBoard', 'gold', 760, RB_ROWS * RB_H + 16, center=True, y=272), [
+    P('spr_rb%d' % i, 'RbRow ' + place(x=10, y=8 + i * RB_H, w=740, h=RB_H - 4), [
+        P(None, 'RbTab ' + place(x=0, y=0, w=8, h=RB_H - 4)),
+        P('spr_rbp%d' % i, 'RbPos ' + place(x=20, y=3, w=90, h=30), tag='Label', extra='text="{s:v}"'),
+        P('spr_rbn%d' % i, 'RbName ' + place(x=116, y=3, w=380, h=30), tag='Label', extra='text="{s:v}"'),
+        P('spr_rbt%d' % i, 'RbTime ' + place(right=14, y=3, w=210, h=30), tag='Label', extra='text="{s:v}"'),
+    ]) for i in range(RB_ROWS)])
 
 # ---------------------------------------------------------------- the car picker: four cards with the car, its perk and stats
 CARD_W, CARD_H, CARD_GAP = 292, 412, 12
@@ -450,7 +482,7 @@ screen = P(None, 'Screen', [
     P(None, 'SpeedFx Full', [P(None, 'Speed0 Full'), P(None, 'Speed1 Full')]),
     logo, res, minimap, top, clock,
     *centre,
-    bars, speed, stand, lobby, pick, help_,
+    bars, speed, stand, resboard, lobby, pick, help_,
     P(None, 'Vig Full'),
     P(None, 'Crt Full'),
 ])
@@ -465,7 +497,7 @@ ids = re.findall(r'id="([^"]+)"', doc)
 assert len(ids) == len(set(ids)), 'duplicate panel ids'
 # classes the script switches on and off must never have a rule of their own (a lone ".Name { }"): the panel getting
 # the class would pick up that rule's layout (the first CS2 test's bug)
-DYNAMIC = re.compile(r'^(st[A-Z]\w*|On|sel|low|boosting|charging|pad|me|T|CT|N|Out|Lead|blink|pulse|hit|wreck|nocrt|[lr][12]|[xyw]\d+|mm_\w+|pic_\w+|g\d+|c[WYCRGP])$')
+DYNAMIC = re.compile(r'^(st[A-Z]\w*|On|sel|low|boosting|charging|pad|me|T|CT|N|Out|Lead|blink|pulse|pop2?|hit|wreck|nocrt|[lr][12]|p[123]|[xyw]\d+|mm_\w+|pic_\w+|g\d+|c[WYCRGP])$')
 lone = [m.group(1) for m in (re.match(r'^\.([\w-]+) \{', c) for c in css) if m]
 bad = sorted(set(c for c in lone if DYNAMIC.match(c)))
 assert not bad, 'switched classes with rules of their own: %s' % bad
