@@ -1,6 +1,6 @@
 // ===================================================================================
 // Part 1: track geometry. A track is a closed centreline of n uniformly spaced samples (step units apart) with
-// a half width, height, rails flag and features (boost pads, charge platforms, slick zones) by sample range.
+// a half width, height, banking, rails flag and features (boost pads, charge platforms, slick zones) by sample range.
 // ===================================================================================
 
 class Track {
@@ -11,6 +11,9 @@ class Track {
     this.rail = data.rail; this.cp = data.cp; this.feats = data.feats; this.crossing = !!data.crossing;
     this.mm = data.mm; this.ext = data.ext; this.off = data.off;
     this.road = data.road || new Array(this.n).fill(1);
+    this.bk = data.bk || new Array(this.n).fill(0);       // banking: tan of the lean (positive = left side low)
+    this.tube = data.tube || new Array(this.n).fill(0);   // 1 inside a tube
+    this.zmin = data.zmin || 0; this.zmax = data.zmax || 0;
     this.ramps = this.feats.filter((f) => f.kind === 'ramp');
     this.rampOf = new Array(this.n).fill(null);
     for (const f of this.ramps) for (let i = f.a, g = 0; g < this.n; g++, i++) { this.rampOf[i % this.n] = f; if (i % this.n === f.b % this.n) break; }
@@ -57,7 +60,7 @@ class Track {
     const p = this.project(i, x, y);
     const tc = clamp(p.t, 0, 1);
     const px = this.x[p.i] + this.tx[p.i] * tc * this.step, py = this.y[p.i] + this.ty[p.i] * tc * this.step;
-    const dz = (z - this.zAt(p.i, tc)) * 2;
+    const dz = (z - this.zAt(p.i, tc) + p.d * this.bankAt(p.i, tc)) * 2;
     p.t = tc; p.score = Math.sqrt((x - px) * (x - px) + (y - py) * (y - py) + dz * dz);
     return p;
   }
@@ -88,7 +91,8 @@ class Track {
     p.t = clamp(p.t, 0, 0.999999);
     p.s = (p.i + p.t) * this.step;
     p.hw = this.hw[p.i] + (this.hw[(p.i + 1) % this.n] - this.hw[p.i]) * p.t;
-    p.z = this.zAt(p.i, p.t);
+    p.bank = this.bankAt(p.i, p.t);
+    p.z = this.zAt(p.i, p.t) - p.d * p.bank;      // the banked road surface under the point
     p.rail = this.rail[p.i];
     return p;
   }
@@ -103,6 +107,7 @@ class Track {
   rampAt(i) { return this.rampOf[((i % this.n) + this.n) % this.n]; }
 
   zAt(i, t) { const j = (i + 1) % this.n; return this.z[i] + (this.z[j] - this.z[i]) * t; }
+  bankAt(i, t) { const j = (i + 1) % this.n; return this.bk[i] + (this.bk[j] - this.bk[i]) * t; }
 
   // a point on the centreline at progress s (any real; wraps)
   point(s) {
@@ -144,6 +149,6 @@ class Track {
     const s = -(190 + row * 160 + (row % 2 ? 60 : 0));
     const p = this.point(s);
     const lat = (col - 1.5) * p.hw * 0.46;
-    return { x: p.x - p.nx * lat, y: p.y - p.ny * lat, z: p.z, yaw: Math.atan2(p.ty, p.tx), s: ((s % this.len) + this.len) % this.len };
+    return { x: p.x - p.nx * lat, y: p.y - p.ny * lat, z: p.z + lat * this.bk[p.i], yaw: Math.atan2(p.ty, p.tx), s: ((s % this.len) + this.len) % this.len };
   }
 }

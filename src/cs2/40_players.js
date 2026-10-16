@@ -90,6 +90,23 @@ function spectatorInput(pe, pk) {
   return pickerInput(pe, pk) || any;
 }
 
+// camera shake (hits, landings, wrecks): a few units of jitter that dies away
+function shake(slot, secs, amp) {
+  const pk = parked.get(slot);
+  if (!pk || !CONFIG.CAM_SHAKE) return;
+  const now = Instance.GetGameTime();
+  if (pk.shakeUntil && now < pk.shakeUntil && pk.shakeAmp > amp) return;
+  pk.shakeUntil = now + secs; pk.shakeLen = secs; pk.shakeAmp = amp * CONFIG.CAM_SHAKE;
+}
+function shakeOffset(pk) {
+  if (!pk.shakeUntil) return null;
+  const now = Instance.GetGameTime();
+  const left = pk.shakeUntil - now;
+  if (left <= 0) { pk.shakeUntil = 0; return null; }
+  const k = pk.shakeAmp * (left / pk.shakeLen);
+  return { x: Math.sin(now * 91) * k, y: Math.sin(now * 77 + 1) * k, z: Math.sin(now * 103 + 2) * k * 0.7 };
+}
+
 // chase camera behind a car (own or watched). The yaw eases towards the car's heading, turned a little into the bend
 // ahead so the upcoming track stays in view; it pulls back at speed; a little roll in corners.
 function placeCamera(pk, car, view, dt, preset) {
@@ -103,11 +120,21 @@ function placeCamera(pk, car, view, dt, preset) {
   else pk.camYaw += normRad(target - pk.camYaw) * Math.min(1, CONFIG.CAM_TURN * dt);
   const cy = pk.camYaw;
   const sp = clamp(car.speed / Math.max(1, car.spec.maxSpeed), 0, 1.5);
-  const back = cp.back + cp.speedBack * sp, up = cp.up;
+  let back = cp.back + cp.speedBack * sp, up = cp.up;
+  // inside a tube the camera drops and closes in so it stays under the roof
+  const inTube = T.tube[car.seg] || T.tube[(car.seg + T.n - 4) % T.n];
+  pk.tubeK = (pk.tubeK || 0) + ((inTube ? 1 : 0) - (pk.tubeK || 0)) * Math.min(1, dt * 3);
+  if (pk.tubeK > 0.001) { up = lerp(up, Math.min(up, CONFIG.CAM_TUBE_UP), pk.tubeK); back = lerp(back, Math.min(back, CONFIG.CAM_TUBE_BACK), pk.tubeK); }
   // in the air the camera follows the car's height but not its bounces
   const cz = car.air ? Math.max(car.tz, car.z - 40) : car.z;
   const pos = view.world(car.x - Math.cos(cy) * back, car.y - Math.sin(cy) * back, cz + up);
+  const sh = shakeOffset(pk);
+  if (sh) { pos.x += sh.x; pos.y += sh.y; pos.z += sh.z; }
   let roll = car.state === 'falling' ? 0 : clamp(-car.vl / 30, -CONFIG.CAM_ROLL, CONFIG.CAM_ROLL);
+  // lean with banked bends (smoothed), a share of the road's angle
+  const bankDeg = car.air || car.state === 'falling' ? 0 : -deg(Math.atan(car.bank)) * CONFIG.CAM_BANK;
+  pk.bankRoll = (pk.bankRoll || 0) + (bankDeg - (pk.bankRoll || 0)) * Math.min(1, dt * 4);
+  roll += pk.bankRoll;
   if (car.spinTimer > 0) roll = 0;
   const pitch = cp.pitch + (car.state === 'falling' ? Math.min(40, car.stateTime * 30) : 0);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }

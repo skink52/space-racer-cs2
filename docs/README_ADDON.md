@@ -1,7 +1,8 @@
 # Space Racer for CS2: setup and how it plays
 
 A 32-car anti-gravity racer that runs inside this one CS2 map as the cs_script `maps/scripts/space_racer.js`, with
-no server plugins. Up to 64 players in two arenas.
+no server plugins. Up to 64 players in two arenas. Retro look and sound: pixel-art tracks, skies and HUD, chiptune
+effects and music.
 
 ## 1. Install
 
@@ -23,10 +24,11 @@ The map's main entities:
 | `prop_dynamic` | `spr_src_prop` | Model = `models/spr/null.vmdl`, not solid |
 | `info_target` | `spr_booth` | Centre of the sealed room where players' bodies wait |
 | `info_map_parameters` | `spr_map_params` | The script ends each CS2 round through its FireWinCondition input |
-| `point_soundevent` ×23 | `spr_snd_<name>` | Sound Event Name = `spr.<name>` |
+| `point_soundevent` ×28 | `spr_snd_<name>` | Sound Event Name = `spr.<name>` (the three `mus_*` ones are the music) |
 | `env_sky` | `spr_sky` | `materials/spr/sky/sky.vmat` |
 
-Plus: `prop_static` for the eight tracks (4 x 2 grid) (one model each) inside moondome + tools/skybox shells with vis hints,
+Plus: `prop_static` for the eight tracks (one model each, two layers of 2 x 2 boxes, 13,800 units each) inside
+moondome + tools/skybox shells (one pixel-art sky per track) with vis hints,
 `spr_cache_*` props that make every car and effect model available to the script, and the lobby with 32 T and
 32 CT spawns about 12,000 units below the tracks.
 
@@ -49,7 +51,10 @@ Loading screen, radar and map icon are in `panorama/images/` and compile with th
 - Shield = health, Charge = boost. Boost pads give free speed; charge platforms (on the slower lines) refill charge
   and shield; drafting behind a car trickles charge; drifting fills it a little. Mouse 1 boosts, Mouse 2 is a spin
   attack (costs charge), Space drifts. Shield 0 = wrecked and out. Falling off a rail-less section costs 15 shield
-  and a 2.5 s reset. Jump ramps (Skyway) throw you over an open gap: hit them fast or drop in. Once a lap the Pulse (a wave from the back of the field) tops up everyone it passes by 40.
+  and a reset. Jump ramps (Skyway) throw you over an open gap: hit them fast or drop in. Bends are banked (they
+  grip harder). Once a lap the Pulse (a wave from the back of the field) tops up everyone it passes by 40.
+- Turbo start: press W on the last beep before GO for a launch; holding W from long before stalls you briefly.
+- Lap records per track are kept while the map runs and shown in the lobby.
 - The race ends when everyone is in, 30 seconds after the winner, or at 5 minutes (ranked by distance).
 - Results: the top 3 survive. Everyone else takes one CS2 death, credited as kills 50% to 1st, 30% to 2nd, 20% to
   3rd (32 cars: 15 / 9 / 5). A car wrecked by another player's attack is that player's kill at once. The CS2 round
@@ -71,14 +76,15 @@ Loading screen, radar and map icon are in `panorama/images/` and compile with th
 | Mouse | nothing while racing - the camera follows the car and turns a little into the bend ahead |
 | Mouse 1 / 2, E (watching) | next car / previous car / next arena |
 
-Chat (`!` or `/`): `!car 1-4` (or a name), `!cam` (camera: high = default, far, near), `!spec`, `!afk`, `!back`,
-`!race` (controls on your own screen).
+Chat (`!` or `/`): `!car 1-4` (or a name), `!cam` (camera: high = default, far, near), `!crt` (CRT scanlines on /
+off for you), `!music`, `!spec`, `!afk`, `!back`, `!race` (controls on your own screen).
 
 ## Settings
 
 `maps/scripts/space_racer.js`, search for `const CONFIG`: `ARENA_LAYOUT` ('2x32', '4x16', 'alternate'), laps, countdown, finish window, race cap,
 podium size and kill shares, `KO_CREDIT_TO_ATTACKER`, tie-break, AFK times, bot skill, camera distance, and the
-cvars the map applies, the camera presets (`CAMERAS`, `CAM_LOOKAHEAD`), `ENGINE_HUM`. The four cars and the physics rules are in `const CARS` / `const RULES` just below.
+cvars the map applies, the camera presets (`CAMERAS`, `CAM_LOOKAHEAD`, `CAM_BANK`, `CAM_SHAKE`), `ENGINE_HUM`,
+`MUSIC` (chiptune music for everyone; volume: `MUSIC_VOL` in `tools/sounds.py`). The four cars and the physics rules are in `const CARS` / `const RULES` just below.
 
 When `APPLY_CVARS` is on the map sets: `mp_respawn_on_death_t/ct 1`, `mp_respawn_immunitytime 0`,
 `mp_teammates_are_enemies 1` (no teamkill penalties for same-side kills), `mp_ignore_round_win_conditions 1`

@@ -41,12 +41,19 @@ def load_smd(path, mats, off=(0, 0, 0), yaw=0.0, pitch=0.0):
         tris.append((mats.get(m, ''), vs)); i += 4
     return tris
 
-def point(s):
+def point(s, lat=0.0):
+    """centreline point at progress s, moved `lat` units to the left on the banked surface"""
     n, step = T['n'], T['step']; s %= T['length']; f = s / step; i = int(f) % n; j = (i + 1) % n; t = f - int(f)
-    return (T['x'][i] + (T['x'][j] - T['x'][i]) * t, T['y'][i] + (T['y'][j] - T['y'][i]) * t, T['z'][i] + (T['z'][j] - T['z'][i]) * t, T['tx'][i], T['ty'][i])
+    bk = T['bk'][i] + (T['bk'][j] - T['bk'][i]) * t
+    return (T['x'][i] + (T['x'][j] - T['x'][i]) * t - T['ty'][i] * lat, T['y'][i] + (T['y'][j] - T['y'][i]) * t + T['tx'][i] * lat,
+            T['z'][i] + (T['z'][j] - T['z'][i]) * t - lat * bk, T['tx'][i], T['ty'][i])
+def bank(s):
+    n, step = T['n'], T['step']; s %= T['length']; i = int(s / step) % n
+    return T['bk'][i]
 
 s0 = FRAC * T['length']
-cx, cy_, cz, tx, ty = point(s0)
+LAT = float(os.environ.get('LAT', '0'))
+cx, cy_, cz, tx, ty = point(s0, LAT)
 car_yaw = math.atan2(ty, tx)
 back, up, pitch, sback = CAMS[PRESET]
 ax, ay, az, _, _ = point(s0 + 500 + 900 * 0.5)
@@ -55,6 +62,8 @@ b = back + sback
 cam = np.array([cx - math.cos(cam_yaw) * b, cy_ - math.sin(cam_yaw) * b, cz + up])
 fwd = np.array([math.cos(cam_yaw) * math.cos(math.radians(pitch)), math.sin(cam_yaw) * math.cos(math.radians(pitch)), -math.sin(math.radians(pitch))])
 right = np.cross(fwd, [0, 0, 1]); right /= np.linalg.norm(right); upv = np.cross(right, fwd)
+roll = math.radians(-math.degrees(math.atan(bank(s0))) * 0.6)     # CS2 roll: positive = right side down
+right, upv = right * math.cos(roll) - upv * math.sin(roll), upv * math.cos(roll) + right * math.sin(roll)
 f = (W / 2) / math.tan(math.radians(FOV / 2))
 
 vmdl = os.path.join(OUT, 'models/spr/track/%s.vmdl' % TID)
@@ -63,32 +72,54 @@ cm = os.path.join(OUT, 'models/spr/cars/%s_boost.vmdl' % CARKEY)
 tris += load_smd(cm.replace('.vmdl', '.smd'), load_vmdl_mats(cm), off=(cx, cy_, cz), yaw=car_yaw)
 # a few more cars ahead
 for k, (ds, lat, key) in enumerate(((700, 120, 'hornet'), (1300, -100, 'bastion'), (2100, 60, 'comet'), (3000, -140, 'meteor'))):
-    px, py, pz, ptx, pty = point(s0 + ds)
+    px, py, pz, ptx, pty = point(s0 + ds, lat)
     m = os.path.join(OUT, 'models/spr/cars/%s.vmdl' % key)
-    tris += load_smd(m.replace('.vmdl', '.smd'), load_vmdl_mats(m), off=(px - pty * lat, py + ptx * lat, pz), yaw=math.atan2(pty, ptx))
+    tris += load_smd(m.replace('.vmdl', '.smd'), load_vmdl_mats(m), off=(px, py, pz), yaw=math.atan2(pty, ptx))
 
 img = np.zeros((H, W, 3), np.float32)
 yy, xx = np.mgrid[0:H, 0:W]
-img[:] = (8, 10, 22)
-rng = np.random.RandomState(4)
-for _ in range(500): img[rng.randint(0, H), rng.randint(0, W)] = rng.randint(80, 255)
+# the sky panorama behind everything (equirectangular)
+skyp = os.path.join(OUT, 'materials/spr/sky/sky_%s_color.png' % TID)
+if os.path.exists(skyp):
+    sky = np.array(Image.open(skyp).convert('RGB')).astype(np.float32)
+    D = fwd[None, None, :] * f + right[None, None, :] * (xx[..., None] - W / 2) + upv[None, None, :] * (H / 2 - yy[..., None])
+    D /= np.linalg.norm(D, axis=2)[..., None]
+    lon = np.arctan2(D[..., 1], D[..., 0]); latr = np.arcsin(np.clip(D[..., 2], -1, 1))
+    su = ((lon / (2 * math.pi)) % 1 * sky.shape[1]).astype(int) % sky.shape[1]
+    sv = np.clip(((0.5 - latr / math.pi) * sky.shape[0]).astype(int), 0, sky.shape[0] - 1)
+    img[:] = sky[sv, su]
+else:
+    img[:] = (8, 10, 22)
 zb = np.full((H, W), 1e9, np.float32)
-for vmat, vs in tris:
-    P = np.array([v[:3] for v in vs]) - cam
+NEAR = 5.0
+def clip_tri(vs):
+    """clip a triangle against the near plane; returns a list of triangles (camera-relative points with uv)"""
+    pts = [(np.array(v[:3]) - cam, v[3], v[4]) for v in vs]
+    out = []
+    for k in range(3):
+        a, b = pts[k], pts[(k + 1) % 3]
+        da, db = a[0] @ fwd, b[0] @ fwd
+        if da >= NEAR: out.append(a)
+        if (da >= NEAR) != (db >= NEAR):
+            t = (NEAR - da) / (db - da)
+            out.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t))
+    return [(out[0], out[k], out[k + 1]) for k in range(1, len(out) - 1)]
+def raster(vmat, tri):
+    P = np.array([p[0] for p in tri])
+    vs = [(0, 0, 0, p[1], p[2]) for p in tri]
     d = P @ fwd
-    if (d < 5).any(): continue
     sx = W / 2 + (P @ right) / d * f; sy = H / 2 - (P @ upv) / d * f
     x0, x1 = int(max(0, math.floor(sx.min()))), int(min(W - 1, math.ceil(sx.max())))
     y0, y1 = int(max(0, math.floor(sy.min()))), int(min(H - 1, math.ceil(sy.max())))
-    if x0 > x1 or y0 > y1: continue
+    if x0 > x1 or y0 > y1: return
     X, Y = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
     den = (sy[1] - sy[2]) * (sx[0] - sx[2]) + (sx[2] - sx[1]) * (sy[0] - sy[2])
-    if abs(den) < 1e-9: continue
+    if abs(den) < 1e-9: return
     w0 = ((sy[1] - sy[2]) * (X - sx[2]) + (sx[2] - sx[1]) * (Y - sy[2])) / den
     w1 = ((sy[2] - sy[0]) * (X - sx[2]) + (sx[0] - sx[2]) * (Y - sy[2])) / den
     w2 = 1 - w0 - w1
     inside = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
-    if not inside.any(): continue
+    if not inside.any(): return
     # perspective-correct depth and uv
     iz = w0 / d[0] + w1 / d[1] + w2 / d[2]
     depth = 1 / np.maximum(iz, 1e-9)
@@ -102,9 +133,11 @@ for vmat, vs in tris:
     ok = inside & (depth < sub)
     if al is not None:
         a = al[vi, ui]
-        if 'shadow' in vmat or 'pulse' in vmat: continue
+        if 'shadow' in vmat or 'pulse' in vmat: return
         ok &= a > 0.5
     sub[ok] = depth[ok]
     img[y0:y1 + 1, x0:x1 + 1][ok] = col[ok]
+for vmat, vs in tris:
+    for tri in clip_tri(vs): raster(vmat, tri)
 Image.fromarray(img.clip(0, 255).astype(np.uint8)).save(PNG)
 print('chase view', TID, PRESET, '->', PNG)

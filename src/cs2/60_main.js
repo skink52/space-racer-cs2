@@ -180,17 +180,22 @@ function sfxCar(view, sfx, car, gap) {
   playSound(view, sfx, car);
 }
 
+const records = new Map();   // track id -> { time, name }: the best lap since the map loaded
+function recordText(T) { const r = records.get(T.id); return r ? `  RECORD ${fmtTime(r.time)} ${r.name}` : ''; }
+
 function handleArenaEvents(a, now) {
   const view = views.get(a);
   const T = a.track;
   for (const e of a.events) {
     switch (e.type) {
-      case 'beep': { const p = T.point(0); if (view) playSound(view, 'beep', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, String(e.n), 1.1, 'red'); break; }
+      case 'beep': { const p = T.point(0); if (view) playSound(view, e.n === 1 ? 'beep2' : 'beep', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, String(e.n), 1.1, 'red'); break; }
+      case 'launch': { const pe = e.car.person; if (pe && !pe.bot) { bottom(pe.slot, 'TURBO START!', 2); hudFlash(pe.slot, 'pulse', 0.3); shake(pe.slot, 0.3, 8); } if (view) sfxCar(view, 'boost', e.car, 0.8); break; }
+      case 'stall': { const pe = e.car.person; if (pe && !pe.bot) bottom(pe.slot, 'TOO EARLY - ENGINE STALLED', 2); break; }
       case 'go': { const p = T.point(0); if (view) playSound(view, 'go', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, 'GO!', 1.2, 'green'); break; }
       case 'wreck': {
         if (view) { view.wreckEffect(e.car, now); sfxCar(view, 'wreck', e.car); }
         const pe = e.car.person;
-        if (pe && !pe.bot) center(pe.slot, 'WRECKED', 3, 'red');
+        if (pe && !pe.bot) { center(pe.slot, 'WRECKED', 3, 'red'); shake(pe.slot, 0.6, 20); }
         if (e.attacker) {
           const ap = e.attacker.person;
           if (ap && !ap.bot) bottom(ap.slot, 'YOU WRECKED ' + e.car.name.slice(0, 20).toUpperCase(), 3);
@@ -206,11 +211,20 @@ function handleArenaEvents(a, now) {
       }
       case 'gone': if (view) { view.warpEffect(e.car, now); sfxCar(view, 'warp', e.car); } break;
       case 'lap': {
-        if (view) sfxCar(view, 'lap', e.car);
+        const best = e.car.bestLap && Math.abs(e.last - e.car.bestLap) < 1e-6 && e.lap > 1;
+        // track records (kept while the map runs)
+        const rec = records.get(T.id);
+        if (e.last > 3 && (!rec || e.last < rec.time)) {
+          records.set(T.id, { time: e.last, name: e.car.name.slice(0, 12).toUpperCase(), who: e.car.name, arena: a });
+          a.newRecord = true;
+          const rp = e.car.person;
+          if (rec && rec.arena !== a && rp && !rp.bot) center(rp.slot, 'LAP RECORD!', 2, 'gold');
+        }
+        if (view) sfxCar(view, best ? 'best' : 'lap', e.car);
         const pe = e.car.person;
         if (pe && !pe.bot) {
           if (e.lap === a.laps - 1) center(pe.slot, 'FINAL LAP', 2, 'gold');
-          else bottom(pe.slot, 'LAP ' + fmtTime(e.last), 2.5);
+          bottom(pe.slot, (best ? 'BEST LAP ' : 'LAP ') + fmtTime(e.last), 2.5);
         }
         break;
       }
@@ -226,8 +240,8 @@ function handleArenaEvents(a, now) {
     const f = car.fx;
     if (!f && !car.boosting && !car.onCharge) { car.wasBoost = false; car.wasCharge = false; continue; }
     const pe = car.person, human = pe && !pe.bot;
-    if (f & 1) { sfxCar(view, 'hit', car, 0.25); if (human) hudFlash(pe.slot, 'hit', 0.25); }
-    if (f & 2) sfxCar(view, 'rail', car, 0.3);
+    if (f & 1) { sfxCar(view, 'hit', car, 0.25); if (human) { hudFlash(pe.slot, 'hit', 0.25); shake(pe.slot, 0.25, 7); } }
+    if (f & 2) { sfxCar(view, 'rail', car, 0.3); if (human) shake(pe.slot, 0.2, 5); }
     if (f & 64) sfxCar(view, 'scrape', car, 0.6);
     if (f & 8) sfxCar(view, 'pad', car, 0.5);
     if (f & 16) { sfxCar(view, 'fall', car); if (human) center(pe.slot, 'FELL OFF', 2, 'red'); }
@@ -235,7 +249,7 @@ function handleArenaEvents(a, now) {
     if (f & 128) { sfxCar(view, 'reset', car); const pk = pe ? parked.get(pe.slot) : null; if (pk) pk.camYaw = null; }
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);
     if (f & 512) sfxCar(view, 'jump', car, 0.3);
-    if (f & 1024) sfxCar(view, 'land', car, 0.3);
+    if (f & 1024) { sfxCar(view, 'land', car, 0.3); if (human) shake(pe.slot, 0.3, 12); }
     if (car.boosting && !car.wasBoost) sfxCar(view, 'boost', car, 0.8);
     if (car.onCharge && !car.wasCharge) sfxCar(view, 'charge', car, 1.0);
     car.wasBoost = car.boosting; car.wasCharge = car.onCharge;
@@ -246,6 +260,7 @@ const flashes = new Map();   // slot -> { cls, until }
 function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: Instance.GetGameTime() + secs }); }
 
 function onArenaEnd(a, result, now) {
+  if (a.newRecord) { const r = records.get(a.track.id); if (r) sayAll(`LAP RECORD on ${a.track.title}: ${r.who} ${fmtTime(r.time)}`); a.newRecord = false; }
   const r = result.ranking;
   const top = r.slice(0, 3).map((c, i) => `${i + 1}. ${c.name}`).join('  ');
   sayAll(`${a.track.title}: ${top}`);
@@ -298,13 +313,13 @@ function raceInfo(pe, car, a, now, spectating) {
   if (cm) { info.center = cm.text; info.centerCls = cm.cls; }
   else if (a.state === 'grid' && a.countdown > 3 * TICRATE) info.center = '';
   else if (car.wrongWayFlag && car.state === 'racing') { info.center = 'WRONG WAY'; info.centerCls = 'red'; }
-  else if (car.offLine && car.state === 'racing') { info.center = 'MISSED CHECKPOINT - TURN BACK'; info.centerCls = 'red'; }
+  else if (car.offLine && car.state === 'racing') { info.center = 'MISSED CHECKPOINT'; info.centerCls = 'red'; }
   const sm = timed(subMsgs, pe.slot, now);
   if (sm) info.sub = sm.text;
-  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 16).toUpperCase() + '   MOUSE 1 / 2 CHANGE CAR   E CHANGE ARENA';
-  else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'A / D CHOOSE YOUR CAR - ' + car.spec.name + ' - ' + car.spec.perk : car.spec.name;
+  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 16).toUpperCase() + '  M1/M2 CAR  E ARENA';
+  else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'A / D CHOOSE YOUR CAR - ' + car.spec.name + ' - ' + car.spec.perk : 'PRESS W ON THE LAST BEEP FOR A TURBO START';
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
-  else if (pe.helpUntil > now) info.sub = 'W S DRIVE  A D STEER  MOUSE1 BOOST  MOUSE2 SPIN  SPACE DRIFT  !CAM VIEW';
+  else if (pe.helpUntil > now) info.sub = 'W/S DRIVE  A/D STEER  M1 BOOST  M2 SPIN  SPACE DRIFT';
   const bm = timed(botMsgs, pe.slot, now);
   info.msg = bm ? bm.text : '';
   const fl = flashes.get(pe.slot);
@@ -316,31 +331,31 @@ let lobbyCycle = 0;
 function lobbyInfo(pe, now) {
   const info = { line1: '', line2: '', line3: '' };
   const car = CARS[pe.carChoice] || CARS.hornet;
-  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + '   (A / D TO CHANGE, !CAR 1-4)';
+  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + '  (A/D OR !CAR 1-4)';
   const nextT = rm.upcoming[0];
   if (phase === 'running') {
     const rem = guard('remaining', () => Instance.GetRoundRemainingTime());
     const left = rem === undefined ? 0 : Math.max(0, Math.ceil(rem - CONFIG.ROUND_SLACK));
-    info.line1 = `RACE IN PROGRESS - YOU ARE IN THE NEXT ONE  (${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} LEFT AT MOST)`;
+    info.line1 = `RACE ON - YOU ARE IN THE NEXT ONE  (${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} AT MOST)`;
     const a = rm.arenas[lobbyCycle % Math.max(1, rm.arenas.length)];
     if (a && a.ranking[0]) info.line3 = `${a.track.title}: ${a.state === 'over' ? 'RESULTS' : 'LEADER ' + a.ranking[0].name.slice(0, 16).toUpperCase()}`;
   } else if (phase === 'ending') {
     info.line1 = 'RACE OVER - NEXT ONE SOON';
-    if (nextT) info.line3 = `NEXT TRACK: ${nextT.title}`;
+    if (nextT) info.line3 = `NEXT: ${nextT.title}${recordText(nextT)}`;
   } else {
     let waiting = 0;
     for (const p of rm.people.values()) if ((p.csTeam === 2 || p.csTeam === 3) && !(p.afk && !p.bot)) waiting++;
     const need = CONFIG.MIN_PLAYERS - waiting;
-    if (need > 0) info.line1 = `WAITING FOR PLAYERS ${waiting}/${CONFIG.MIN_PLAYERS}`;
+    if (need > 0) { info.line1 = `WAITING FOR PLAYERS ${waiting}/${CONFIG.MIN_PLAYERS}`; info.blink1 = true; }
     else {
       const t = Math.max(0, Math.ceil(startAt - now));
       info.line1 = Instance.IsFreezePeriod() ? 'THE RACE STARTS AFTER FREEZE TIME' : t > 0 ? `THE RACE STARTS IN ${t}` : 'STARTING...';
     }
-    if (nextT) info.line3 = `NEXT TRACK: ${nextT.title} - ${nextT.laps} LAPS`;
+    if (nextT) info.line3 = `NEXT: ${nextT.title} - ${nextT.laps} LAPS${recordText(nextT)}`;
   }
   if (pe.afk) info.line3 = 'AFK - TYPE !BACK OR PRESS A KEY TO RACE';
   else if (pe.csTeam !== 2 && pe.csTeam !== 3) info.line3 = 'JOIN T OR CT TO RACE';
-  if (pe.helpUntil > now) { info.center = 'W S DRIVE   A D STEER   MOUSE 1 BOOST   MOUSE 2 SPIN   SPACE DRIFT'; info.sub = 'CHAT: !CAR 1-4  !CAM  !SPEC  !AFK  !BACK  !RACE'; }
+  if (pe.helpUntil > now) { info.center = 'W/S DRIVE  A/D STEER  M1 BOOST  M2 SPIN'; info.sub = 'SPACE DRIFT   CHAT: !CAR 1-4 !CAM !CRT !SPEC !AFK'; }
   return info;
 }
 
@@ -372,7 +387,7 @@ function lobbyFrame(now, dt) {
     const pk = park(pe.slot);
     if (!pk) continue;
     if (pickerInput(pe, pk)) rm.markActive(pe.slot);
-    guard('lobbyhud', () => { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); });
+    guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); });
     // nothing to look at yet: a slow look around the first track from above
     if (!a0) guard('lobbycam', () => {
       if (!live(pk.cam)) return;
@@ -380,16 +395,36 @@ function lobbyFrame(now, dt) {
       const T = rm.upcoming[0] || rm.tracks[0];
       const off = T.off || [0, 0, 0];
       const ang = now * 0.06;
-      const r = T.ext * 0.92, h = T.ext * 0.8;
-      const pitch = deg(Math.atan2(h, r));
+      const r = T.ext * 0.95, h = T.ext * 0.6;
+      const zc = (T.zmin + T.zmax) / 2;
+      const pitch = deg(Math.atan2(h + T.zmax - zc, r));
       if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
-      pk.cam.Move({ position: { x: off[0] + Math.cos(ang) * r, y: off[1] + Math.sin(ang) * r, z: off[2] + h }, angles: { pitch, yaw: deg(ang + Math.PI), roll: 0 } });
+      pk.cam.Move({ position: { x: off[0] + Math.cos(ang) * r, y: off[1] + Math.sin(ang) * r, z: off[2] + T.zmax + h }, angles: { pitch, yaw: deg(ang + Math.PI), roll: 0 } });
     });
   }
 }
 
+// music: one piece at a time for everyone (lobby loop, race loop, results fanfare), retriggered at the end of each loop
+let musCur = null, musAt = 0;
+function musicFrame(now) {
+  if (!CONFIG.MUSIC) { if (musCur) { musicStop(musCur); musCur = null; } return; }
+  const want = phase === 'lobby' ? 'mus_lobby' : phase === 'running' ? 'mus_race' : 'mus_results';
+  if (want !== musCur) {
+    if (musCur) musicStop(musCur);
+    musCur = want; musAt = now + (MUSIC_LEN[want] || 20);
+    musicStart(want);
+  } else if (now >= musAt - 0.008 && want !== 'mus_results') {
+    musAt += MUSIC_LEN[want] || 20;
+    if (musAt < now) musAt = now + (MUSIC_LEN[want] || 20);
+    musicStart(want);
+  }
+}
+function musicStart(name) { const e = soundEnt(name); if (e) Instance.EntFireAtTarget({ target: e, input: 'StartSound' }); }
+function musicStop(name) { const e = soundEnt(name); if (e) Instance.EntFireAtTarget({ target: e, input: 'StopSound' }); }
+
 function frame(dt) {
   const now = Instance.GetGameTime();
+  guard('music', () => musicFrame(now));
   soundsThisTick = 0;
   spawnBudget = CONFIG.SPAWN_BUDGET;
   scanPeople(false);
@@ -435,6 +470,7 @@ function frame(dt) {
     if (pe.bot) continue;
     const pk = parked.get(pe.slot);
     if (!pk) continue;
+    hudOptions(pe.slot, pe);
     guard('view', () => {
       if (pe.status === 'racing' && pe.car && pe.arena) {
         const a = pe.arena, v = views.get(a);
@@ -540,6 +576,11 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
     const cur = pe.cam || CONFIG.CAM_DEFAULT;
     pe.cam = names.includes(want) ? want : names[(names.indexOf(cur) + 1) % names.length];
     bottom(slot, 'CAMERA: ' + pe.cam.toUpperCase() + '   (!CAM ' + names.join(' / ').toUpperCase() + ')', 3);
+  } else if (t === '!crt') {
+    pe.crt = pe.crt === false;
+    bottom(slot, 'SCANLINES ' + (pe.crt ? 'ON' : 'OFF') + '   (!CRT)', 3);
+  } else if (t === '!music') {
+    bottom(slot, CONFIG.MUSIC ? 'MUSIC: ON FOR THE WHOLE SERVER' : 'MUSIC IS OFF ON THIS SERVER', 4);
   } else if (t === '!spec' || t === '!spectate') {
     if (pe.status === 'racing' && pe.arena) { const a = pe.arena; rm.leaveArena(pe, 'spectate'); rm.spectate(pe, a); }
   } else if (t === '!afk') {

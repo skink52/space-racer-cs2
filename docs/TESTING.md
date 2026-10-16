@@ -5,14 +5,15 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 ## A. Hammer
 
-1. Open `maps/mg_space_racer.vmap`. Expect: eight track props in a 4 x 2 grid in the void, each inside a dark
-   moondome box; the lobby/booth/cache rooms 12,000 units below; the entities listed in README_SPACE_RACER.md.
+1. Open `maps/mg_space_racer.vmap`. Expect: eight track props in two layers of 2 x 2 boxes (13,800 units each; the
+   lower layer around z -5000, the upper around z +3600), each inside a moondome box; the lobby/booth/cache rooms
+   at z -12,000; the entities listed in README_SPACE_RACER.md.
 2. Check the `point_script` has its script and the `custom_hud_layout` its layout (keys `cs_script`, `layout`).
 3. Build. Expect no missing materials (`materials/spr/...`) or models (`models/spr/...`).
 
 ## B. First run (listen server, `bot_quota 0`)
 
-1. Console on map load: `[spr] v0.2.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
+1. Console on map load: `[spr] v0.3.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too.
 3. After freeze time: `RACE 1: <track> (1)` in chat, a 10-second countdown on the grid, your car on the grid
@@ -50,14 +51,45 @@ Valve's type declarations. These are the things only the real game can show, in 
   `resource/overviews/mg_space_racer.txt` into the GAME addon folder for the overview position.
 - `ARENA_LAYOUT 'alternate'` switches between 2 x 32 and 4 x 16 every round.
 
+## C3. Added in session 3 (the retro / grander pass)
+
+- Music: a chiptune loop in the lobby, a faster one during the race, a short fanfare at the results. Is it audible
+  everywhere at the same volume (it should not pan or fade with the camera)? Does it restart cleanly at the end of
+  each loop (24.6 s race, 19.2 s lobby)? Too loud: `MUSIC_VOL` in `tools/sounds.py`; off: `MUSIC: false`.
+- Every sound effect is new (chiptune). Countdown: two low beeps then a higher one, then GO.
+- HUD: all text is the pixel font (white / gold / cyan / red / green / pink). Check the glyphs line up in rows,
+  centre messages are centred, and nothing is cut off. If letters come out blurry, the glyph pictures are 60 px
+  (`GS` in `tools/hud.py`). Bars are segmented. A faint scanline + vignette overlay covers the screen: `!crt`
+  toggles it for you. The lobby shows the SPACE RACER logo.
+- Panorama features used for the first time here: `@keyframes` animations (blinking WRONG WAY / FINAL LAP / low
+  shield, the pulsing selected car card and logo), `background-repeat: repeat` (scanlines). If the console shows
+  CSS errors about them, the HUD still works without the animation.
+- Tracks are about twice as big, in two layers. The skies: each track has its own pixel-art panorama on the
+  moondome. If a sky shows black or stretched, the moondome shader may want a different texture layout.
+- Banked bends: the road leans, the car leans with it (prop roll) and the camera leans 60% as much. If the lean
+  looks backwards, flip the sign in `20_render.js` (prop) and `40_players.js` (camera).
+- Tubes (Solar Oval back straight, Hairpin Harbour, Ringworld under the bridge, Spire and Helix descents): the
+  camera drops lower inside. Check it never pokes through the roof.
+- Scenery: towers, asteroids, crystals, rings, clouds, the synth-grid floor, billboards, the voxel-letter start
+  gantry and sector numbers on the checkpoint gates. Watch `cl_showfps` on the busiest views (Solar Oval and
+  Hairpin Harbour cities).
+- Turbo start: press W on the last beep (inside half a second of GO) - "TURBO START!" and a kick. Hold W from the
+  first beep - "TOO EARLY - ENGINE STALLED".
+- Camera shake on hits, rail strikes, landings and wrecks (`CAM_SHAKE` 0 turns it off).
+- Effects are pixel art now (explosion, warp-out, the Pulse, the hover shadow).
+- Lap records: after a race, the lobby's NEXT line shows a record for tracks that have one; chat announces new ones.
+
 ## D. Things to look at and tune
 
 - Speed feel: `CARS[*].maxSpeed`, `RULES.padSpeed`, the camera presets in `CONFIG.CAMERAS`.
-- Jumps: `RULES.gravity`, `rampKick`, `airControl`; ramp height `RAMP_H` and gap lengths in `tools/tracks.py`.
+- Jumps: `RULES.gravity`, `rampKick`, `airControl`, `landSafe`; ramp heights and gap lengths (`jumps`) in
+  `tools/trackdefs.py`.
+- Banking: `bank` per track in `tools/trackdefs.py`; how much it helps: `RULES.bankGrip` / `bankTurn`.
+- Turbo start: `RULES.launchWindow` / `launchKick` / `stallAfter`.
 - Carnage: `RULES.contactSoft` / `contactMax` / `spinDamage` / `regenRate`; `BOT_SKILL`.
-- Race length: `laps` per track in `tools/tracks.py` (or `LAPS` in CONFIG for all), `FINISH_WINDOW`.
+- Race length: `laps` per track in `tools/trackdefs.py` (or `LAPS` in CONFIG for all), `FINISH_WINDOW`.
 - The Pulse: `RULES.pulseEnabled` / `pulseSpeed` / `pulseCharge`.
-- Sounds too loud/quiet: `VOL` and `RANGE` in `tools/sounds.py`.
+- Sounds too loud/quiet: `VOL`, `RANGE` and `MUSIC_VOL` in `tools/sounds.py`.
 
 ## Known unknowns (only CS2 can answer)
 
@@ -67,4 +99,5 @@ Valve's type declarations. These are the things only the real game can show, in 
   picker pictures). `HUD classes not in the css: none` is the mock's check; the look is not.
 - Whether `TakeDamage` with `damageTypes: VEHICLE` shows a sensible killfeed icon (FreeDM used BULLET).
 - The translucent effects (wreck, warp, the Pulse wave, hover shadow) and the alpha-blended materials.
-- Sound spatialisation relative to the custom camera.
+- Sound spatialisation relative to the custom camera, and whether the music events stay un-positioned.
+- Whether `csgo_moondome` accepts the equirectangular sky pictures as its `TextureCubeMap`.

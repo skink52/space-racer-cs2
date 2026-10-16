@@ -91,14 +91,15 @@ class ArenaView {
       propModel(p, car.state === 'wrecked' ? CAR_MODELS.cars[car.cls].base : this.carModel(car));
       propSkin(p, car.team === 0 ? SKIN_INDEX.t : car.team === 1 ? SKIN_INDEX.ct : SKIN_INDEX.neutral);
       propAlpha(p, car.state === 'wrecked' ? 90 : car.ghost > 0 && car.state === 'racing' ? 140 : car.state === 'finished' ? 160 : 255);
-      // angles: yaw from the heading (+ spin), pitch from the slope, roll from the slide
+      // angles: yaw from the heading (+ spin), pitch from the slope, roll from the bank and the slide
       const i = car.seg, j = (i + 1) % T.n;
       const rf = car.lift > 0 ? T.rampAt(i) : null;
       const rampTilt = rf ? -deg(Math.atan2(rf.h, (((rf.b - rf.a + T.n) % T.n) + 1) * T.step)) : 0;
       const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50)
         : car.air ? clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25)
         : -deg(Math.atan2(T.z[j] - T.z[i], T.step)) + rampTilt;
-      const roll = car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18);
+      // roll: the lean of a banked bend (positive roll = right side down in CS2) plus a little from sliding
+      const roll = car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18) - (car.air ? 0 : deg(Math.atan(car.bank)));
       const yaw = deg(car.yaw + car.spinYaw);
       const pos = this.world(car.x, car.y, car.z);
       if (car.state === 'wrecked') pos.z -= Math.min(8, car.stateTime * 6);

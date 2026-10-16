@@ -1,8 +1,13 @@
 # Space Racer for CS2 — design
 
 A 32-car anti-gravity racing minigame that runs entirely inside one Counter-Strike 2 map as a cs_script
-(JavaScript), with no server plugins. Up to 64 players in two 32-car arenas. 2.5D: flat neon tracks seen from a
-low chase camera, cars drawn as voxel models, in the style of the FreeDM and bomb-arena addons.
+(JavaScript), with no server plugins. Up to 64 players in two 32-car arenas. 2.5D: huge neon tracks seen from a
+chase camera, cars drawn as voxel models, in the style of the FreeDM and bomb-arena addons.
+
+The look is **retro**: everything is drawn in one original 32-colour palette with chunky, dithered pixels
+(`tools/retro.py`) - the roads, the pixel-art skies, the cities and asteroids, the HUD (an original 8x8 pixel font,
+`tools/pixfont.py`), the loading screen - and every sound and the music is chiptune, synthesised from the four voices
+of an old sound chip (`tools/sounds.py`).
 
 Everything here is original: the name, cars, tracks, art, sounds and rules are ours. Nothing is taken from
 F-Zero or any other racing game (see `WORKSHOP_COMPLIANCE.md`). The genre conventions we do use (anti-grav
@@ -10,7 +15,8 @@ racers, boost pads, drafting, laps) are not anyone's property.
 
 ## The pitch
 
-Thirty-two cars line up on a glowing track hanging in space. Three laps. Every car has a **shield** (its health)
+Thirty-two cars line up on a glowing track hanging in space over a pixel city or an asteroid belt. Two or three
+long laps. Every car has a **shield** (its health)
 and a **charge** meter (its boost). Boost pads on the racing line give free speed; **charge platforms** sit on
 slower side lanes and refill your charge and shield, so the race is a constant choice between the fast line and
 the refill detour. Cars bump, ram and spin-attack each other; a car whose shield hits zero is **wrecked** and out.
@@ -30,8 +36,8 @@ not racing (A / D keys, or `!car 1-4`). The cars differ in feel and in one signa
 | | HORNET | METEOR | COMET | BASTION |
 |---|---|---|---|---|
 | Style | light, agile | heavy, rams | boost specialist | tank, team player |
-| Top speed | 962 | 1005 | 935 | 955 |
-| Acceleration | 580 | 430 | 470 | 490 |
+| Top speed | 1065 | 1090 | 1040 | 1035 |
+| Acceleration | 640 | 495 | 525 | 550 |
 | Turning | sharpest | widest | medium | medium |
 | Shield | 90 | 110 | 100 | 130 |
 | Charge capacity | 100 | 100 | 130 | 100 |
@@ -39,9 +45,9 @@ not racing (A / D keys, or `!car 1-4`). The cars differ in feel and in one signa
 | Spin attack cost | 18 | 30 | 30 | 30 |
 | Perk | **Drift charge**: drifting (hold Space) fills charge twice as fast; cheap spin attack | **Ram**: contact deals double damage to the other car and half to the Meteor; 1.6x mass, so it shoves | **Afterburn**: boost pads last 40% longer; charge platforms fill it 30% faster | **Slipstream**: drafting behind any car fills charge at double rate and repairs the shield; teammates drafting *it* get the convoy bonus |
 
-The numbers were tuned in `test/sim.cjs` (bot races) so that every car wins some races; in bot hands the
-Hornet and Meteor win most, the Comet wrecks most (it boosts into traffic), the Bastion survives most. Tune in
-`CARS` in `src/core/00_defs.js`.
+The numbers were tuned in `test/sim.cjs` (bot races on the big v0.3 tracks) so that every car wins some races and
+the average finishing positions are within a place of each other; the Hornet and Comet wreck most (light, and the
+Comet boosts into traffic), the Bastion almost never. Tune in `CARS` in `src/core/00_defs.js`.
 
 Speeds are CS2 units per second (a player sprinting is 250). A full-speed car crosses a 640-unit-wide track in
 under a second.
@@ -70,16 +76,27 @@ under a second.
   dealt the last blow within the last 2 seconds, that player gets the CS2 kill immediately (killfeed and all).
 - **The Pulse**: once per lap a ring of light sets off from the back of the field and travels the track at 1.5x
   top speed. Every car it overtakes gets +40 charge. It is a catch-up mechanic you can see coming.
-- **Jump ramps**: a full-width striped ramp rising 70 units, then open space. Off the lip the car flies with the
-  ramp's slope (gravity 1150, a little steering, no thrust); land on the road beyond, or fall into the gap. A hard
-  landing (falling faster than 850 u/s) costs a little shield.
-- **Slick zones**: on some tracks, a strip where grip is halved (visible as a darker, wet-looking surface).
+- **Jump ramps**: a full-width striped ramp, then open space. Off the lip the car flies with the ramp's slope
+  (gravity 1150, a little steering, no thrust); land on the road beyond, or fall into the gap. Skyway's ramps rise
+  110 units and the landings are 240 lower than the lips - about 700 u/s is needed to clear the 720-unit gap. A hard
+  landing (falling faster than 1050 u/s) costs a little shield.
+- **Banked bends**: every bend leans into the turn by its curvature (up to 14-26 degrees, steepest on Skyway). A
+  banked bend grips harder and turns tighter (`RULES.bankGrip`, `bankTurn`), so the fast line hugs the high side.
+  The car and the camera lean with the road.
+- **Tubes**: some sections run through octagonal tubes with neon strips that stream past; the camera drops and
+  closes in inside them. Ringworld's lower pass runs through a tube under the bridge.
+- **Turbo start**: press W during the last half-second before GO for a launch (an instant kick and a pad-strength
+  boost for a second). Holding W down since long before GO stalls the engine for half a second. Bots get it
+  sometimes, more often the better they are.
+- **Lap records**: the best lap on each track since the map loaded is shown in the lobby ("RECORD 0:24.31 NAME")
+  and announced in chat at the end of the race that set it.
+- **Slick zones**: on some tracks, a strip where grip drops to 30% (purple and pink wavy bands).
 - **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (1.5/s), so a race is lost
   to sustained aggression, not to attrition. Bumps below a closing speed of 250 are free; the first 3 seconds after
   the lights are damage-free (the first corner is crowded).
-- **Laps**: per track (3-5, about 70-100 seconds for bots, longer for people). Eight checkpoints per lap stop corner
+- **Laps**: per track (2 or 3; a race is about 75-120 seconds for bots, longer for people). Eight checkpoints per lap stop corner
   cutting; driving the wrong way shows a warning and does not count, and a missed checkpoint shows
-  "MISSED CHECKPOINT - TURN BACK" until you go back for it.
+  "MISSED CHECKPOINT" until you go back for it.
 - **Finish**: crossing the line on the last lap. Your car warps out (flash) so it does not block the others.
   The race ends when everyone is in, or 30 seconds after the winner; the rest are ranked by distance.
 
@@ -142,32 +159,50 @@ lobby: the same.
 | Mouse (look) | nothing — the camera follows the car |
 | Mouse 1 / Mouse 2 / E (spectating) | next car / previous car / next arena |
 
-Chat: `!car 1-4`, `!spec`, `!afk`, `!back`, `!race` (controls on your own HUD).
+Chat: `!car 1-4`, `!cam` (high / far / near view), `!crt` (scanlines on/off), `!music`, `!spec`, `!afk`, `!back`,
+`!race` (controls on your own HUD).
 
 ## HUD
 
-Panorama custom HUD, per player: position and lap top-centre, shield and charge bars bottom-left, speed bottom-right,
-the top-8 standings down the right edge (names coloured by side, you highlighted), a track outline with your dot,
-centre messages (countdown, FINAL LAP, WRONG WAY, WRECKED, FINISHED 3RD), the car picker (four cards with stat
-bars) in the lobby and on the grid, and lobby status lines for anyone not racing.
+Panorama custom HUD, per player, all game text in the pixel font: a big position ("3RD/32", green on the podium,
+gold when leading) and the lap ("FINAL LAP" blinks red) top-centre, the race clock top-right, segmented pixel bars
+for shield and charge bottom-left (shield blinks red when low; charge turns gold when boosting and pink on a charge
+platform), speed bottom-right, the top-8 standings down the right edge (a side-coloured tab per row, you
+highlighted), a pixelated track map with square dots (yours blinks), centre messages (countdown, GO!, FINAL LAP,
+WRONG WAY blinking, WRECKED, FINISHED 3RD, LAP RECORD!), the car picker (four framed cards with pixelated car
+pictures and stat bars, the chosen one pulsing) in the lobby and on the grid, the SPACE RACER logo and three
+status lines in the lobby, and CRT scanlines plus a vignette over everything (`!crt` turns them off for you).
+
+How the pixel text works: each text row is a line of small image panels, one per character. The script sets each
+panel's glyph class (`g65` = A) and the row's colour class, and only for characters that changed; whole rows are
+cached, so an unchanged HUD costs nothing. Player names in the standings stay as ordinary Labels.
 
 ## Tracks (eight, all original)
 
-| Track | Lap | Laps | Character |
-|---|---|---|---|
-| Solar Oval | 15.6k | 5 | wide speedway, long straights, boost lanes, slipstream heaven (easy); slick chicane |
-| Hairpin Harbour | 23.4k | 3 | four straights joined by hairpins, charge platforms on the hairpins' outsides |
-| Crosswire | 17.9k | 4 | a figure-8 with a flat crossing - cars cross each other's path at speed; boost pads feed the crossing |
-| Null Gap | 14.4k | 5 | two long narrow sections with no rails over the void, charge platforms right before them |
-| Switchback Spire | 29.0k | 2 | climbs a stack of switchbacks (2.5D height) then a long fast sweep back down; slick zone |
-| Ringworld | 14.8k | 5 | a figure-8 with lobes of different sizes; one pass is a bridge (330 up), the other runs under it through a slick zone |
-| Skyway | 15.9k | 4 | a fast stadium with a jump ramp on each long straight over an open gap; boost pads feed the ramps |
-| Helix | 22.7k | 3 | climbs a stacked spiral (1.25 turns, upper deck 360 over the lower), then a long descent home |
+| Track | Lap | Laps | Scenery | Character |
+|---|---|---|---|---|
+| Solar Oval | 30.9k | 3 | pixel city at sunset | a huge speedway; the east bend climbs onto an elevated back straight with a chicane that ends in a tube, the west bend dives home |
+| Hairpin Harbour | 37.4k | 2 | teal city | four long straights joined by banked hairpins, climbing a terrace each time, then down through the harbour tube |
+| Crosswire | 33.3k | 3 | neon city | a giant figure-8 with a flat crossing; each lobe climbs to a high banked end |
+| Null Gap | 28.1k | 3 | asteroid belt | two long narrow rail-less sections over the void that roll up and down like a coaster |
+| Switchback Spire | 39.2k | 2 | crystal spikes | four switchbacks up to 1200 units, a long banked sweep, then a dive through a tube |
+| Ringworld | 29.5k | 3 | giant rings, asteroids | a figure-8; one pass is a bridge 920 up, the other runs under it through a tube |
+| Skyway | 33.0k | 3 | cloud sea | a stadium high in the sky with steep banking and a long downhill jump on each straight |
+| Helix | 38.8k | 3 | asteroid belt | a 1.5-turn spiral climbing 1300 units, off the side and a banked dive home through a tube |
 
-(Lap lengths in units; `preview/tracks.png` shows all six with their pads, platforms, gaps and checkpoints.)
+(Lap lengths in units; `preview/tracks.png` shows all eight with their pads, platforms, gaps, tubes and
+checkpoints; `preview/chase_all.png` the racer's view on each.)
 
-Each track sits in its own box in the void, inside a moondome (starfield sky) with a tools/skybox shell one unit
-inside it and vis hints (Lowest for the void, Low in the boxes and lobby), as in the other multi-arena maps.
+Every track has a start gantry with its name in voxel letters, checkpoint gates with their sector number in voxel
+digits, slogan billboards beside the straights, beacons and turn signs, a synth-grid floor far below (Skyway has
+clouds instead), and its own pixel-art sky: gradient bands, a dithered nebula, pixel stars, a big planet (ringed,
+banded, cratered, or a striped retro sun) and a skyline or mountain silhouette on the horizon.
+
+World layout: each track sits in its own 13,800-unit box. The eight boxes are two layers of 2 x 2 (layer 0 at
+z -5000: oval, hairpin, crosswire, null gap; layer 1 at z +3600: spire, ringworld, skyway, helix), all inside the
+CS2 world limits. Each box is a moondome (its theme's sky) with a tools/skybox shell one unit inside it and vis
+hints (Lowest for the void, Low in the boxes and lobby), as in the other multi-arena maps. Only one box is ever in
+view, so the scenery (25-35k triangles per track) costs little.
 
 ## Architecture (same shape as FreeDM)
 
@@ -175,9 +210,11 @@ inside it and vis hints (Lowest for the void, Low in the boxes and lobby), as in
 src/core/   the race game, plain JS, no engine calls: track maths, car physics, rules, bots, round manager
 src/cs2/    the CS2 side: pawn parking + chase camera, input, prop pool rendering, HUD, sounds, CS2 kills,
             round control (FireWinCondition), chat commands, cvars
-tools/      generators: tracks.py (track data + road models + minimaps), cars.py (voxel car models),
-            hud.py (Panorama layout/css), sounds.py (synthesised sounds + soundevents), vmap.py (writes the
-            whole map into the Hammer template), build.mjs (assembles the script), build_all.sh
+tools/      generators: trackdefs.py (the eight designs + colour themes), tracks.py (track data, road / tube /
+            scenery models, minimaps), retro.py (palette, dithering), pixfont.py (the pixel font, logos),
+            skies.py (pixel-art sky panoramas), cars.py (voxel car models, pixel effects), hud.py (Panorama
+            layout/css + glyph pictures), loading.py, sounds.py (chiptune sounds + music + soundevents),
+            vmap.py (writes the whole map into the Hammer template), build.mjs (assembles the script), build_all.sh
 test/       sim.cjs (bot races on the pure game), mock_cs2.mjs (the real script on a stand-in cs_script API),
             tsconfig.json + point_script.d.ts (type check against Valve's API)
 preview/    PNG renders of tracks and cars for checking without CS2
@@ -191,16 +228,23 @@ preview/    PNG renders of tracks and cars for checking without CS2
   15 deg down), far (420 / 260 / 22), near (230 / 100 / 9); pulls back further at speed, yaw eases towards the car's
   heading turned 35% into the bend ahead (so the upcoming track stays in view), a few degrees of roll in corners.
   The mouse does nothing during a race.
-- Readability at a distance: tall beacon pylons with glowing caps every ~430 units on alternating sides, and a
+- Readability at a distance: tall beacon pylons with glowing caps every ~480 units on alternating sides, and a
   chevron sign on the outside of every real corner, facing the approaching cars. No fog, nothing fades out.
-- Cars are true 3D voxel models (about 100 units long), so every viewing angle is drawn correctly - the chase camera
+- The camera leans with banked bends (60% of the road's angle), shakes a little on hits, rail strikes, landings and
+  wrecks (`CAM_SHAKE`), and drops lower inside tubes.
+- Cars are true 3D voxel models (about 115 units long), so every viewing angle is drawn correctly - the chase camera
   shows them from behind like a classic racer, and each car's tail has its own silhouette and lights.
   `preview/car_angles.png` shows all four from eight directions.
 - Every CS2 pawn stays parked (frozen, invisible, weaponless) in the booth; all damage to pawns is aborted except
   the script's own kills.
 - Tracks are `prop_static` models (road, rails, pads, platforms, scenery), unlit materials, so compiles are quick
   and the look is the same on every setting.
-- Sounds: `point_soundevent` per sound, pointed at the car prop (or an anchor) and started, as in FreeDM.
+- Sounds: `point_soundevent` per sound, pointed at the car prop (or an anchor) and started, as in FreeDM. All
+  chiptune: pulse waves, a 16-step triangle, shift-register noise, 4-bit envelopes, a 22 kHz sample-and-hold.
+- Music: three original pieces written as note lists in `tools/sounds.py` - "Parking Orbit" (lobby loop, 100 bpm,
+  D minor), "Neon Overdrive" (race loop, 156 bpm, A minor) and a results fanfare. They play for everyone at once,
+  not placed in the world (stereo, no distance fall-off); the script restarts each loop as it ends. `MUSIC: false`
+  in CONFIG turns it off; the volume is `MUSIC_VOL` in `tools/sounds.py`.
 
 ## Settings (CONFIG in the script)
 

@@ -21,6 +21,8 @@ class Car {
     this.fallTimer = 0; this.fx = 0;   // fx bits for the renderer: 1 hit, 2 rail, 4 pulsed, 8 pad, 16 fell
     this.pulsed = 0; this.noDamage = 0; this.calm = 0;   // seconds of no-damage after the start
     this.air = false; this.tz = 0; this.lift = 0; this.airTime = 0;   // jumps: airborne flag, track height, ramp height under the car
+    this.bank = 0;                 // tan of the road's lean under the car (banked bends)
+    this.gasAt = null; this.stall = 0;   // turbo start: when the gas went down on the grid; seconds of stalled engine
   }
 
   placeAt(x, y, z, yaw, track) {
@@ -47,7 +49,8 @@ class Car {
     if (this.state !== 'racing' && this.state !== 'finished') return;
     const finished = this.state === 'finished';
     // finished cars coast on autopilot for a moment, then leave
-    const throttle = finished ? 0.4 : clamp(c.throttle, -1, 1);
+    if (this.stall > 0) this.stall -= dt;
+    const throttle = finished ? 0.4 : this.stall > 0 ? 0 : clamp(c.throttle, -1, 1);
     const steer = finished ? this.autoSteer(track) : (this.spinTimer > 0 ? 0 : clamp(c.steer, -1, 1));
     const air = this.air;
     const wantBoost = !finished && !air && c.boost && this.charge > 0;
@@ -66,6 +69,7 @@ class Car {
     if (this.drifting) turnRate *= 1.45;
     if (this.slick) turnRate *= 0.8;
     if (this.spinTimer > 0) turnRate *= 0.3;
+    if (!air) turnRate *= 1 + Math.abs(this.bank) * RULES.bankTurn;   // banked bends turn tighter
     if (air) turnRate *= RULES.airControl;
     this.yaw += turnRate * steer * dt * (this.vf < 0 ? -1 : 1);
     fx = Math.cos(this.yaw); fy = Math.sin(this.yaw);
@@ -94,6 +98,7 @@ class Car {
     let grip = this.drifting ? sp.driftGrip : sp.grip;
     if (this.slick) grip *= RULES.slickGrip;
     if (this.spinTimer > 0) grip *= 0.5;
+    if (!air) grip *= 1 + Math.abs(this.bank) * RULES.bankGrip;        // ... and hold the car better
     const g = air ? 1 : Math.exp(-grip * dt);
     this.sliding = Math.abs(vl) > 90 && absv > 300;
     if (this.drifting && this.sliding) this.charge = Math.min(sp.charge, this.charge + RULES.driftChargeRate * sp.driftCharge * dt);
@@ -104,7 +109,7 @@ class Car {
     this.x += this.vx * dt; this.y += this.vy * dt;
     // where on the track are we now
     const p = track.locate(this.x, this.y, this.tz, this.seg);
-    this.seg = p.i; this.t = p.t; this.d = p.d; this.tz = p.z;
+    this.seg = p.i; this.t = p.t; this.d = p.d; this.tz = p.z; this.bank = p.bank;
     this.prevS = this.s; this.s = p.s;
     // height: ramps lift the car, the lip of a ramp throws it, an open gap drops it
     const lift = track.rampLift(p.i, p.t);
@@ -116,7 +121,7 @@ class Car {
       this.z += this.vz * dt;
       if (this.z <= ground && road && !finished) {
         this.air = false; this.z = ground; this.fx |= 1024;
-        if (this.vz < -850 && this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, (-this.vz - 850) * 0.03), null, tic);
+        if (this.vz < -RULES.landSafe && this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, (-this.vz - RULES.landSafe) * 0.03), null, tic);
         this.vz = 0;
       } else if (!road && this.z < ground - 40 && !finished) {
         this.state = 'falling'; this.stateTime = 0; this.fallTimer = RULES.fallTime; this.fx |= 16; this.air = false;

@@ -9,10 +9,12 @@ import numpy as np
 from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(__file__))
 import s2
+import retro
+from retro import *
 
 OUT = sys.argv[1]
 PREVIEW = sys.argv[2] if len(sys.argv) > 2 else None
-VOX = 3.0                      # units per voxel (a Hornet is about 100 units long)
+VOX = 3.4                      # units per voxel (a Hornet is about 115 units long)
 HOVER = 12                     # units the hull floats above the road
 MDIR = 'models/spr/cars'
 PAL_DIR = 'materials/spr/cars'
@@ -218,12 +220,12 @@ def shadow_tris(L, W):
     return tris
 
 def write_shadow_material():
-    S = 64
-    yy, xx = np.mgrid[0:S, 0:S]
-    r = np.hypot((yy - S / 2) / (S / 2), (xx - S / 2) / (S / 2))
-    alpha = (np.clip(1 - r, 0, 1) ** 1.2 * 170).astype(np.uint8)
-    col = np.zeros((S, S, 3), np.uint8)
-    return s2.write_material(OUT, PAL_DIR + '/shadow', col, alpha, blend=1, comment='hover shadow')
+    G = 16          # a stepped pixel shadow: three rings of darkness
+    yy, xx = np.mgrid[0:G, 0:G]
+    r = np.hypot((yy + 0.5 - G / 2) / (G / 2), (xx + 0.5 - G / 2) / (G / 2))
+    alpha = (np.ceil(np.clip(1 - r, 0, 1) * 3) / 3 * 170).astype(np.uint8)
+    col = np.zeros((G * 4, G * 4, 3), np.uint8)
+    return s2.write_material(OUT, PAL_DIR + '/shadow', col, up(alpha, 4), blend=1, comment='hover shadow')
 
 def build_car(key, boost, pal_paths, shadow_mat):
     L, W, H = DIMS[key]
@@ -265,23 +267,34 @@ _flame_shift_wrapper()
 
 # ---------------------------------------------------------------- effects
 def fireball(S, frame):
+    """pixel-art explosion frame (drawn at 16 x 16, upscaled to S): a white flash, a jagged fire ball, a broken
+    ring with flying debris, then smoke puffs. Alpha is cut-out (crisp pixel edges)."""
+    G = 16
     rng = np.random.RandomState(31 + frame)
-    yy, xx = np.mgrid[0:S, 0:S]
-    img = np.zeros((S, S, 4), np.float32)
-    n = 10 + frame * 4
-    for k in range(n):
-        a = rng.rand() * 2 * math.pi; d = rng.rand() * (0.15 + frame * 0.16) * S / 2
-        cx, cy = S / 2 + math.cos(a) * d, S / 2 + math.sin(a) * d
-        r = (0.12 + rng.rand() * 0.16) * S * (1 + frame * 0.25)
-        m = np.clip(1 - np.hypot(xx - cx, yy - cy) / r, 0, 1) ** 1.5
-        heat = 1 - frame / 4.0
-        col = np.array([255, 120 + 120 * heat, 40 * heat]) if frame < 3 else np.array([70, 70, 75])
-        img[..., :3] = np.maximum(img[..., :3], col[None, None, :] * m[..., None] / 255 * 255)
-        img[..., 3] = np.maximum(img[..., 3], m * (255 if frame < 3 else 160))
+    yy, xx = np.mgrid[0:G, 0:G]
+    cx = cy = (G - 1) / 2
+    ang = np.arctan2(yy - cy, xx - cx)
+    jag = 1 + 0.22 * np.sin(ang * 7 + frame) + 0.12 * np.sin(ang * 13 + 2 * frame)
+    r = np.hypot(xx - cx, yy - cy) / jag
+    img = np.zeros((G, G, 4), np.uint8)
+    def put(mask, col): img[mask, :3] = col; img[mask, 3] = 255
     if frame == 0:
-        core = np.clip(1 - np.hypot(xx - S / 2, yy - S / 2) / (S * 0.18), 0, 1)
-        img[..., :3] = np.maximum(img[..., :3], 255 * core[..., None]); img[..., 3] = np.maximum(img[..., 3], core * 255)
-    return img.clip(0, 255).astype(np.uint8)
+        put(r < 5.5, ORANGE); put(r < 4.3, GOLD); put(r < 3.0, CREAM); put(r < 1.8, WHITE)
+    elif frame == 1:
+        put(r < 7.5, RED); put(r < 6.2, ORANGE); put(r < 4.5, GOLD); put(r < 2.5, CREAM)
+    elif frame == 2:
+        ring = (r > 4.0) & (r < 7.6)
+        holes = rng.rand(G, G) < 0.3
+        put(ring & ~holes, ORANGE); put(ring & ~holes & (r < 5.4), RED); put((r < 4.0) & (rng.rand(G, G) < 0.25), GOLD)
+        for _ in range(7):
+            x, y = rng.randint(G), rng.randint(G)
+            put((xx == x) & (yy == y), GOLD)
+    else:
+        for _ in range(6):
+            px, py, pr = rng.uniform(3, 12), rng.uniform(3, 12), rng.uniform(1.8, 3.4)
+            d = np.hypot(xx - px, yy - py)
+            put(d < pr, MAUVE); put(d < pr * 0.6, LILAC)
+    return up(img, S // G)
 
 def star_tris(mat, w, h, zoff=0.0):
     """three crossed vertical planes (both faces drawn by CS2), width w, height h, centred, bottom at zoff"""
@@ -299,23 +312,27 @@ def write_effects():
     out = {}
     for f in range(4):
         img = fireball(64, f)
-        mat = s2.write_material(OUT, '%s/boom%d' % (PAL_DIR, f), img[..., :3] * (img[..., 3:4] > 0), img[..., 3], blend=1, backfaces=True, comment='wreck frame %d' % f)
+        mat = s2.write_material(OUT, '%s/boom%d' % (PAL_DIR, f), img[..., :3], img[..., 3], blend=2, backfaces=True, comment='wreck frame %d' % f)
         size = 70 + f * 40
         out['boom%d' % f] = s2.write_model(OUT, MDIR, 'boom%d' % f, star_tris('spr_fx', size, size, -size * 0.3), {'spr_fx': mat})
     # warp-out flash: a tall bright pillar, two frames
     for f in range(2):
-        S = 32
-        yy, xx = np.mgrid[0:S, 0:S]
-        m = np.clip(1 - np.abs(xx - S / 2) / (S / 2), 0, 1) ** (1.0 if f == 0 else 2.5)
-        img = np.zeros((S, S, 3), np.uint8); img[:] = (200, 240, 255)
-        mat = s2.write_material(OUT, '%s/warp%d' % (PAL_DIR, f), img, (m * 255).astype(np.uint8), blend=1, backfaces=True, comment='warp-out %d' % f)
+        G = 16
+        yy, xx = np.mgrid[0:G, 0:G]
+        dx = np.abs(xx - (G - 1) / 2)
+        img = np.zeros((G, G, 3), np.uint8); img[:] = ICE
+        img[dx < 4.5] = FROST; img[dx < 2] = WHITE
+        img[(yy % 4 == f * 2) & (dx < 6)] = SKYBLUE
+        alpha = ((dx < (7 if f == 0 else 3.5)) & ~((yy % 3 == 0) & (dx > 4))).astype(np.uint8) * 255
+        mat = s2.write_material(OUT, '%s/warp%d' % (PAL_DIR, f), up(img, 4), up(alpha, 4), blend=2, backfaces=True, comment='warp-out %d' % f)
         out['warp%d' % f] = s2.write_model(OUT, MDIR, 'warp%d' % f, star_tris('spr_fx', 90 if f == 0 else 50, 220 if f == 0 else 320, 0), {'spr_fx': mat})
     # the Pulse: a translucent vertical wave across the track (two-sided), 760 wide, 160 tall
-    S = 64
-    yy, xx = np.mgrid[0:S, 0:S]
-    a = (np.clip(1 - yy / S, 0, 1) ** 1.3) * (0.55 + 0.45 * np.sin(xx / S * 2 * math.pi * 3) ** 2)
-    img = np.zeros((S, S, 3), np.uint8); img[:] = (90, 240, 255)
-    mat = s2.write_material(OUT, PAL_DIR + '/pulse', img, (a * 200).astype(np.uint8), blend=1, backfaces=True, comment='the Pulse')
+    G = 16
+    yy, xx = np.mgrid[0:G, 0:G]
+    a = (np.floor((1 - yy / G) * 5) / 5) * (0.6 + 0.4 * ((xx // 2) % 2))       # stepped bands: brighter low down
+    img = np.zeros((G, G, 3), np.uint8); img[:] = ICE
+    img[yy % 4 == 0] = WHITE; img[yy > 11] = TEAL
+    mat = s2.write_material(OUT, PAL_DIR + '/pulse', up(img, 4), up((a * 210).astype(np.uint8), 4), blend=1, backfaces=True, comment='the Pulse')
     w, h = 760, 160
     p = [(0, -w / 2, 0, 0, 1), (0, w / 2, 0, 1, 1), (0, w / 2, h, 1, 0), (0, -w / 2, h, 0, 0)]
     tris = [('spr_fx', (p[0], p[1], p[2]), (1, 0, 0)), ('spr_fx', (p[0], p[2], p[3]), (1, 0, 0))]

@@ -119,3 +119,38 @@ def box_tris(mat, x0, y0, z0, x1, y1, z1, uscale=1 / 64.0):
     q(c[1], c[2], c[6], c[5], (1, 0, 0), 1, 2)      # x1
     q(c[3], c[0], c[4], c[7], (-1, 0, 0), 1, 2)     # x0
     return t
+
+
+def quad_n(mat, p0, p1, p2, p3, uv0, uv1, uv2, uv3, n):
+    """like quad, but flips the winding when needed so the quad faces along n"""
+    ax, ay, az = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
+    bx, by, bz = p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]
+    cx, cy, cz = ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx
+    if cx * n[0] + cy * n[1] + cz * n[2] < 0:
+        return quad(mat, p3, p2, p1, p0, uv3, uv2, uv1, uv0, n)
+    return quad(mat, p0, p1, p2, p3, uv0, uv1, uv2, uv3, n)
+
+
+def tri_n(mat, p0, p1, p2, uv0, uv1, uv2, n):
+    ax, ay, az = p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]
+    bx, by, bz = p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]
+    cx, cy, cz = ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx
+    if cx * n[0] + cy * n[1] + cz * n[2] < 0:
+        return [(mat, (p2 + uv2, p1 + uv1, p0 + uv0), n)]
+    return [(mat, (p0 + uv0, p1 + uv1, p2 + uv2), n)]
+
+
+def box_faces(mats, x0, y0, z0, x1, y1, z1, uscale=1 / 256.0):
+    """closed box with a material per face direction: mats = dict(top, bottom, x, y) (x: the +-x faces, y: the +-y faces)"""
+    t = []
+    def q(m, p0, p1, p2, p3, n, ua, va):
+        uv = [((p[ua]) * uscale, (p[va]) * uscale) for p in (p0, p1, p2, p3)]
+        t.extend(quad_n(m, p0, p1, p2, p3, uv[0], uv[1], uv[2], uv[3], n))
+    c = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    q(mats['top'], c[4], c[5], c[6], c[7], (0, 0, 1), 0, 1)
+    if mats.get('bottom'): q(mats['bottom'], c[3], c[2], c[1], c[0], (0, 0, -1), 0, 1)
+    q(mats['y'], c[0], c[1], c[5], c[4], (0, -1, 0), 0, 2)
+    q(mats['y'], c[2], c[3], c[7], c[6], (0, 1, 0), 0, 2)
+    q(mats['x'], c[1], c[2], c[6], c[5], (1, 0, 0), 1, 2)
+    q(mats['x'], c[3], c[0], c[4], c[7], (-1, 0, 0), 1, 2)
+    return t

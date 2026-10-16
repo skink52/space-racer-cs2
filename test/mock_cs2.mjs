@@ -53,7 +53,7 @@ const hudIds = new Set(JSON.parse(fs.readFileSync(path.join(root, 'out/addon/_ge
 const hudCss = fs.readFileSync(path.join(root, `out/addon/panorama/styles/custom_game/${NAME}.css`), 'utf8');
 const classesUsed = new Map();
 class CustomHudLayout extends Entity {
-  SetHasClassForPlayer(slot, panel, cls, on) { stats.hudCalls++; if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); classesUsed.set(cls, (classesUsed.get(cls) || 0) + 1); }
+  SetHasClassForPlayer(slot, panel, cls, on) { stats.hudCalls++; const pk = panel.replace(/_\d+$/, '').replace(/\d+$/, ''); (stats.hudBy ||= {})[pk] = (stats.hudBy[pk] || 0) + 1; if (OPTS.includes('hudtrace') && slot === 0 && (pk === 'spr_lap' || pk === 'spr_sub') && on && time > 60 && time < 64) console.log('t', time.toFixed(2), panel, cls); if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); classesUsed.set(cls, (classesUsed.get(cls) || 0) + 1); }
   SetDialogVariableStringForPlayer(slot, panel, name, value) { stats.hudVars++; if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); if (typeof value !== 'string') throw new Error('non-string dialog var'); }
   ResetForPlayer() {}
 }
@@ -141,6 +141,7 @@ const Instance = {
   EntFireAtTarget: ({ target, input, value }) => {
     if (input === 'Skin') stats.skins++;
     else if (input === 'StartSound') { stats.sounds++; if (!target.name.startsWith('spr_snd_')) throw new Error('sound on ' + target.name); }
+    else if (input === 'StopSound') { stats.stops = (stats.stops || 0) + 1; if (!target.name.startsWith('spr_snd_mus_')) throw new Error('stop on ' + target.name); }
     else if (input === 'SetSourceEntity') { if (!spawnedEnts.some((e) => e.name === value)) throw new Error('unknown sound source ' + value); }
     else throw new Error('unexpected input ' + input);
   },
@@ -249,6 +250,7 @@ console.log('says:', stats.says.slice(0, 10).join('\n      '));
 const live = players.filter((c) => c.connected);
 console.log(`scoreboard kills ${players.reduce((n, c) => n + c.kills, 0)} deaths ${players.reduce((n, c) => n + c.deaths, 0)} (teamkill penalties ${stats.teamkills}), connected ${live.length} (${live.filter((c) => !c.bot).length} humans), churn ${JSON.stringify(stats.churn)}`);
 const unknownCls = [...classesUsed.keys()].filter((c) => c && !hudCss.includes('.' + c));
+if (OPTS.includes('hudstats')) console.log('HUD calls by panel:', JSON.stringify(Object.entries(stats.hudBy || {}).sort((a, b) => b[1] - a[1]).slice(0, 14)));
 console.log('HUD classes not in the css:', unknownCls.join(' ') || 'none');
 if (stats.errors.length) { console.log('ERRORS/WARNINGS:'); for (const e of [...new Set(stats.errors)].slice(0, 20)) console.log('  ' + e); }
 console.log('log:', stats.msgs.filter((m) => !/chat command/.test(m)).slice(0, 12).join(' | '));

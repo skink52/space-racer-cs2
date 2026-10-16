@@ -1,5 +1,5 @@
-"""Writes the whole Space Racer map into a Hammer map (binary DMX .vmap): the six track props in their boxes in the
-void, a moondome (starfield sky shell) and tools/skybox shell around each box, vis hints, the lobby, the pawn booth,
+"""Writes the whole Space Racer map into a Hammer map (binary DMX .vmap): the eight track props in their boxes in the
+void (two layers of 2 x 2), a moondome (pixel-art sky shell, one per theme) and tools/skybox shell around each box, vis hints, the lobby, the pawn booth,
 the model cache room, spawns and every entity the script needs.
 
 usage: vmap.py <template_or_current.vmap> <out.vmap> <addon_out_dir> [script_name]
@@ -21,8 +21,6 @@ NAME = sys.argv[4] if len(sys.argv) > 4 else 'space_racer'
 GROUP = 'spr_env'
 SCRIPT_PATH = 'maps/scripts/%s.vjs' % NAME
 HUD_PATH = 'panorama/layout/custom_game/%s.vxml' % NAME
-BOX = 7000
-MOONDOME = 'materials/spr/sky/moondome.vmat'
 TOOLSSKY = 'materials/tools/toolsskybox.vmat'
 HINT_LOWEST, HINT_LOW = 9, 3
 LZ = -12000
@@ -36,36 +34,15 @@ root = d.root
 world = root.get('world')
 vmaplib.init(d, OUT)
 
-# ---------------------------------------------------------------- sky: a starfield with a faint nebula (original, generated)
-def sky():
-    H, W = 1024, 2048
-    rng = np.random.RandomState(42)
-    img = np.zeros((H, W, 3), np.float32)
-    lat = (0.5 - (np.arange(H) + 0.5) / H)[:, None]
-    lon = ((np.arange(W) + 0.5) / W)[None, :]
-    # deep blue-black with a nebula band
-    band = np.exp(-((lat - 0.08 * np.sin(lon * 2 * math.pi * 2)) / 0.22) ** 2)
-    img[..., 0] = 6 + 28 * band; img[..., 1] = 8 + 14 * band; img[..., 2] = 18 + 48 * band
-    blobs = rng.rand(14, 5)
-    for bx, by, br, bc, bi in blobs:
-        cx, cy = bx * W, (0.25 + by * 0.5) * H
-        yy, xx = np.mgrid[0:H, 0:W]
-        dx = np.minimum(np.abs(xx - cx), W - np.abs(xx - cx)) / (W * 0.08 * (0.5 + br)); dy = (yy - cy) / (H * 0.07 * (0.5 + br))
-        g = np.exp(-(dx * dx + dy * dy)) * 40 * bi
-        col = np.array([[0.9, 0.3, 0.8], [0.3, 0.6, 1.0], [1.0, 0.6, 0.3]][int(bc * 3) % 3])
-        img += g[..., None] * col[None, None, :]
-    # stars
-    n = 9000
-    sx = rng.randint(0, W, n); sy = rng.randint(0, H, n); sb = rng.rand(n) ** 3 * 255
-    img[sy, sx] += sb[:, None] * np.array([0.9, 0.95, 1.0])[None, :]
-    big = rng.rand(n) < 0.06
-    for k in np.where(big)[0]:
-        x, y = sx[k], sy[k]
-        img[max(0, y - 1):y + 2, max(0, x - 1):x + 2] += sb[k] * 0.5
+# ---------------------------------------------------------------- skies: a pixel-art panorama per track theme (tools/skies.py)
+import skies
+from trackdefs import THEMES, TRACKS as DEFS
+import retro
+DEF = {t['id']: t for t in DEFS}
+def sky_files(key, img):
     dd = os.path.join(OUT, 'materials/spr/sky'); os.makedirs(dd, exist_ok=True)
-    Image.fromarray(img.clip(0, 255).astype(np.uint8)).save(os.path.join(dd, 'sky_color.png'))
-    open(os.path.join(dd, 'sky.vmat'), 'w', newline='\n').write('// Space Racer sky\nLayer0\n{\n\tshader "sky.vfx"\n\tF_TEXTURE_FORMAT2 1\n\tSkyTexture "materials/spr/sky/sky_color.png"\n\tg_flBrightnessExposureBias "0.000"\n}\n')
-    open(os.path.join(dd, 'moondome.vmat'), 'w', newline='\n').write('''// Space Racer moondome: mesh material that shows the sky (same panorama as env_sky), unlit, no shadows, no fog
+    Image.fromarray(img).save(os.path.join(dd, 'sky_%s_color.png' % key))
+    open(os.path.join(dd, 'moondome_%s.vmat' % key), 'w', newline='\n').write('''// Space Racer moondome (%s): mesh material that shows the sky panorama, unlit, no shadows, no fog
 Layer0
 {
 	shader "csgo_moondome.vfx"
@@ -74,18 +51,32 @@ Layer0
 	TextureColor "materials/spr/sky/moondome_color.png"
 	g_flCubeParallax "0.000"
 	g_bFogEnabled "0"
-	TextureCubeMap "materials/spr/sky/sky_color.png"
+	TextureCubeMap "materials/spr/sky/sky_%s_color.png"
 }
-''')
+''' % (key, key))
+    return 'materials/spr/sky/moondome_%s.vmat' % key
+def sky():
+    dd = os.path.join(OUT, 'materials/spr/sky'); os.makedirs(dd, exist_ok=True)
     Image.new('RGB', (16, 16), (255, 255, 255)).save(os.path.join(dd, 'moondome_color.png'))
-sky()
+    mats = {}
+    for k, t in enumerate(DEFS):
+        img = skies.make_sky(t['theme'], THEMES[t['theme']], t['scenery'], k + 5)
+        mats[t['id']] = sky_files(t['id'], img)
+        if k == 0:
+            Image.fromarray(img).save(os.path.join(dd, 'sky_color.png'))
+    open(os.path.join(dd, 'sky.vmat'), 'w', newline='\n').write('// Space Racer sky\nLayer0\n{\n\tshader "sky.vfx"\n\tF_TEXTURE_FORMAT2 1\n\tSkyTexture "materials/spr/sky/sky_color.png"\n\tg_flBrightnessExposureBias "0.000"\n}\n')
+    return mats
+SKY_MATS = sky()
 
 # lobby materials (dark panels with a thin light line)
 def lobby_mats():
+    """retro panels: dark tiles with a neon grid line, dithered"""
     dd = os.path.join(OUT, 'materials/spr'); os.makedirs(dd, exist_ok=True)
-    for name, col, line in (('lobby_wall', (24, 28, 40), (60, 200, 255)), ('lobby_floor', (18, 20, 30), (40, 60, 90)), ('lobby_ceil', (12, 14, 22), (30, 40, 60))):
-        img = np.zeros((256, 256, 3), np.uint8); img[:] = col
-        img[::64, :] = line; img[:, ::64] = line
+    for name, col, line in (('lobby_wall', retro.INK, retro.TEAL), ('lobby_floor', retro.BLACK, retro.MAGENTA), ('lobby_ceil', retro.INK, retro.PLUM)):
+        img = np.zeros((32, 32, 3), np.float32); img[:] = col
+        img[0, :] = line; img[:, 0] = line
+        img[1:3, :] = np.array(line, np.float32) * 0.35 + np.array(col, np.float32) * 0.65
+        img = retro.up(retro.quantize(img, 24), 8)
         Image.fromarray(img).save(os.path.join(dd, name + '_color.png'))
         open(os.path.join(dd, name + '.vmat'), 'w', newline='\n').write('// Space Racer lobby\nLayer0\n{\n\tshader "csgo_unlitgeneric.vfx"\n\tF_BLEND_MODE 0\n\tTextureColor "materials/spr/%s_color.png"\n\tg_vColorTint "[1.000000 1.000000 1.000000 0.000000]"\n}\n' % name)
 lobby_mats()
@@ -112,9 +103,10 @@ for tp in tracks:
     ox, oy, oz = tp['off']
     ent('prop_static', (ox, oy, oz), group=GROUP, model=tp['model'], solid='0', disableshadows='1', fademindist='-1', fademaxdist='0',
         rendertocubemaps='0', bakelighting='0', visoccluder='0')
-    box = (ox - BOX / 2, oy - BOX / 2, oz + tp['zmin'] - 900, ox + BOX / 2, oy + BOX / 2, oz + tp['zmax'] + 3400)   # tall enough for the lobby's overview camera
+    hb = tp['half']
+    box = (ox - hb, oy - hb, oz + tp['floor'] - 500, ox + hb, oy + hb, oz + tp['zmax'] + 4800)   # tall enough for the lobby's overview camera
     boxes.append(box)
-    shell(box, MOONDOME, 0)
+    shell(box, SKY_MATS[tp['id']], 0)
     shell(box, TOOLSSKY, 1)
     hint(box, HINT_LOW)
 for i, a in enumerate(boxes):
@@ -158,7 +150,7 @@ for k, mpath in enumerate(models):
     ent('prop_dynamic', (x, y, LZ + 8), group=GROUP, targetname='spr_cache_%d' % k, model=mpath, solid='0', disableshadows='1')
 for k, s in enumerate(SOUNDS):
     ent('point_soundevent', (-600 + (k % 12) * 100, 600 + (k // 12) * 100, LZ + 64), group=GROUP, targetname='spr_snd_' + s, soundName='spr.' + s,
-        startOnSpawn='0', toLocalPlayer='0', stopOnNew='0', saveAndRestore='0')
+        startOnSpawn='0', toLocalPlayer='0', stopOnNew='1' if s.startswith('mus_') else '0', saveAndRestore='0')
 # bots need a walkable seed for nav generation
 seed = ent('func_nav_markup', (0, 0, 0), group=GROUP, navProperty_NavGen='WALKABLESEED', flags='1')
 v, faces = box_faces(-704, -704, LZ + 1, 704, 704, LZ + 40, inward=False)

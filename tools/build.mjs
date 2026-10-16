@@ -16,7 +16,11 @@ if (fs.existsSync(adapterDir) && fs.existsSync(carModels)) {
   const adapter = cat(adapterDir);
   const head = `import { Instance, CSInputs, CSPlayerPawn, CSPlayerController, BaseModelEntity, PointTemplate, CustomHudLayout, CSDamageFlags, CSDamageTypes, CustomCameraMode, CSMoveType, CSRoundEndReason, Entity } from "cs_script/point_script";\n`;
   const models = fs.readFileSync(carModels, 'utf8');
-  const out = head + core + `\nconst TRACKS = ${tracks};\nconst CAR_MODELS = ${models};\n` + adapter;
+  const hudTextPath = path.join(root, 'out/addon/_gen/hud_text.json');
+  const hudText = fs.existsSync(hudTextPath) ? fs.readFileSync(hudTextPath, 'utf8') : '{"slots":{},"charset":""}';
+  const musicPath = path.join(root, 'out/addon/_gen/music.json');
+  const music = fs.existsSync(musicPath) ? fs.readFileSync(musicPath, 'utf8') : '{}';
+  const out = head + core + `\nconst TRACKS = ${tracks};\nconst CAR_MODELS = ${models};\nconst HUD_TEXT = ${hudText};\nconst MUSIC_LEN = ${music};\n` + adapter;
   fs.mkdirSync(path.join(root, 'out/addon/maps/scripts'), { recursive: true });
   fs.writeFileSync(path.join(root, `out/addon/maps/scripts/${NAME}.js`), out);
   console.log('cs2 script', (out.length / 1024).toFixed(0), 'KB ->', `maps/scripts/${NAME}.js`);

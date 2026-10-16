@@ -70,9 +70,27 @@ class Arena {
       this.countdown--;
       const secs = Math.ceil(this.countdown / TICRATE);
       if (secs <= 3 && secs !== this.lastBeep && this.countdown > 0) { this.lastBeep = secs; this.events.push({ type: 'beep', n: secs }); }
+      // turbo start: remember when each driver last pressed the gas during the final beeps
+      if (secs <= 3) for (const car of this.order) {
+        if (car.state !== 'grid' || car.isBot) continue;
+        if (car.cmd.throttle > 0) { if (car.gasAt === null) car.gasAt = this.countdown; } else car.gasAt = null;
+      }
       if (this.countdown <= 0) {
         this.state = 'racing'; this.raceTic = 0;
-        for (const car of this.order) if (car.state === 'grid') { car.state = 'racing'; car.stateTime = 0; car.lapStart = 0; car.noDamage = RULES.startProtect; }
+        for (const car of this.order) if (car.state === 'grid') {
+          car.state = 'racing'; car.stateTime = 0; car.lapStart = 0; car.noDamage = RULES.startProtect;
+          // gas pressed in the last moment before the lights: a turbo start; held down since long before: a stall
+          const g = car.isBot ? (rnd() < car.bot.skill * RULES.botLaunch ? 1 : null) : car.gasAt;
+          if (g !== null && g <= RULES.launchWindow * TICRATE) {
+            const fx = Math.cos(car.yaw), fy = Math.sin(car.yaw);
+            car.vx += fx * RULES.launchKick; car.vy += fy * RULES.launchKick; car.padTimer = RULES.launchTime; car.fx |= 8;
+            this.events.push({ type: 'launch', car });
+          } else if (g !== null && g > RULES.stallAfter * TICRATE) {
+            car.stall = RULES.stallTime;
+            this.events.push({ type: 'stall', car });
+          }
+          car.gasAt = null;
+        }
         this.events.push({ type: 'go' });
       }
       return;

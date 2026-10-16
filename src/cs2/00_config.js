@@ -7,6 +7,7 @@ const CONFIG = {
   ARENA_LAYOUT: '2x32',          // '2x32': up to 2 arenas of 32 (33+ split evenly); '4x16': up to 4 arenas of 16; 'alternate': switch each round
   ARENA_MIN: 8,                  // with more than one arena, none has fewer than this
   ENGINE_HUM: true,              // engine sound on every human-driven car (pitch follows speed)
+  MUSIC: true,                   // chiptune music for everyone: a lobby loop, a race loop and a results fanfare
   MIN_PLAYERS: 1,                // fewer than this on T/CT (bots count): no race, everyone waits in the lobby
   LAPS: 0,                       // 0 = each track's own lap count
   COUNTDOWN: 10,                 // seconds on the grid before the lights
@@ -52,13 +53,16 @@ const CONFIG = {
   CAM_TURN: 6.0,                 // how quickly the camera swings round behind the car
   CAM_LOOKAHEAD: 0.35,           // 0..1: how much the camera turns into the bend ahead (shows more of the upcoming track)
   CAM_ROLL: 8,                   // max degrees of lean in corners
+  CAM_SHAKE: 1.0,                // camera shake on hits / landings / wrecks (0 = off, 2 = double)
+  CAM_BANK: 0.6,                 // how much of a banked bend's lean the camera copies
+  CAM_TUBE_UP: 150, CAM_TUBE_BACK: 300,   // camera height / distance limits inside tubes
   HIDE_OWN_BODY: true,
 
   // ---- rendering
   MAX_EFFECT_PROPS: 40,          // per arena
   MAX_SOUNDS_PER_TICK: 24,
   SPAWN_BUDGET: 24,              // new props per server tick at most
-  HUD_BUDGET: 700,               // HUD changes per server tick at most
+  HUD_BUDGET: 900,               // HUD changes per server tick at most (pixel text sends one per changed letter)
   STANDINGS_PERIOD: 0.5,         // seconds between standings refreshes
 
   // ---- input
@@ -76,4 +80,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
