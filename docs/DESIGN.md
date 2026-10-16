@@ -70,6 +70,9 @@ under a second.
   dealt the last blow within the last 2 seconds, that player gets the CS2 kill immediately (killfeed and all).
 - **The Pulse**: once per lap a ring of light sets off from the back of the field and travels the track at 1.5x
   top speed. Every car it overtakes gets +40 charge. It is a catch-up mechanic you can see coming.
+- **Jump ramps**: a full-width striped ramp rising 70 units, then open space. Off the lip the car flies with the
+  ramp's slope (gravity 1150, a little steering, no thrust); land on the road beyond, or fall into the gap. A hard
+  landing (falling faster than 850 u/s) costs a little shield.
 - **Slick zones**: on some tracks, a strip where grip is halved (visible as a darker, wet-looking surface).
 - **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (1.5/s), so a race is lost
   to sustained aggression, not to attrition. Bumps below a closing speed of 250 are free; the first 3 seconds after
@@ -98,8 +101,8 @@ under a second.
 
 - Up to 32 cars per arena, up to 2 arenas: 1-32 players race together; 33-64 are split evenly into two arenas
   (33 → 17 + 16). The split keeps the same share of Ts and CTs in each arena.
-- Each arena races on a different track, picked at random from the six in the map, never the same track two
-  rounds running.
+- Each arena races on a different track, picked at random from the eight in the map, never the same track two
+  rounds running. The next round's tracks are picked in advance so the lobby can show them.
 - Bots on the server race too (CS2 bots are driven by the script's own driving AI), so a test server with
   `bot_quota` fills the grid.
 
@@ -148,16 +151,18 @@ the top-8 standings down the right edge (names coloured by side, you highlighted
 centre messages (countdown, FINAL LAP, WRONG WAY, WRECKED, FINISHED 3RD), the car picker (four cards with stat
 bars) in the lobby and on the grid, and lobby status lines for anyone not racing.
 
-## Tracks (six, all original)
+## Tracks (eight, all original)
 
 | Track | Lap | Laps | Character |
 |---|---|---|---|
 | Solar Oval | 15.6k | 5 | wide speedway, long straights, boost lanes, slipstream heaven (easy); slick chicane |
-| Hairpin Harbour | 23.4k | 4 | four straights joined by hairpins, charge platforms on the hairpins' outsides |
+| Hairpin Harbour | 23.4k | 3 | four straights joined by hairpins, charge platforms on the hairpins' outsides |
 | Crosswire | 17.9k | 4 | a figure-8 with a flat crossing - cars cross each other's path at speed; boost pads feed the crossing |
 | Null Gap | 14.4k | 5 | two long narrow sections with no rails over the void, charge platforms right before them |
-| Switchback Spire | 29.0k | 3 | climbs a stack of switchbacks (2.5D height) then a long fast sweep back down; slick zone |
-| Ringworld | 14.8k | 5 | a figure-8 with lobes of different sizes; one pass is a bridge, the other runs under it through a slick zone |
+| Switchback Spire | 29.0k | 2 | climbs a stack of switchbacks (2.5D height) then a long fast sweep back down; slick zone |
+| Ringworld | 14.8k | 5 | a figure-8 with lobes of different sizes; one pass is a bridge (330 up), the other runs under it through a slick zone |
+| Skyway | 15.9k | 4 | a fast stadium with a jump ramp on each long straight over an open gap; boost pads feed the ramps |
+| Helix | 22.7k | 3 | climbs a stacked spiral (1.25 turns, upper deck 360 over the lower), then a long descent home |
 
 (Lap lengths in units; `preview/tracks.png` shows all six with their pads, platforms, gaps and checkpoints.)
 
@@ -182,8 +187,15 @@ preview/    PNG renders of tracks and cars for checking without CS2
   interpolates; no sub-tick interpolation needed.
 - Cars are pooled `prop_dynamic` entities spawned from one `point_template` (model = car class + state:
   normal / boosting / wreck frames; skin = T or CT colour).
-- Camera: `CustomPlayerCamera` in CONTROLLED mode, 260 units behind and 110 above the car, yaw smoothed, a few
-  degrees of roll in corners. The mouse does nothing during a race.
+- Camera: `CustomPlayerCamera` in CONTROLLED mode. Presets per player (`!cam`): high (default, 290 back / 165 up /
+  15 deg down), far (420 / 260 / 22), near (230 / 100 / 9); pulls back further at speed, yaw eases towards the car's
+  heading turned 35% into the bend ahead (so the upcoming track stays in view), a few degrees of roll in corners.
+  The mouse does nothing during a race.
+- Readability at a distance: tall beacon pylons with glowing caps every ~430 units on alternating sides, and a
+  chevron sign on the outside of every real corner, facing the approaching cars. No fog, nothing fades out.
+- Cars are true 3D voxel models (about 100 units long), so every viewing angle is drawn correctly - the chase camera
+  shows them from behind like a classic racer, and each car's tail has its own silhouette and lights.
+  `preview/car_angles.png` shows all four from eight directions.
 - Every CS2 pawn stays parked (frozen, invisible, weaponless) in the booth; all damage to pawns is aborted except
   the script's own kills.
 - Tracks are `prop_static` models (road, rails, pads, platforms, scenery), unlit materials, so compiles are quick
@@ -194,3 +206,10 @@ preview/    PNG renders of tracks and cars for checking without CS2
 
 Laps, arena sizes, finish window, race time cap, the four car stat tables, kill shares and podium size,
 `KO_CREDIT_TO_ATTACKER`, the Pulse (on/off, speed, charge), AFK times, bot skill, cvars the map applies.
+
+## Bots
+
+Each bot keeps a home lane (from its grid column, five lanes across the track), changes lane only to pass a slower
+car into a lane that is clear ahead and just behind, brakes when it is closing on the car in front, gives room to a car
+alongside, and brakes for any bend it cannot make at its current speed (turn rate needed vs. its car's turn rate).
+In `test/sim.cjs` this cut car-to-car contact by about 30% and wrecks from ~110 to ~60 per 16 races of 32 cars.

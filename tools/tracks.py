@@ -4,7 +4,7 @@ pad / scenery models for the map, minimap outlines for the HUD and a preview pic
 usage: tracks.py <addon_out_dir> [preview.png]
 
 Track space: x east, y north, z up, CS2 units. Each track is centred on (0, 0) and must fit inside its box
-(see BOX); vmap.py places the boxes in a 3 x 2 grid in the void.
+(see BOX); vmap.py places the boxes in a 4 x 2 grid in the void.
 """
 import os, sys, json, math
 import numpy as np
@@ -16,21 +16,24 @@ OUT = sys.argv[1]
 PREVIEW = sys.argv[2] if len(sys.argv) > 2 else None
 SPACING = 48.0          # distance between centreline samples
 BOX = 7000              # each track's box (vmap.py); the track must stay inside +-BOX/2 - 300
-BOX_DX, BOX_DY = 7200, 7600   # box spacing in the world (3 x 2 grid)
+BOX_DX, BOX_DY = 7200, 7600   # box spacing in the world (4 x 2 grid)
+COLS = 4
 
 def box_origin(ti):
     """world position of track ti's box centre (the track's local origin)"""
-    return [(ti % 3 - 1) * BOX_DX, (ti // 3) * BOX_DY - BOX_DY / 2, 0]
+    return [(ti % COLS - (COLS - 1) / 2) * BOX_DX, (ti // COLS) * BOX_DY - BOX_DY / 2, 0]
 
 RAIL_H = 28
 SKIRT = 56
 CHECKPOINTS = 8
+RAMP_H = 70             # jump ramps rise this much over their length; the road stops after the lip
 
 # ---------------------------------------------------------------- track definitions
 # pts: control points (x, y, z, half-width) in driving order; the loop closes back to the first point, which is
 # the start/finish line, so keep the ~1000 units before it straight (the grid sits there).
 # feats: (kind, from, to, lat0, lat1) with from/to as fractions of the lap and lat as -1 (left edge) .. 1 (right)
 # gaps: (from, to) fractions with no rails on either side.
+# jumps: (lip, ramp_samples, void_samples): a ramp ending at fraction `lip`, then open space (no road) to jump over.
 
 def stadium(cx, cy, hx, hy, r, n=7):
     """control points of a rounded rectangle, counter-clockwise, starting mid-bottom (driving east)"""
@@ -94,7 +97,7 @@ hp += arc(-2500, 20, 460, math.pi / 2, math.pi, 4)[1:]
 hp += [(-2960, -400, 0), (-2960, -1000, 0)]
 hp += arc(-2500, -1340, 460, math.pi, 3 * math.pi / 2, 4)[1:]
 hp += [(-1900, y0, 0)]
-TRACKS.append(dict(id='hairpin', title='HAIRPIN HARBOUR', laps=4, theme='hairpin', pts=[(x, y, z, 250) for x, y, z in hp],
+TRACKS.append(dict(id='hairpin', title='HAIRPIN HARBOUR', laps=3, theme='hairpin', pts=[(x, y, z, 250) for x, y, z in hp],
     feats=[('boost', 0.02, 0.05, -0.5, 0.5), ('boost', 0.175, 0.205, -0.5, 0.5), ('boost', 0.335, 0.365, -0.5, 0.5),
            ('boost', 0.495, 0.525, -0.5, 0.5),
            ('charge', 0.10, 0.125, -1.0, -0.35), ('charge', 0.26, 0.285, 0.35, 1.0), ('charge', 0.42, 0.445, -1.0, -0.35),
@@ -149,7 +152,7 @@ for i in range(4):
 sp += [(1800, 1050, 355), (2500, 1500, 340), (2900, 2150, 320), (2700, 2650, 300), (1900, 2900, 280), (0, 2950, 250),
        (-1900, 2800, 210), (-2750, 2300, 180), (-2950, 1500, 150), (-3000, 400, 110), (-2950, -800, 70), (-2780, -1700, 35),
        (-2500, -2200, 10)]
-TRACKS.append(dict(id='spire', title='SWITCHBACK SPIRE', laps=3, theme='spire',
+TRACKS.append(dict(id='spire', title='SWITCHBACK SPIRE', laps=2, theme='spire',
     pts=[(x, y, z, 270) for x, y, z in sp],
     feats=[('boost', 0.02, 0.045, -0.5, 0.5), ('charge', 0.095, 0.125, 0.4, 1.0), ('charge', 0.265, 0.295, -1.0, -0.4),
            ('charge', 0.435, 0.465, 0.4, 1.0), ('boost', 0.56, 0.59, -0.5, 0.5), ('boost', 0.70, 0.73, -0.6, 0.6),
@@ -169,12 +172,39 @@ for k in range(n):
     # the bridge: the pass through the origin at t ~ pi/2 (going from the small lobe to the big lobe)
     tt = (t - math.pi / 2 + math.pi) % (2 * math.pi) - math.pi
     u = abs(tt)
-    z = 220.0 if u < 0.27 else (220 * (0.5 - 0.5 * math.cos(math.pi * (1 - (u - 0.27) / 0.33))) if u < 0.6 else 0.0)
+    z = 330.0 if u < 0.27 else (330 * (0.5 - 0.5 * math.cos(math.pi * (1 - (u - 0.27) / 0.33))) if u < 0.6 else 0.0)
     rw.append((x, y, z, 290))
 TRACKS.append(dict(id='ringworld', title='RINGWORLD', laps=5, theme='ringworld', pts=rw,
     feats=[('boost', 0.04, 0.07, -0.6, 0.6), ('slick', 0.095, 0.125, -1.0, 1.0), ('charge', 0.20, 0.26, 0.4, 1.0),
            ('boost', 0.33, 0.36, -0.5, 0.5), ('charge', 0.42, 0.47, -1.0, -0.4), ('boost', 0.48, 0.505, -0.5, 0.5),
            ('boost', 0.70, 0.73, -0.5, 0.5), ('charge', 0.80, 0.86, 0.4, 1.0), ('boost', 0.92, 0.95, -0.6, 0.6)],
+    gaps=[], crossing=True))
+
+# 7. Skyway: a fast stadium with a jump on each long straight - boost pads feed the ramps, and a slow car drops
+# into the gap. Charge platforms sit on the outside of every bend.
+sk = stadium(0, 0, 2800, 1600, 1000, n=6)
+TRACKS.append(dict(id='skyway', title='SKYWAY', laps=4, theme='skyway', pts=with_zw(sk, 0, 300),
+    feats=[('boost', 0.012, 0.03, -0.6, 0.6), ('boost', 0.465, 0.49, -0.6, 0.6),
+           ('charge', 0.15, 0.22, 0.4, 1.0), ('charge', 0.33, 0.40, 0.4, 1.0), ('charge', 0.65, 0.72, 0.4, 1.0), ('charge', 0.83, 0.90, 0.4, 1.0),
+           ('slick', 0.26, 0.29, -1.0, 1.0)],
+    gaps=[], jumps=[(0.05, 4, 9), (0.52, 4, 10)]))
+
+# 8. Helix: up a stacked spiral (1.25 turns, the upper deck 360 units over the lower one), then a long descent home.
+hx = [(-600, -2500, 0), (1300, -2500, 0)]
+hx += arc(1300, -1900, 600, -math.pi / 2, 0, 4)[1:]
+hx += [(1900, -900, 0), (1900, -100, 0)]
+C, R, TURN, RISE = (800, 700), 1100, 2.5 * math.pi, 450
+for k in range(0, 31):
+    a = TURN * k / 30
+    hx.append((C[0] + R * math.cos(a), C[1] + R * math.sin(a), RISE * a / TURN))
+hx += [(-500, 1800, 430), (-1700, 1800, 360)]
+hx += arc(-1700, 1200, 600, math.pi / 2, math.pi, 4, 330, 270)[1:]
+hx += [(-2300, 200, 190), (-2300, -1100, 90)]
+hx += arc(-1700, -1900, 600, math.pi, 1.5 * math.pi, 4, 40, 0)[1:]
+TRACKS.append(dict(id='helix', title='HELIX', laps=3, theme='helix', pts=[(x, y, z, 270) for x, y, z in hx],
+    feats=[('boost', 0.03, 0.06, -0.6, 0.6), ('charge', 0.10, 0.14, 0.4, 1.0), ('boost', 0.20, 0.225, -0.5, 0.5),
+           ('charge', 0.33, 0.38, -1.0, -0.4), ('boost', 0.46, 0.485, -0.5, 0.5), ('charge', 0.55, 0.60, -1.0, -0.4),
+           ('boost', 0.72, 0.75, -0.6, 0.6), ('slick', 0.80, 0.83, -1.0, 1.0), ('boost', 0.90, 0.93, -0.6, 0.6)],
     gaps=[], crossing=True))
 
 # ---------------------------------------------------------------- themes (colours)
@@ -185,6 +215,8 @@ THEMES = {
     'nullgap':   dict(road=(30, 30, 46), line=(255, 110, 110), rail=(255, 80, 80), post=(240, 60, 60), gate=(255, 170, 170)),
     'spire':     dict(road=(42, 56, 40), line=(150, 255, 110), rail=(120, 255, 80), post=(90, 230, 50), gate=(200, 255, 170)),
     'ringworld': dict(road=(52, 46, 36), line=(255, 232, 130), rail=(255, 225, 110), post=(240, 200, 80), gate=(255, 245, 190)),
+    'skyway':    dict(road=(34, 40, 66), line=(120, 200, 255), rail=(90, 170, 255), post=(70, 140, 255), gate=(180, 220, 255)),
+    'helix':     dict(road=(56, 36, 50), line=(255, 170, 120), rail=(255, 130, 90), post=(255, 100, 70), gate=(255, 200, 170)),
 }
 
 # ---------------------------------------------------------------- spline sampling
@@ -293,7 +325,7 @@ def chevron_texture(color, bg, S=256, up=True):
     img = np.zeros((S, S, 3), np.float32); img[:] = bg
     yy, xx = np.mgrid[0:S, 0:S]
     v = np.abs(yy - S / 2) / (S / 2)          # 0 centre .. 1 edge
-    phase = ((xx - v * S * 0.45) / (S / 4)) % 1.0
+    phase = ((xx + v * S * 0.45) / (S / 4)) % 1.0     # edges trail the centre: the chevrons point along +u (travel)
     mask = phase < 0.45
     glow = 0.55 + 0.45 * (1 - v)
     img[mask] = np.array(color, np.float32) * glow[mask][:, None]
@@ -362,6 +394,27 @@ def edge_texture(S=128):
     img[st] = (255, 210, 40); img[~st] = (20, 20, 24)
     return img
 
+def ramp_texture(S=256):
+    """jump ramp: bold yellow / black chevrons pointing up the ramp"""
+    return chevron_texture((255, 220, 40), (24, 22, 18), S)
+
+def sign_texture(S=256):
+    """turn sign: three yellow chevrons on black with a border (arrows point along +u)"""
+    img = np.zeros((S // 2, S, 3), np.float32); img[:] = (16, 16, 20)
+    h, w = img.shape[:2]
+    yy, xx = np.mgrid[0:h, 0:w]
+    v = np.abs(yy - h / 2) / (h / 2)
+    phase = ((xx + v * h * 0.55) / (w / 3)) % 1.0
+    img[(phase < 0.42) & (v < 0.8)] = (255, 215, 40)
+    img[:8] = img[-8:] = (255, 215, 40); img[:, :8] = img[:, -8:] = (255, 215, 40)
+    return img.clip(0, 255).astype(np.uint8)
+
+def beacon_texture(color, S=32):
+    img = np.zeros((S, S, 3), np.float32); img[:] = color
+    yy, xx = np.mgrid[0:S, 0:S]
+    img *= (1.15 - 0.3 * np.hypot(yy - S / 2, xx - S / 2) / (S / 2))[..., None]
+    return np.clip(img + 40, 0, 255).astype(np.uint8)
+
 # ---------------------------------------------------------------- model building
 def build_models(track, S, crossings):
     th = THEMES[track['theme']]
@@ -373,6 +426,7 @@ def build_models(track, S, crossings):
     mats['skirt'] = s2.write_material(OUT, '%s/skirt_%s' % (mdir, tid), skirt_texture(th['road']), comment='skirt ' + tid)
     mats['post'] = s2.write_material(OUT, '%s/post_%s' % (mdir, tid), post_texture(th['post']), comment='post ' + tid)
     mats['gate'] = s2.write_material(OUT, '%s/gate_%s' % (mdir, tid), gate_texture(th['gate']), comment='gate ' + tid)
+    mats['beacon'] = s2.write_material(OUT, '%s/beacon_%s' % (mdir, tid), beacon_texture(th['rail']), comment='beacon light ' + tid)
     return mats
 
 SHARED = {}
@@ -383,64 +437,95 @@ def shared_materials():
     SHARED['slick'] = s2.write_material(OUT, mdir + '/pad_slick', slick_texture((40, 44, 60)), comment='slick zone')
     SHARED['start'] = s2.write_material(OUT, mdir + '/startline', start_texture(), comment='start line')
     SHARED['edge'] = s2.write_material(OUT, mdir + '/edge_hazard', edge_texture(), comment='rail-less edge stripe')
+    SHARED['ramp'] = s2.write_material(OUT, mdir + '/ramp', ramp_texture(), comment='jump ramp')
+    SHARED['sign'] = s2.write_material(OUT, mdir + '/turn_sign', sign_texture(), backfaces=True, comment='turn sign')
 
 def lerp3(a, b, t): return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t)
 
-def track_tris(track, S, feats, gaps_idx, cps):
+def segset(ranges, N):
+    out = set()
+    for a, b in ranges:
+        i = a
+        while True:
+            out.add(i % N)
+            if i % N == b % N: break
+            i += 1
+    return out
+
+def track_tris(track, S, feats, gaps_idx, cps, road, lift):
+    """road[i] = 0 where segment i is open space (a jump gap); lift[i] = ramp height at sample i"""
     pos, hw, tan, N, step = S['pos'], S['hw'], S['tan'], S['N'], S['step']
     nrm = np.stack([-tan[:, 1], tan[:, 0]], 1)
-    def L(i, k=1.0): i %= N; return (pos[i, 0] + nrm[i, 0] * hw[i] * k, pos[i, 1] + nrm[i, 1] * hw[i] * k, pos[i, 2])
-    def R(i, k=1.0): i %= N; return (pos[i, 0] - nrm[i, 0] * hw[i] * k, pos[i, 1] - nrm[i, 1] * hw[i] * k, pos[i, 2])
+    def L(i, k=1.0): i %= N; return (pos[i, 0] + nrm[i, 0] * hw[i] * k, pos[i, 1] + nrm[i, 1] * hw[i] * k, pos[i, 2] + lift[i])
+    def R(i, k=1.0): i %= N; return (pos[i, 0] - nrm[i, 0] * hw[i] * k, pos[i, 1] - nrm[i, 1] * hw[i] * k, pos[i, 2] + lift[i])
     def Z(p, dz): return (p[0], p[1], p[2] + dz)
     tris = []
     UL = 640.0
-    gapset = set()
-    for a, b in gaps_idx:
-        i = a
-        while True:
-            gapset.add(i % N)
-            if i % N == b % N: break
-            i += 1
+    gapset = segset(gaps_idx, N)
+    rampseg = set()
+    for f in feats:
+        if f['kind'] == 'ramp': rampseg |= segset([(f['a'], f['b'])], N)
     for i in range(N):
+        if not road[i]: continue
         j = i + 1
         u0, u1 = i * step / UL, (i + 1) * step / UL
         l0, r0, l1, r1 = L(i), R(i), L(j), R(j)
-        # road surface (seen from above)
-        tris += s2.quad('road', r0, r1, l1, l0, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (0, 0, 1))
-        # skirts + bottom
-        tris += s2.quad('skirt', Z(l0, -SKIRT), Z(l1, -SKIRT), l1, l0, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (nrm[i, 0], nrm[i, 1], 0))
-        tris += s2.quad('skirt', r0, r1, Z(r1, -SKIRT), Z(r0, -SKIRT), (u0, 0), (u1, 0), (u1, 1), (u0, 1), (-nrm[i, 0], -nrm[i, 1], 0))
-        tris += s2.quad('skirt', Z(l0, -SKIRT), Z(l1, -SKIRT), Z(r1, -SKIRT), Z(r0, -SKIRT), (u0, 0), (u1, 0), (u1, 1), (u0, 1), (0, 0, -1))
+        # the road surface seen from above (a ramp gets its own striped surface); skirts and underside below it
+        sl = lift[i % N] - lift[j % N] if False else 0
+        if i in rampseg:
+            k0 = (i - min(f['a'] for f in feats if f['kind'] == 'ramp' and i in segset([(f['a'], f['b'])], N)))
+            tris += s2.quad('ramp', r0, r1, l1, l0, (k0 * step / 256.0, 1), ((k0 + 1) * step / 256.0, 1), ((k0 + 1) * step / 256.0, 0), (k0 * step / 256.0, 0), (0, 0, 1))
+        else:
+            tris += s2.quad('road', r0, r1, l1, l0, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (0, 0, 1))
+        bz0, bz1 = -SKIRT - lift[i % N], -SKIRT - lift[j % N]
+        tris += s2.quad('skirt', Z(l0, bz0), Z(l1, bz1), l1, l0, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (nrm[i, 0], nrm[i, 1], 0))
+        tris += s2.quad('skirt', r0, r1, Z(r1, bz1), Z(r0, bz0), (u0, 0), (u1, 0), (u1, 1), (u0, 1), (-nrm[i, 0], -nrm[i, 1], 0))
+        tris += s2.quad('skirt', Z(l0, bz0), Z(l1, bz1), Z(r1, bz1), Z(r0, bz0), (u0, 0), (u1, 0), (u1, 1), (u0, 1), (0, 0, -1))
+        # an open end facing a gap: a cliff face, with a hazard stripe on the road edge
+        for end, here, there, sgn in ((j, (l1, r1), (L(j), R(j)), 1), (i, (l0, r0), (L(i), R(i)), -1)):
+            nb = end if sgn > 0 else i - 1
+            if road[nb % N]: continue
+            tl, tr = here
+            n = (tan[end % N, 0] * sgn, tan[end % N, 1] * sgn, 0)
+            bz = -SKIRT - lift[end % N]
+            if sgn > 0: tris += s2.quad('edge', Z(tr, bz), Z(tl, bz), tl, tr, (0, 1), (4, 1), (4, 0), (0, 0), n)
+            else: tris += s2.quad('edge', Z(tl, bz), Z(tr, bz), tr, tl, (0, 1), (4, 1), (4, 0), (0, 0), n)
+            a0, a1 = (tl, tr)
+            d = (-tan[end % N, 0] * 24 * sgn, -tan[end % N, 1] * 24 * sgn)
+            tris += s2.quad('edge', Z(a1, 0.8), Z((a1[0] + d[0], a1[1] + d[1], a1[2]), 0.8), Z((a0[0] + d[0], a0[1] + d[1], a0[2]), 0.8), Z(a0, 0.8),
+                            (0, 0), (0, 1), (4, 1), (4, 0), (0, 0, 1)) if sgn > 0 else \
+                    s2.quad('edge', Z(a0, 0.8), Z((a0[0] + d[0], a0[1] + d[1], a0[2]), 0.8), Z((a1[0] + d[0], a1[1] + d[1], a1[2]), 0.8), Z(a1, 0.8),
+                            (0, 0), (0, 1), (4, 1), (4, 0), (0, 0, 1))
         if i in gapset:
             # hazard stripes along the open edges
-            for side, pa, pb, k in (('l', l0, l1, 1.0), ('r', r0, r1, 1.0)):
+            for side in ('l', 'r'):
+                pa, pb = (l0, l1) if side == 'l' else (r0, r1)
                 ia, ib = (L(i, 0.93), L(j, 0.93)) if side == 'l' else (R(i, 0.93), R(j, 0.93))
                 if side == 'l': tris += s2.quad('edge', Z(ia, 0.6), Z(ib, 0.6), Z(pb, 0.6), Z(pa, 0.6), (u0 * 4, 0), (u1 * 4, 0), (u1 * 4, 1), (u0 * 4, 1), (0, 0, 1))
                 else: tris += s2.quad('edge', Z(pa, 0.6), Z(pb, 0.6), Z(ib, 0.6), Z(ia, 0.6), (u0 * 4, 0), (u1 * 4, 0), (u1 * 4, 1), (u0 * 4, 1), (0, 0, 1))
         else:
             ur0, ur1 = i * step / 256.0, (i + 1) * step / 256.0
-            # left rail: inner face (seen from the road), top cap, outer face
             lt0, lt1 = Z(l0, RAIL_H), Z(l1, RAIL_H)
             lo0, lo1 = L(i, 1.0 + 10 / max(hw[i], 1)), L(j, 1.0 + 10 / max(hw[j % N], 1))
             # (SMD v = 1 is the top of the texture: the bright strip sits along the top edge of the rail)
             tris += s2.quad('rail', l0, l1, lt1, lt0, (ur0, 0), (ur1, 0), (ur1, 1), (ur0, 1), (-nrm[i, 0], -nrm[i, 1], 0))
             tris += s2.quad('rail', lt0, lt1, Z(lo1, RAIL_H), Z(lo0, RAIL_H), (ur0, 1), (ur1, 1), (ur1, 0.9), (ur0, 0.9), (0, 0, 1))
-            tris += s2.quad('rail', Z(lo0, RAIL_H), Z(lo1, RAIL_H), Z(lo1, -SKIRT), Z(lo0, -SKIRT), (ur0, 1), (ur1, 1), (ur1, 0), (ur0, 0), (nrm[i, 0], nrm[i, 1], 0))
+            tris += s2.quad('rail', Z(lo0, RAIL_H), Z(lo1, RAIL_H), Z(lo1, bz1), Z(lo0, bz0), (ur0, 1), (ur1, 1), (ur1, 0), (ur0, 0), (nrm[i, 0], nrm[i, 1], 0))
             rt0, rt1 = Z(r0, RAIL_H), Z(r1, RAIL_H)
             ro0, ro1 = R(i, 1.0 + 10 / max(hw[i], 1)), R(j, 1.0 + 10 / max(hw[j % N], 1))
             tris += s2.quad('rail', r1, r0, rt0, rt1, (ur1, 0), (ur0, 0), (ur0, 1), (ur1, 1), (nrm[i, 0], nrm[i, 1], 0))
             tris += s2.quad('rail', rt1, rt0, Z(ro0, RAIL_H), Z(ro1, RAIL_H), (ur1, 1), (ur0, 1), (ur0, 0.9), (ur1, 0.9), (0, 0, 1))
-            tris += s2.quad('rail', Z(ro1, RAIL_H), Z(ro0, RAIL_H), Z(ro0, -SKIRT), Z(ro1, -SKIRT), (ur1, 1), (ur0, 1), (ur0, 0), (ur1, 0), (-nrm[i, 0], -nrm[i, 1], 0))
+            tris += s2.quad('rail', Z(ro1, RAIL_H), Z(ro0, RAIL_H), Z(ro0, bz0), Z(ro1, bz1), (ur1, 1), (ur0, 1), (ur0, 0), (ur1, 0), (-nrm[i, 0], -nrm[i, 1], 0))
     # pads: quads 0.5 above the road between lateral fractions
-    def lat(i, f): i %= N; return (pos[i, 0] - nrm[i, 0] * hw[i] * f, pos[i, 1] - nrm[i, 1] * hw[i] * f, pos[i, 2] + 0.5)
+    def lat(i, f): i %= N; return (pos[i, 0] - nrm[i, 0] * hw[i] * f, pos[i, 1] - nrm[i, 1] * hw[i] * f, pos[i, 2] + lift[i] + 0.5)
     for ft in feats:
         kind, a, b, l0f, l1f = ft['kind'], ft['a'], ft['b'], ft['l0'], ft['l1']
+        if kind == 'ramp': continue
         i = a; k = 0
         while True:
             j = i + 1
             uu = 1.0 if kind == 'boost' else 0.5
             u0, u1 = k * step / 256.0 * uu, (k + 1) * step / 256.0 * uu
-            # lateral fraction f: -1 left .. 1 right; lat() uses "right = -nrm"
             p00, p01, p11, p10 = lat(i, l1f), lat(j, l1f), lat(j, l0f), lat(i, l0f)
             tris += s2.quad(kind, p00, p01, p11, p10, (u0, 1), (u1, 1), (u1, 0), (u0, 0), (0, 0, 1))
             if i % N == b % N: break
@@ -453,7 +538,6 @@ def track_tris(track, S, feats, gaps_idx, cps):
             p = L(ci, 1.0 + 70 / hw[ci]) if side == 'l' else R(ci, 1.0 + 70 / hw[ci])
             tris += s2.box_tris('gate', p[0] - 14, p[1] - 14, p[2] - SKIRT, p[0] + 14, p[1] + 14, p[2] + 230)
         l, r = L(ci, 1.0 + 70 / hw[ci]), R(ci, 1.0 + 70 / hw[ci])
-        # crossbar as a thin box along the gate direction: approximate with a quad pair (both faces visible anyway)
         d = (r[0] - l[0], r[1] - l[1]); ln = math.hypot(*d); dx, dy = d[0] / ln, d[1] / ln
         t = (-dy * 12, dx * 12)
         a0 = (l[0] + t[0], l[1] + t[1], l[2] + 210); a1 = (r[0] + t[0], r[1] + t[1], r[2] + 210)
@@ -462,14 +546,42 @@ def track_tris(track, S, feats, gaps_idx, cps):
             tris += s2.quad('gate', Z(a0, dz), Z(a1, dz), Z(b1, dz), Z(b0, dz), (0, 0), (ln / 64, 0), (ln / 64, 1), (0, 1), (0, 0, 1))
         tris += s2.quad('gate', a0, a1, Z(a1, 24), Z(a0, 24), (0, 0), (ln / 64, 0), (ln / 64, 1), (0, 1), (-dy, dx, 0))
         tris += s2.quad('gate', b1, b0, Z(b0, 24), Z(b1, 24), (0, 0), (ln / 64, 0), (ln / 64, 1), (0, 1), (dy, -dx, 0))
-    # scenery posts
-    rng = np.random.RandomState(hash(track['id']) & 0xffff)
-    for k, i in enumerate(range(3, N, 14)):
+    # beacons: tall pylons with a glowing cap on alternating sides, so the line of the course reads from far away
+    rng = np.random.RandomState(sum(map(ord, track['id'])))
+    pts_all = pos[:, :2]
+    for k, i in enumerate(range(3, N, 9)):
+        if not road[i]: continue
         side = 1.0 if k % 2 == 0 else -1.0
-        off = hw[i] + 120
-        p = (pos[i, 0] + nrm[i, 0] * off * side, pos[i, 1] + nrm[i, 1] * off * side, pos[i, 2])
-        h = 260 + rng.randint(0, 200)
-        tris += s2.box_tris('post', p[0] - 14, p[1] - 14, p[2] - SKIRT - 40, p[0] + 14, p[1] + 14, p[2] + h, uscale=1 / 256.0)
+        off = hw[i] + 150
+        p = (pos[i, 0] + nrm[i, 0] * off * side, pos[i, 1] + nrm[i, 1] * off * side, pos[i, 2] + lift[i])
+        # keep clear of other parts of the track (figure-8s, spirals, hairpins)
+        dd = np.hypot(pts_all[:, 0] - p[0], pts_all[:, 1] - p[1]) - hw
+        near = (np.abs(pos[:, 2] - p[2]) < 700) & (dd < 90)
+        if near.any(): continue
+        h = 420 + rng.randint(0, 320)
+        tris += s2.box_tris('post', p[0] - 12, p[1] - 12, p[2] - SKIRT - 60, p[0] + 12, p[1] + 12, p[2] + h, uscale=1 / 256.0)
+        tris += s2.box_tris('beacon', p[0] - 26, p[1] - 26, p[2] + h, p[0] + 26, p[1] + 26, p[2] + h + 52)
+    # turn signs: a board of chevrons on the outside of every real corner, facing the cars coming towards it
+    head = np.unwrap(np.arctan2(tan[:, 1], tan[:, 0]))
+    turn = np.array([head[(i + 12) % N] - head[i] if i + 12 < N else head[(i + 12) % N] + (head[-1] - head[0] + (head[1] - head[0])) - head[i] for i in range(N)])
+    turn = np.array([math.atan2(math.sin(t_), math.cos(t_)) for t_ in turn])
+    signs = 0; last = -99
+    for i in range(N):
+        if abs(turn[i]) < 0.75 or abs(turn[i - 3]) >= 0.75 or i - last < 20: continue
+        si = (i - 5) % N
+        if not road[si]: continue
+        last = i
+        left = turn[i] > 0
+        side = -1.0 if left else 1.0                  # outside of the corner
+        off = hw[si] + 70
+        c = (pos[si, 0] + nrm[si, 0] * off * side, pos[si, 1] + nrm[si, 1] * off * side, pos[si, 2] + lift[si])
+        dirv = (nrm[si, 0] * (1 if left else -1), nrm[si, 1] * (1 if left else -1))
+        w, z0, z1 = 300, 50, 200
+        p0 = (c[0] - dirv[0] * w / 2, c[1] - dirv[1] * w / 2, c[2] + z0); p1 = (c[0] + dirv[0] * w / 2, c[1] + dirv[1] * w / 2, c[2] + z0)
+        tris += s2.quad('sign', p0, p1, Z(p1, z1 - z0), Z(p0, z1 - z0), (0, 0), (1, 0), (1, 1), (0, 1), (-tan[si, 0], -tan[si, 1], 0))
+        for q in (p0, p1):
+            tris += s2.box_tris('post', q[0] - 8, q[1] - 8, q[2] - z0 - SKIRT, q[0] + 8, q[1] + 8, q[2], uscale=1 / 256.0)
+        signs += 1
     return tris
 
 def minimap(track, S, path, size=192):
@@ -489,7 +601,7 @@ def minimap(track, S, path, size=192):
     img.save(path)
     return dict(scale=scale, size=size)
 
-def preview_draw(dr, S, feats, gaps_idx, cps, ox, oy, sc, th, title):
+def preview_draw(dr, S, feats, gaps_idx, cps, ox, oy, sc, th, title, road):
     pos, hw, tan, N = S['pos'], S['hw'], S['tan'], S['N']
     nrm = np.stack([-tan[:, 1], tan[:, 0]], 1)
     def P(x, y): return (ox + x * sc, oy - y * sc)
@@ -504,16 +616,17 @@ def preview_draw(dr, S, feats, gaps_idx, cps, ox, oy, sc, th, title):
         j = (i + 1) % N
         l0 = pos[i, :2] + nrm[i] * hw[i]; r0 = pos[i, :2] - nrm[i] * hw[i]
         l1 = pos[j, :2] + nrm[j] * hw[j]; r1 = pos[j, :2] - nrm[j] * hw[j]
+        if not road[i]: continue
         shade = 0.6 + 0.4 * min(1, pos[i, 2] / 400)
-        col = tuple(int(c * shade) for c in th['road'])
+        col = tuple(min(255, int(c * shade * (1 + pos[i, 2] / 500))) for c in th['road'])
         dr.polygon([P(*r0), P(*r1), P(*l1), P(*l0)], fill=col)
     for i in range(N):
         j = (i + 1) % N
-        if i in gapset: continue
+        if i in gapset or not road[i]: continue
         l0 = pos[i, :2] + nrm[i] * hw[i]; l1 = pos[j, :2] + nrm[j] * hw[j]
         r0 = pos[i, :2] - nrm[i] * hw[i]; r1 = pos[j, :2] - nrm[j] * hw[j]
         dr.line([P(*l0), P(*l1)], fill=th['rail'], width=2); dr.line([P(*r0), P(*r1)], fill=th['rail'], width=2)
-    colors = {'boost': (255, 190, 40), 'charge': (60, 240, 255), 'slick': (90, 90, 140)}
+    colors = {'boost': (255, 190, 40), 'charge': (60, 240, 255), 'slick': (90, 90, 140), 'ramp': (255, 90, 40)}
     for ft in feats:
         i = ft['a']
         while True:
@@ -538,7 +651,7 @@ def main():
     shared_materials()
     runtime = []
     props = []
-    prev = Image.new('RGB', (3 * 700, 2 * 700), (12, 12, 18)) if PREVIEW else None
+    prev = Image.new('RGB', (COLS * 700, 2 * 700), (12, 12, 18)) if PREVIEW else None
     dr = ImageDraw.Draw(prev) if prev else None
     ok = True
     for ti, track in enumerate(TRACKS):
@@ -549,14 +662,26 @@ def main():
         def frac_idx(f): return int(round(f * N)) % N
         feats = [dict(kind=k, a=frac_idx(a), b=frac_idx(b), l0=l0, l1=l1) for k, a, b, l0, l1 in track['feats']]
         gaps_idx = [(frac_idx(a), frac_idx(b)) for a, b in track['gaps']]
-        cps = [int(round(k * N / CHECKPOINTS)) % N for k in range(CHECKPOINTS)]
+        road = np.ones(N, np.int8)
+        lift = np.zeros(N + 1)
+        for lip, rn, vn in track.get('jumps', []):
+            e = frac_idx(lip)                       # the lip is at sample e; ramp segments e-rn .. e-1; open e .. e+vn-1
+            feats.append(dict(kind='ramp', a=(e - rn) % N, b=(e - 1) % N, l0=-1.0, l1=1.0, h=RAMP_H))
+            for k in range(rn + 1): lift[(e - rn + k) % N] = RAMP_H * k / rn
+            for k in range(vn): road[(e + k) % N] = 0
+        lift[N] = lift[0]
+        # checkpoints never in a gap
+        cps = []
+        for k in range(CHECKPOINTS):
+            c = int(round(k * N / CHECKPOINTS)) % N
+            while not road[c] or not road[(c - 1) % N]: c = (c + 1) % N
+            cps.append(c)
         mats = build_models(track, S, crossings)
-        tris = track_tris(track, S, feats, gaps_idx, cps)
+        tris = track_tris(track, S, feats, gaps_idx, cps, road, lift)
         allmats = dict(mats); allmats.update(SHARED)
         model = s2.write_model(OUT, 'models/spr/track', track['id'], tris, allmats)
         mm = minimap(track, S, os.path.join(mmdir, 'mm_%s.png' % track['id']))
         pos, hw, tan = S['pos'], S['hw'], S['tan']
-        # rails per sample: 0 none, 1 both (per-side gaps are not used yet)
         rail = np.ones(N, np.int8)
         for a, b in gaps_idx:
             i = a
@@ -564,24 +689,25 @@ def main():
                 rail[i % N] = 0
                 if i % N == b % N: break
                 i += 1
+        rail[road == 0] = 0
         runtime.append(dict(
             id=track['id'], title=track['title'], laps=track['laps'], theme=track['theme'], index=ti,
             n=N, length=round(L, 1), step=round(S['step'], 4),
             x=[round(float(v), 1) for v in pos[:, 0]], y=[round(float(v), 1) for v in pos[:, 1]], z=[round(float(v), 1) for v in pos[:, 2]],
             tx=[round(float(v), 4) for v in tan[:, 0]], ty=[round(float(v), 4) for v in tan[:, 1]],
-            hw=[round(float(v), 1) for v in hw], rail=[int(v) for v in rail],
+            hw=[round(float(v), 1) for v in hw], rail=[int(v) for v in rail], road=[int(v) for v in road],
             cp=cps, feats=feats, crossing=bool(track.get('crossing')),
             mm=dict(scale=round(mm['scale'], 5), size=mm['size']),
             ext=round(float(np.abs(pos[:, :2]).max() + hw.max()), 1),
             zmin=round(float(pos[:, 2].min()), 1), zmax=round(float(pos[:, 2].max()), 1),
             off=box_origin(ti),
         ))
-        props.append(dict(id=track['id'], model=model, index=ti, off=box_origin(ti), ext=runtime[-1]['ext'], zmin=runtime[-1]['zmin'], zmax=runtime[-1]['zmax']))
-        print('%-10s %4d samples, lap %6.0f, hw %3.0f-%3.0f, z %3.0f-%3.0f, feats %d, gaps %d, crossings %d, tris %d' % (
-            track['id'], N, L, hw.min(), hw.max(), pos[:, 2].min(), pos[:, 2].max(), len(feats), len(gaps_idx), len(crossings), len(tris)))
+        props.append(dict(id=track['id'], model=model, index=ti, off=box_origin(ti), ext=runtime[-1]['ext'], zmin=runtime[-1]['zmin'], zmax=runtime[-1]['zmax'], title=track['title']))
+        print('%-10s %4d samples, lap %6.0f, hw %3.0f-%3.0f, z %3.0f-%3.0f, feats %d, gaps %d, jumps %d, crossings %d, tris %d' % (
+            track['id'], N, L, hw.min(), hw.max(), pos[:, 2].min(), pos[:, 2].max(), len(feats), len(gaps_idx), len(track.get('jumps', [])), len(crossings), len(tris)))
         if dr:
-            ox = 350 + (ti % 3) * 700; oy = 350 + (ti // 3) * 700
-            preview_draw(dr, S, feats, gaps_idx, cps, ox, oy, 330 / 3300, THEMES[track['theme']], track['title'] + '  lap %.0f' % L)
+            ox = 350 + (ti % COLS) * 700; oy = 350 + (ti // COLS) * 700
+            preview_draw(dr, S, feats, gaps_idx, cps, ox, oy, 330 / 3300, THEMES[track['theme']], track['title'] + '  lap %.0f' % L, road)
     json.dump(runtime, open(os.path.join(OUT, '_gen/tracks.json'), 'w'), separators=(',', ':'))
     json.dump(props, open(os.path.join(OUT, '_gen/track_props.json'), 'w'))
     if prev: prev.save(PREVIEW)

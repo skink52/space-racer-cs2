@@ -65,10 +65,22 @@ S('reset', np.concatenate([tone(f, 0.08) * env(int(SR * 0.08), 0.002, 0.02, 0.6,
 n = int(SR * 0.8); wh = noise(0.8); S('boost', (lowpass(wh, 600) * np.linspace(0.3, 1.6, n) + 0.3 * highpass(wh, 3000) * np.linspace(0.1, 1, n) + 0.3 * sweep(180, 420, 0.8)) * env(n, 0.02, 0.2, 0.7, 0.3))
 n = int(SR * 0.7); S('charge', (tone(220, 0.7) + 0.6 * tone(330, 0.7) + 0.3 * tone(440, 0.7) * (0.5 + 0.5 * np.sin(2 * math.pi * 7 * t(0.7)))) * env(n, 0.05, 0.1, 0.7, 0.3))
 
+# engine hum grains (0.5 s, soft ends so the 0.38 s retriggers blend): idle, cruise, flat out, boosting
+def hum(f0, bright):
+    n = int(SR * 0.5); tt = t(0.5)
+    x = np.sin(2 * math.pi * f0 * tt) + 0.5 * np.sin(2 * math.pi * f0 * 2.01 * tt) + bright * 0.35 * np.sign(np.sin(2 * math.pi * f0 * 3 * tt))
+    x = x * (1 + 0.25 * np.sin(2 * math.pi * 23 * tt)) + 0.15 * lowpass(noise(0.5), 900)
+    return lowpass(x, 2500 + 2000 * bright) * env(n, 0.08, 0.05, 1.0, 0.2)
+for k, (f0, br) in enumerate(((70, 0.0), (105, 0.3), (150, 0.6), (190, 1.0))):
+    S('hum%d' % k, hum(f0, br) * 0.8)
+n = int(SR * 0.35); S('jump', (sweep(300, 900, 0.35) * 0.6 + lowpass(noise(0.35), 3000) * 0.5) * env(n, 0.005, 0.1, 0.6, 0.15))
+n = int(SR * 0.3); S('land', (lowpass(noise(0.3), 500) * 1.4 + 0.8 * sweep(140, 60, 0.3)) * env(n, 0.001, 0.06, 0.3, 0.15))
+
 # ranges: how far each sound carries (units)
 RANGE = {'beep': 5000, 'go': 6000, 'wreck': 3500, 'finish': 2500, 'warp': 2500, 'lap': 1200, 'pulse': 3500, 'pulsed': 1200,
-         'hit': 1200, 'rail': 1200, 'scrape': 900, 'pad': 1500, 'fall': 1800, 'spin': 1500, 'reset': 1200, 'boost': 1800, 'charge': 1200}
-VOL = {'scrape': 0.5, 'hit': 0.7, 'rail': 0.7, 'charge': 0.6, 'boost': 0.7, 'pulsed': 0.6}
+         'hit': 1200, 'rail': 1200, 'scrape': 900, 'pad': 1500, 'fall': 1800, 'spin': 1500, 'reset': 1200, 'boost': 1800, 'charge': 1200,
+         'hum0': 900, 'hum1': 1000, 'hum2': 1100, 'hum3': 1200, 'jump': 1500, 'land': 1500}
+VOL = {'scrape': 0.5, 'hit': 0.7, 'rail': 0.7, 'charge': 0.6, 'boost': 0.7, 'pulsed': 0.6, 'hum0': 0.35, 'hum1': 0.4, 'hum2': 0.45, 'hum3': 0.5}
 
 d = os.path.join(OUT, 'sounds/spr'); os.makedirs(d, exist_ok=True)
 for name, x in SOUNDS.items():

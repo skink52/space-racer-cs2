@@ -154,6 +154,8 @@ const api = { Instance, CSInputs, CustomCameraMode, CSMoveType, CSRoundEndReason
 
 let src = fs.readFileSync(path.join(root, `out/addon/maps/scripts/${NAME}.js`), 'utf8');
 src = src.replace(/^import \{[^}]+\} from "cs_script\/point_script";/m, 'const { Instance, CSInputs, CSPlayerPawn, CSPlayerController, BaseModelEntity, PointTemplate, CustomHudLayout, CSDamageFlags, CSDamageTypes, CustomCameraMode, CSMoveType, CSRoundEndReason, Entity } = __api;');
+if (OPTS.includes('4x16')) src = src.replace("ARENA_LAYOUT: '2x32'", "ARENA_LAYOUT: '4x16'");
+if (OPTS.includes('alt')) src = src.replace("ARENA_LAYOUT: '2x32'", "ARENA_LAYOUT: 'alternate'");
 src += '\nglobalThis.__dbg = () => ({ rm, views, parked, phase });\n';
 const ctx = vm.createContext({ __api: api, console, Math, Date, JSON, Map, Set, Array, Object, String, Number, Error, Infinity, NaN, Promise, performance });
 vm.runInContext(src, ctx, { filename: NAME + '.js' });

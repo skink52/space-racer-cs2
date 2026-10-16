@@ -1,81 +1,115 @@
 // ===================================================================================
 // Part 4: the driving AI (CS2 bots race with it, and it drives finished cars off the line).
+// Lane discipline: every bot has a home lane (from its grid column) and keeps it; it only changes lane to pass a
+// slower car, into a lane that is clear, and drifts back home afterwards. Corners pull it a little to the inside.
 // ===================================================================================
+
+const BOT_LANES = [-0.7, -0.35, 0, 0.35, 0.7];
 
 function makeBot(skill) {
   return {
     skill: clamp(skill + (rnd() - 0.5) * 0.3, 0.05, 1),
-    lane: (rnd() - 0.5) * 1.2,        // preferred lateral position, -1 left .. 1 right
-    laneTimer: 0, avoidTimer: 0, avoid: 0, think: 0,
+    home: null, lane: 0, passTimer: 0, think: 0,
     aggression: rnd(), noise: 0, boostHold: 0, brakeHold: 0,
   };
+}
+
+// the nearest car just ahead of `car` near a lateral position (-1 left edge .. 1 right edge)
+function laneTraffic(arena, car, lane, ahead) {
+  const T = arena.track;
+  let worst = null;
+  for (const o of arena.order) {
+    if (o === car || !o.solid) continue;
+    const ds = o.total - car.total;
+    if (ds < (ahead < 0 ? ahead : -60) || ds > Math.abs(ahead)) continue;
+    const ol = -o.d / Math.max(1, T.hw[o.seg]);
+    if (Math.abs(ol - lane) > 0.3) continue;
+    if (!worst || ds < worst.ds) worst = { car: o, ds };
+  }
+  return worst;
 }
 
 function botThink(arena, car) {
   const b = car.bot, T = arena.track, c = car.cmd;
   if (!b || car.state !== 'racing') { c.throttle = 0; c.steer = 0; c.boost = false; c.drift = false; return; }
+  if (car.air) { c.steer = 0; c.throttle = 1; c.boost = false; c.drift = false; return; }
   b.think--;
   if (b.think > 0) return;             // decisions a few times a second; the previous command keeps running
-  b.think = 2 + Math.round((1 - b.skill) * 4);
+  b.think = 2 + Math.round((1 - b.skill) * 3);
   const dt = b.think * DT;
   const seg = car.seg;
-  const hw = T.hw[seg];
-  // lane: wander a little; head for a charge platform when low; take boost pads that are near the lane
-  b.laneTimer -= dt;
-  if (b.laneTimer <= 0) { b.laneTimer = 2 + rnd() * 4; b.lane = clamp(b.lane + (rnd() - 0.5) * 0.6, -0.8, 0.8); }
-  let lane = b.lane;
-  const ahead = 24;
-  if (car.charge < car.spec.charge * 0.35) {
-    const nf = T.nextFeature(seg, 'charge', ahead);
-    if (nf) lane = (nf.f.l0 + nf.f.l1) / 2;
-  }
-  const bp = T.nextFeature(seg, 'boost', 10);
-  if (bp) { const mid = (bp.f.l0 + bp.f.l1) / 2; if (Math.abs(mid - lane) < 0.7) lane = lane * 0.3 + mid * 0.7; }
-  // keep off the edges over a gap
-  if (!T.rail[seg] || !T.rail[(seg + 6) % T.n]) lane *= 0.5;
-  // avoid the car right in front
-  b.avoidTimer -= dt;
-  if (b.avoidTimer <= 0) {
-    b.avoid = 0;
-    const fx = Math.cos(car.yaw), fy = Math.sin(car.yaw);
-    for (const o of arena.order) {
-      if (o === car || !o.solid) continue;
-      const rx = o.x - car.x, ry = o.y - car.y;
-      const along = rx * fx + ry * fy, side = -rx * fy + ry * fx;
-      if (along > 30 && along < 170 && Math.abs(side) < 60 && o.speed < car.speed + 60) {
-        b.avoid = side > 0 ? 0.45 : -0.45; b.avoidTimer = 0.8; break;
+  if (b.home === null) { b.home = BOT_LANES[(car.gridPos || 0) % 5]; b.lane = b.home; }
+  // jumps: line up in the middle and go flat out
+  const ramp = T.nextFeature(seg, 'ramp', 28);
+  let lane;
+  b.passTimer -= dt;
+  if (ramp) {
+    lane = b.lane * 0.7;                // ramps are full width: hold the lane, just keep straight
+  } else {
+    // pass slower traffic in our lane, otherwise return home
+    const mine = laneTraffic(arena, car, b.lane, 260);
+    if (mine && mine.car.speed < car.speed + 40 && b.passTimer <= 0) {
+      let best = null;
+      for (const l of BOT_LANES) {
+        if (l === b.lane) continue;
+        const t = laneTraffic(arena, car, l, 320) || laneTraffic(arena, car, l, -140);
+        const score = (t ? 1000 - t.ds : 0) + Math.abs(l - b.lane) * 200;
+        if (!best || score < best.score) best = { l, score };
       }
+      if (best && best.score < 1000) { b.lane = best.l; b.passTimer = 2.5; }
+    } else if (b.passTimer <= 0 && b.lane !== b.home && !laneTraffic(arena, car, b.home, 320)) b.lane = b.home;
+    lane = b.lane;
+    // low on charge: head for the next charge platform; a boost pad near our lane: take it
+    if (car.charge < car.spec.charge * 0.3) {
+      const nf = T.nextFeature(seg, 'charge', 24);
+      if (nf && !laneTraffic(arena, car, (nf.f.l0 + nf.f.l1) / 2, 300)) lane = (nf.f.l0 + nf.f.l1) / 2;
     }
+    const bp = T.nextFeature(seg, 'boost', 10);
+    if (bp) { const mid = (bp.f.l0 + bp.f.l1) / 2; if (Math.abs(mid - lane) < 0.5) lane = lane * 0.4 + mid * 0.6; }
+    // corners: a little towards the inside
+    const k2 = (seg + 16) % T.n;
+    const turn = normRad(Math.atan2(T.ty[k2], T.tx[k2]) - Math.atan2(T.ty[seg], T.tx[seg]));
+    lane = clamp(lane - turn * 0, -0.85, 0.85);
+    if (!T.rail[seg] || !T.rail[(seg + 6) % T.n]) lane *= 0.4;
   }
-  lane = clamp(lane + b.avoid, -0.85, 0.85);
   // steer towards a point ahead on the chosen lane
   const look = clamp(140 + car.speed * 0.32, 200, 520);
   const p = T.point(car.s + look);
-  const tx = p.x - p.nx * lane * p.hw * 0.75, ty = p.y - p.ny * lane * p.hw * 0.75;
+  const tx = p.x - p.nx * lane * p.hw * 0.92, ty = p.y - p.ny * lane * p.hw * 0.92;
   const want = Math.atan2(ty - car.y, tx - car.x);
-  let diff = normRad(want - car.yaw);
-  b.noise = b.noise * 0.7 + (rnd() - 0.5) * (1 - b.skill) * 0.25;
+  const diff = normRad(want - car.yaw);
+  b.noise = b.noise * 0.7 + (rnd() - 0.5) * (1 - b.skill) * 0.2;
   c.steer = clamp(diff * 2.4 + b.noise, -1, 1);
   // speed control from the bend ahead
-  const bend = T.curve[(seg + Math.round(look / T.step)) % T.n];        // radians of heading change over the next 10 samples
+  const bend = T.curve[(seg + Math.round(look / T.step)) % T.n];
   const tight = bend > 0.55 + b.skill * 0.25;
-  c.drift = tight && car.speed > 600 && Math.abs(diff) > 0.25;
+  c.drift = !ramp && tight && car.speed > 600 && Math.abs(diff) > 0.25;
   b.brakeHold -= dt;
-  if (bend > 0.9 && car.speed > 700 - b.skill * 150) b.brakeHold = 0.25;
-  c.throttle = b.brakeHold > 0 ? -0.5 : 1;
-  // boost on the straights when there is charge to spare (and always when nearly full)
+  // can we make the bend at this speed? (turn rate needed vs the car's turn rate at this speed, with a margin by skill)
+  let worstK = 0;
+  for (let k = 4; k <= 28; k += 4) worstK = Math.max(worstK, T.curve[(seg + k) % T.n] / (10 * T.step));
+  const v = car.speed, omega = car.spec.turn / (1 + Math.max(0, v - 450) / 1500);
+  const tooFast = v * worstK > omega * (0.72 + b.skill * 0.18);
+  if (!ramp && (tooFast || (bend > 0.9 && v > 700 - b.skill * 150))) b.brakeHold = 0.2;
+  // don't ram the car in front: brake if closing on it, ease off if it is just slower
+  const front = laneTraffic(arena, car, lane, 220);
+  const closing = front ? car.speed - front.car.speed : 0;
+  const tooClose = !!front && closing > 40 && front.ds < 90 + closing * 0.35;
+  c.throttle = b.brakeHold > 0 ? -0.5 : tooClose && !ramp ? (closing > 150 ? -0.6 : 0) : 1;
+  // boost on straights when there is charge to spare (always before a jump)
   b.boostHold -= dt;
   const straight = bend < 0.25;
-  if ((straight && car.charge > 45 + (1 - b.aggression) * 30) || car.charge > car.spec.charge * 0.9) b.boostHold = 0.6;
-  c.boost = b.boostHold > 0 && !tight;
-  // spin attack when someone is right beside us
-  if (car.charge > 60 && car.spinCd <= 0 && b.aggression > 0.3) {
+  if (ramp && car.charge > 5) b.boostHold = 0.4;
+  else if ((straight && car.charge > 45 + (1 - b.aggression) * 30) || car.charge > car.spec.charge * 0.9) b.boostHold = 0.6;
+  c.boost = b.boostHold > 0 && !tight && !tooClose && !tooFast;
+  // spin attack only when an opponent is right alongside
+  if (!ramp && car.charge > 60 && car.spinCd <= 0 && b.aggression > 0.4) {
     const fx = Math.cos(car.yaw), fy = Math.sin(car.yaw);
     for (const o of arena.order) {
       if (o === car || !o.solid || (o.team >= 0 && o.team === car.team)) continue;
       const rx = o.x - car.x, ry = o.y - car.y;
       const along = rx * fx + ry * fy, side = Math.abs(-rx * fy + ry * fx);
-      if (Math.abs(along) < 70 && side < 70 && rnd() < b.aggression * 0.12) { c.spin = true; break; }
+      if (Math.abs(along) < 50 && side < 70 && rnd() < b.aggression * 0.12) { c.spin = true; break; }
     }
   }
 }

@@ -93,7 +93,11 @@ class ArenaView {
       propAlpha(p, car.state === 'wrecked' ? 90 : car.ghost > 0 && car.state === 'racing' ? 140 : car.state === 'finished' ? 160 : 255);
       // angles: yaw from the heading (+ spin), pitch from the slope, roll from the slide
       const i = car.seg, j = (i + 1) % T.n;
-      const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50) : -deg(Math.atan2(T.z[j] - T.z[i], T.step));
+      const rf = car.lift > 0 ? T.rampAt(i) : null;
+      const rampTilt = rf ? -deg(Math.atan2(rf.h, (((rf.b - rf.a + T.n) % T.n) + 1) * T.step)) : 0;
+      const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50)
+        : car.air ? clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25)
+        : -deg(Math.atan2(T.z[j] - T.z[i], T.step)) + rampTilt;
       const roll = car.state === 'falling' ? 0 : clamp(-car.vl / 14, -18, 18);
       const yaw = deg(car.yaw + car.spinYaw);
       const pos = this.world(car.x, car.y, car.z);

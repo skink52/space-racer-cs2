@@ -12,22 +12,26 @@ import s2
 
 OUT = sys.argv[1]
 PREVIEW = sys.argv[2] if len(sys.argv) > 2 else None
-VOX = 1.6                      # units per voxel
-HOVER = 9                      # units the hull floats above the road
+VOX = 3.0                      # units per voxel (a Hornet is about 100 units long)
+HOVER = 12                     # units the hull floats above the road
 MDIR = 'models/spr/cars'
 PAL_DIR = 'materials/spr/cars'
 
-# ---------------------------------------------------------------- palette: 8 colours x 4 shades (top, side, end, bottom)
+# ---------------------------------------------------------------- palette: 12 colours x 4 shades (top, side, end, bottom)
 # colour roles: 0 primary (team), 1 secondary (team, darker), 2 trim (light), 3 dark metal, 4 canopy glass,
-# 5 engine glow, 6 flame core, 7 flame outer
+# 5 engine glow, 6 flame core, 7 flame outer, 8 tail light (red), 9 light bar (white), 10 accent stripe, 11 black
 SHADE = [1.0, 0.78, 0.64, 0.45]
+GLOW = (5, 6, 7, 8, 9)
+NCOL = 12
 def palette(primary, secondary):
-    base = [primary, secondary, (225, 228, 235), (52, 56, 66), (120, 220, 255), (255, 200, 90), (255, 250, 200), (255, 120, 20)]
-    pal = np.zeros((32, 3), np.float32)
+    accent = tuple(min(255, int(c * 1.25 + 30)) for c in primary)
+    base = [primary, secondary, (225, 228, 235), (52, 56, 66), (120, 220, 255), (255, 200, 90), (255, 250, 200), (255, 120, 20),
+            (255, 40, 60), (255, 255, 255), accent, (18, 18, 22)]
+    pal = np.zeros((64, 3), np.float32)
     for c, col in enumerate(base):
         for sh in range(4):
             k = SHADE[sh]
-            if c in (5, 6, 7): k = 1.0 if sh == 0 else 0.92      # glowing parts barely shade
+            if c in GLOW: k = 1.0 if sh == 0 else 0.94      # glowing parts barely shade
             pal[c * 4 + sh] = np.array(col, np.float32) * k
     return pal.clip(0, 255).astype(np.uint8)
 
@@ -40,18 +44,18 @@ SKINS = {
 
 def write_palettes():
     paths = {}
-    for name, (p, s) in SKINS.items():
-        pal = palette(p, s)
-        img = np.zeros((32, 32, 3), np.uint8)
-        for c in range(32):
+    for name, (p, s_) in SKINS.items():
+        pal = palette(p, s_)
+        img = np.zeros((64, 32, 3), np.uint8)
+        for c in range(64):
             y, x = (c // 8) * 8, (c % 8) * 4
             img[y:y + 8, x:x + 4] = pal[c]
         paths[name] = s2.write_material(OUT, '%s/pal_%s' % (PAL_DIR, name), img, comment='Space Racer car palette ' + name)
     return paths
 
 def pal_uv(c):
-    # cell centre of colour c in the 32x32 palette image (8 columns of 4 px, 4 rows of 8 px)
-    return ((c % 8) * 4 + 2) / 32.0, 1 - ((c // 8) * 8 + 4) / 32.0
+    # cell centre of entry c in the 32x64 palette image (8 columns of 4 px, 8 rows of 8 px)
+    return ((c % 8) * 4 + 2) / 32.0, 1 - ((c // 8) * 8 + 4) / 64.0
 
 # ---------------------------------------------------------------- voxel grid helpers
 class Grid:
@@ -82,19 +86,26 @@ class Grid:
         self.paint(m, c); return m
 
 # ---------------------------------------------------------------- the four cars (all original designs)
+# x = 0 is the tail. Everyone sees the cars mostly from behind (chase camera), so each tail has its own silhouette:
+# Hornet twin booms + split fin, Meteor one huge engine under a wide wing, Comet three stacked engines + tall fin,
+# Bastion four engines under a full-width light bar.
 def car_hornet(g, boost):
     L = g.L
     g.taper(4, L - 2, 5.5, 1.2, 1.5, 3.2, 1.6, 0)                  # dart hull, narrowing to the nose
     g.taper(10, 22, 3.0, 2.2, 3.0, 2.6, 1.8, 4)                     # canopy
     g.box(8, 11, -2.6, 2.6, 2.5, 5.8, 1)                             # canopy frame
     g.box(6, 16, -9, -5.5, 1.8, 2.6, 1); g.box(6, 16, 5.5, 9, 1.8, 2.6, 1)     # swept wings
-    g.box(9, 14, -11, -8.5, 1.8, 2.4, 2); g.box(9, 14, 8.5, 11, 1.8, 2.4, 2)   # wing tips
-    g.box(2, 7, -0.8, 0.8, 3.5, 7.5, 1)                              # tail fin
-    for cy in (-3.2, 3.2):
+    g.box(9, 14, -11, -8.5, 1.8, 2.4, 10); g.box(9, 14, 8.5, 11, 1.8, 2.4, 10) # wing tips
+    g.box(0, 9, -6.2, -4.6, 1.6, 3.4, 1); g.box(0, 9, 4.6, 6.2, 1.6, 3.4, 1)   # twin tail booms
+    g.box(1, 5, -6.0, -4.8, 3.4, 7.6, 0); g.box(1, 5, 4.8, 6.0, 3.4, 7.6, 0)   # split fins
+    g.box(1, 4, -6.0, -4.8, 7.0, 7.6, 10); g.box(1, 4, 4.8, 6.0, 7.0, 7.6, 10)
+    g.box(0, 1, -6.2, -4.6, 2.0, 3.0, 8); g.box(0, 1, 4.6, 6.2, 2.0, 3.0, 8)   # boom tail lights
+    for cy in (-2.4, 2.4):
         g.cylinder_x(1, 7, cy, 2.6, 1.7, 3)                           # engines
         g.cylinder_x(0, 1.5, cy, 2.6, 1.3, 5)                         # glow
         if boost: flame(g, 0, cy, 2.6, 1.4, 11)
     g.box(L - 6, L - 1, -1.2, 1.2, 1.2, 2.2, 2)                       # nose trim
+    g.box(14, L - 4, -0.6, 0.6, 3.0, 3.4, 10)                        # spine stripe
 
 def car_meteor(g, boost):
     L = g.L
@@ -106,20 +117,27 @@ def car_meteor(g, boost):
     g.cylinder_x(0, 6, 0, 3.0, 2.9, 3)                               # big engine
     g.cylinder_x(0, 1.5, 0, 3.0, 2.3, 5)
     if boost: flame(g, 0, 0, 3.0, 2.3, 14)
-    g.box(2, 5, -7, -5, 3.4, 5.6, 1); g.box(2, 5, 5, 7, 3.4, 5.6, 1)   # rear fins
+    g.box(2, 5, -7, -5, 3.4, 6.6, 1); g.box(2, 5, 5, 7, 3.4, 6.6, 1)   # wing struts
+    g.box(0, 4, -8.5, 8.5, 6.6, 7.6, 0)                              # wide rear wing
+    g.box(0, 1, -8.5, 8.5, 6.6, 7.6, 10)
+    g.box(0, 1, -8.5, -6.5, 4.0, 5.2, 8); g.box(0, 1, 6.5, 8.5, 4.0, 5.2, 8)   # tail lights on the armour
+    g.box(L - 8, L - 4, -6.5, -4.5, 3.2, 3.8, 10); g.box(L - 8, L - 4, 4.5, 6.5, 3.2, 3.8, 10)
 
 def car_comet(g, boost):
     L = g.L
     g.taper(2, L - 1, 4.8, 2.0, 1.5, 3.6, 1.6, 0)                   # long teardrop
     g.taper(12, 24, 3.2, 2.2, 3.4, 2.8, 1.8, 4)                     # bubble canopy
     g.box(11, 13, -3.2, 3.2, 2.5, 6.2, 1)
-    g.box(1, 9, -0.7, 0.7, 3.6, 9.5, 1)                              # tall tail fin
-    g.box(1, 6, -0.7, 0.7, 8.5, 9.5, 2)
+    g.box(1, 9, -0.7, 0.7, 3.6, 10.5, 1)                             # tall tail fin
+    g.box(1, 6, -0.7, 0.7, 9.5, 10.5, 10)
+    g.box(1, 3, -0.8, 0.8, 7.0, 9.0, 8)                              # fin light
     g.box(14, 26, -7, -4.6, 1.6, 2.4, 1); g.box(14, 26, 4.6, 7, 1.6, 2.4, 1)   # canards
+    g.box(14, 17, -7, -4.6, 1.6, 2.4, 10); g.box(14, 17, 4.6, 7, 1.6, 2.4, 10)
     for cy, cz in ((-2.6, 2.4), (2.6, 2.4), (0, 4.8)):
         g.cylinder_x(0, 5, cy, cz, 1.4, 3)
         g.cylinder_x(0, 1.5, cy, cz, 1.1, 5)
         if boost: flame(g, 0, cy, cz, 1.2, 15)
+    g.box(0, 1, -4.6, -3.6, 1.6, 2.6, 8); g.box(0, 1, 3.6, 4.6, 1.6, 2.6, 8)
 
 def car_bastion(g, boost):
     L = g.L
@@ -128,11 +146,14 @@ def car_bastion(g, boost):
     g.box(3, L - 3, -7.5, -6.0, 0.8, 3.4, 1); g.box(3, L - 3, 6.0, 7.5, 0.8, 3.4, 1)   # side skirts
     g.box(14, 22, -3.0, 3.0, 5.0, 7.2, 4)                            # slit canopy
     g.box(14, 22, -3.4, 3.4, 4.6, 5.0, 1)
-    g.box(6, 13, -6.0, 6.0, 5.0, 6.0, 1)                             # rear deck
+    g.box(4, 13, -6.0, 6.0, 5.0, 6.0, 1)                             # rear deck
     g.box(L - 12, L - 7, -6.0, 6.0, 5.0, 5.8, 2)                     # front trim bar
-    for cy, cz in ((-4.2, 2.6), (-1.4, 2.6), (1.4, 2.6), (4.2, 2.6)):
-        g.cylinder_x(0, 4, cy, cz, 1.2, 3)
-        g.cylinder_x(0, 1.5, cy, cz, 0.9, 5)
+    g.box(3, 4, -6.5, 6.5, 4.4, 5.0, 9)                              # full-width rear light bar
+    g.box(3, 4, -6.5, -5.0, 1.4, 2.4, 8); g.box(3, 4, 5.0, 6.5, 1.4, 2.4, 8)   # tail lights
+    g.box(6, 12, -6.6, -6.4, 2.0, 4.0, 10); g.box(6, 12, 6.4, 6.6, 2.0, 4.0, 10)
+    for cy, cz in ((-3.6, 2.8), (-1.2, 2.8), (1.2, 2.8), (3.6, 2.8)):
+        g.cylinder_x(0, 4, cy, cz, 1.1, 3)
+        g.cylinder_x(0, 1.5, cy, cz, 0.85, 5)
         if boost: flame(g, 0, cy, cz, 1.0, 10)
 
 def flame(g, x0, cy, cz, r, length):
@@ -143,7 +164,7 @@ def flame(g, x0, cy, cz, r, length):
         g.paint(m, c)
 
 CARS = {'hornet': car_hornet, 'meteor': car_meteor, 'comet': car_comet, 'bastion': car_bastion}
-DIMS = {'hornet': (34, 24, 9), 'meteor': (32, 18, 8), 'comet': (36, 16, 11), 'bastion': (31, 17, 9)}
+DIMS = {'hornet': (34, 24, 9), 'meteor': (32, 18, 9), 'comet': (36, 16, 12), 'bastion': (31, 17, 9)}
 
 # ---------------------------------------------------------------- greedy mesher (voxels -> quads)
 def mesh_voxels(occ, col, origin, scale):
@@ -305,36 +326,54 @@ def write_effects():
     return out
 
 # ---------------------------------------------------------------- pictures (HUD car picker + preview)
-def render_voxels(g, pal, size=160, yaw=0.9, pitch=0.55):
-    """painter's-algorithm orthographic render of the voxel grid"""
+def render_voxels(g, pal, size=256, az=200.0, el=24.0, fill=0.78, ss=3):
+    """Shaded voxel render. az = where the camera stands around the car in degrees (180 = straight behind,
+    0 = in front), el = degrees above the horizon. Exposed faces only, far to near, supersampled."""
+    from PIL import ImageDraw
     occ, col = g.occ, g.col
     L, W, H = occ.shape
-    img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-    px = img.load()
-    cy_, sy_ = math.cos(yaw), math.sin(yaw)
-    cp, sp = math.cos(pitch), math.sin(pitch)
-    sc = size / (max(L, W) * 1.25)
-    cells = []
-    for x in range(L):
-        for y in range(W):
-            for z in range(H):
-                if not occ[x, y, z]: continue
-                wx, wy, wz = x - L / 2, y - W / 2, z
-                rx = wx * cy_ - wy * sy_; ry = wx * sy_ + wy * cy_
-                sx = rx; sy = ry * sp - wz * cp; depth = ry * cp + wz * sp
-                cells.append((depth, sx, sy, int(col[x, y, z]), z))
-    cells.sort()
-    for depth, sx, sy, c, z in cells:
-        X = int(size / 2 + sx * sc); Y = int(size * 0.6 + sy * sc)
-        # shade by height a little
-        base = pal[c * 4 + 1].astype(int)
-        top = pal[c * 4].astype(int)
-        for dx in range(int(sc) + 1):
-            for dy in range(int(sc) + 1):
-                xx, yy = X + dx, Y + dy
-                if 0 <= xx < size and 0 <= yy < size:
-                    px[xx, yy] = tuple(top if dy == 0 else base) + (255,)
-    return img
+    a, e = math.radians(az), math.radians(el)
+    cdir = np.array([math.cos(a) * math.cos(e), math.sin(a) * math.cos(e), math.sin(e)])   # object -> camera
+    fwd = -cdir
+    right = np.cross(fwd, [0, 0, 1.0]); right /= np.linalg.norm(right)
+    up = np.cross(right, fwd)
+    light = np.array([-0.4, 0.5, 0.85]); light /= np.linalg.norm(light)
+    ctr = np.array([L / 2, 0, H / 2])
+    pad = np.zeros((L + 2, W + 2, H + 2), bool); pad[1:-1, 1:-1, 1:-1] = occ
+    dirs = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+    shade_of = [2, 2, 1, 1, 0, 3]
+    faces = []
+    for fi, d in enumerate(dirs):
+        if np.dot(d, cdir) <= 0: continue
+        nb = pad[1 + d[0]:L + 1 + d[0], 1 + d[1]:W + 1 + d[1], 1 + d[2]:H + 1 + d[2]]
+        xs, ys, zs = np.where(occ & ~nb)
+        for x, y, z in zip(xs, ys, zs):
+            c = int(col[x, y, z])
+            base = pal[c * 4 + shade_of[fi]].astype(np.float32)
+            if c not in GLOW:
+                base = base * (0.7 + 0.45 * max(0.0, float(np.dot(d, light))))
+            # the face square (4 corners) in grid coordinates (y is centred)
+            o = np.array([x, y - W / 2, z], float)
+            ax = [i for i in range(3) if d[i] == 0]
+            p0 = o.copy()
+            if d[[i for i in range(3) if d[i] != 0][0]] > 0: p0[[i for i in range(3) if d[i] != 0][0]] += 1
+            u = np.zeros(3); u[ax[0]] = 1; v = np.zeros(3); v[ax[1]] = 1
+            quad = [p0, p0 + u, p0 + u + v, p0 + v]
+            depth = float(np.dot(o + 0.5 - ctr, fwd))
+            faces.append((depth, quad, tuple(int(t) for t in np.clip(base, 0, 255))))
+    faces.sort(key=lambda f: -f[0])
+    S = size * ss
+    proj = [[(float(np.dot(q - ctr, right)), -float(np.dot(q - ctr, up))) for q in quad] for _, quad, _ in faces]
+    allp = np.array([p for pp in proj for p in pp]) if proj else np.zeros((1, 2))
+    mn, mx = allp.min(0), allp.max(0)
+    sc = S * fill / max(mx[0] - mn[0], mx[1] - mn[1], 1e-6)
+    cx, cy = (mn + mx) / 2
+    img = Image.new('RGBA', (S, S), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(img)
+    for (depth, quad, c), pp in zip(faces, proj):
+        pts = [(S / 2 + (px - cx) * sc, S / 2 + (py - cy) * sc) for px, py in pp]
+        dr.polygon(pts, fill=c + (255,), outline=tuple(max(0, v - 30) for v in c) + (255,))
+    return img.resize((size, size), Image.LANCZOS)
 
 def main():
     pal_paths = write_palettes()
@@ -346,21 +385,41 @@ def main():
         for boost in (False, True):
             path, g = build_car(key, boost, pal_paths, shadow_mat)
             models[key]['boost' if boost else 'base'] = path
-            if not boost: grids[key] = g
+            grids[key + ('_boost' if boost else '')] = g
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
     json.dump(dict(cars=models, fx=fx, skins=['neutral', 't', 'ct', 'gold'], hover=HOVER), open(os.path.join(OUT, '_gen/car_models.json'), 'w'), indent=1)
-    # pictures for the car picker (neutral, T, CT) and the preview sheet
+    # picker pictures: the view you get in the race (from behind, a little to the side and above)
     pdir = os.path.join(OUT, 'panorama/images/custom_game/spr'); os.makedirs(pdir, exist_ok=True)
-    sheet = Image.new('RGBA', (4 * 170, 3 * 170), (14, 14, 22, 255)) if PREVIEW else None
-    for ci, key in enumerate(CARS):
-        for si, skin in enumerate(('neutral', 't', 'ct')):
-            pal = palette(*SKINS[skin])
-            img = render_voxels(grids[key], pal)
+    for key in CARS:
+        for skin in ('neutral', 't', 'ct'):
+            img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86)
             img.save(os.path.join(pdir, 'car_%s_%s.png' % (key, skin)))
-            if sheet: sheet.paste(img, (ci * 170 + 5, si * 170 + 5), img)
-    if sheet: sheet.save(PREVIEW)
+    # big renders for the loading screen
+    for i, key in enumerate(CARS):
+        render_voxels(grids[key + '_boost'], palette(*SKINS['t' if i % 2 == 0 else 'ct']), size=420, az=200, el=18, fill=0.9).save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
+    if PREVIEW:
+        # every car from 8 directions (the models are true 3D, so every angle is drawn correctly in game)
+        cell = 200
+        angles = [180, 225, 270, 315, 0, 45, 90, 135]
+        names = ['REAR', 'REAR-RIGHT', 'RIGHT', 'FRONT-RIGHT', 'FRONT', 'FRONT-LEFT', 'LEFT', 'REAR-LEFT']
+        sheet = Image.new('RGBA', (cell * 8, cell * 4 + 30), (14, 14, 22, 255))
+        from PIL import ImageDraw
+        dr = ImageDraw.Draw(sheet)
+        for i, nm in enumerate(names): dr.text((i * cell + 8, 8), nm, fill=(200, 200, 210))
+        for r, key in enumerate(CARS):
+            skin = ('t', 'ct', 't', 'ct')[r]
+            for i, az in enumerate(angles):
+                im = render_voxels(grids[key + '_boost'] if i == 0 else grids[key], palette(*SKINS[skin]), size=cell, az=az, el=20, fill=0.8)
+                sheet.alpha_composite(im, (i * cell, 30 + r * cell))
+            dr.text((8, 30 + r * cell + 8), key.upper(), fill=(255, 220, 90))
+        sheet.save(PREVIEW)
+        rear = Image.new('RGBA', (4 * 300, 300), (14, 14, 22, 255))
+        for i, key in enumerate(CARS):
+            im = render_voxels(grids[key], palette(*SKINS['ct' if i % 2 else 't']), size=300, az=180, el=14, fill=0.8)
+            rear.alpha_composite(im, (i * 300, 0))
+        rear.save(PREVIEW.replace('.png', '_rear.png'))
     print('car models written:', sum(len(v) for v in models.values()), 'fx', len(fx))
 
 main()

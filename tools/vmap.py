@@ -112,7 +112,7 @@ for tp in tracks:
     ox, oy, oz = tp['off']
     ent('prop_static', (ox, oy, oz), group=GROUP, model=tp['model'], solid='0', disableshadows='1', fademindist='-1', fademaxdist='0',
         rendertocubemaps='0', bakelighting='0', visoccluder='0')
-    box = (ox - BOX / 2, oy - BOX / 2, oz + tp['zmin'] - 900, ox + BOX / 2, oy + BOX / 2, oz + tp['zmax'] + 1900)
+    box = (ox - BOX / 2, oy - BOX / 2, oz + tp['zmin'] - 900, ox + BOX / 2, oy + BOX / 2, oz + tp['zmax'] + 3400)   # tall enough for the lobby's overview camera
     boxes.append(box)
     shell(box, MOONDOME, 0)
     shell(box, TOOLSSKY, 1)
@@ -167,10 +167,11 @@ seed.attr('children')[2].append(mesh_node(polymesh(v, faces, ['materials/tools/t
 # ---------------------------------------------------------------- swap into the world: drop our old nodes, Hammer samples, the default box
 SAMPLE = {'point_script', 'custom_hud_layout', 'point_soundevent', 'point_template', 'prop_dynamic'}
 kids = world.attr('children')
+first_run = not any(c.get('customVisGroup', '') == GROUP for c in kids[2])
 kept = []
 for c in kids[2]:
     if c.get('customVisGroup', '') == GROUP: continue
-    if c.type == 'CMapMesh' and SRC.endswith('hammer_template.vmap'): continue
+    if c.type == 'CMapMesh' and first_run and not c.get('customVisGroup', ''): continue    # Hammer's default box
     if c.type == 'CMapEntity':
         ep = c.get('entity_properties'); cls = ep.get('classname')
         if cls in SAMPLE and not ep.get('targetname'): continue

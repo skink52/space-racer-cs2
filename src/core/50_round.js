@@ -4,7 +4,7 @@
 // ===================================================================================
 
 const DEFAULT_CFG = {
-  arenaMax: 32, maxArenas: 2, minPlayers: 1,
+  arenaMax: 32, maxArenas: 2, minPlayers: 1, layout: '2x32', arenaMin: 8,
   afkWarnTics: 20 * TICRATE, afkKickTics: 30 * TICRATE,
   countdownTics: 10 * TICRATE, finishWindow: 30, raceCap: 300, endHold: 6, laps: 0,
   botSkill: 0.5,
@@ -12,10 +12,19 @@ const DEFAULT_CFG = {
   trackBlacklist: [], staggerArenas: true, defaultCar: 'hornet',
 };
 
-// 1..32 players race together; more are split into equal arenas (33 -> 17 + 16)
+// layouts: '2x32' (up to 2 arenas of 32), '4x16' (up to 4 arenas of 16), 'alternate' (switches every round)
+const LAYOUTS = { '2x32': { arenaMax: 32, maxArenas: 2 }, '4x16': { arenaMax: 16, maxArenas: 4 } };
+function layoutFor(cfg, round) {
+  const k = cfg.layout === 'alternate' ? (round % 2 ? '2x32' : '4x16') : cfg.layout;
+  return Object.assign({ key: LAYOUTS[k] ? k : '2x32' }, LAYOUTS[k] || LAYOUTS['2x32']);
+}
+
+// 2x32: 1..32 players race together, more are split into equal arenas (33 -> 17 + 16).
+// 4x16: one arena up to 16, then as many as needed (each at least arenaMin when there is more than one).
 function arenaSizes(n, cfg) {
   if (n <= 0) return [];
-  const count = Math.max(1, Math.min(cfg.maxArenas, Math.ceil(n / cfg.arenaMax)));
+  let count = Math.max(1, Math.min(cfg.maxArenas, Math.ceil(n / cfg.arenaMax)));
+  while (count > 1 && n < count * (cfg.arenaMin || 1) && Math.ceil(n / (count - 1)) <= cfg.arenaMax) count--;
   const m = Math.min(n, cfg.arenaMax * count);
   const base = Math.floor(m / count), extra = m % count;
   return Array.from({ length: count }, (_, i) => base + (i < extra ? 1 : 0));
@@ -44,7 +53,17 @@ class RoundManager {
     this.time = 0;                 // tics since the round started
     this.roundNumber = 0;
     this.lastTracks = [];
+    this.upcoming = [];
     this.events = [];
+    this.pickUpcoming();
+  }
+
+  // the tracks the next round will use (shown in the lobby): shuffled, none from the last round if possible
+  pickUpcoming() {
+    let cands = this.tracks.filter((t) => !this.lastTracks.includes(t.id) && !this.cfg.trackBlacklist.includes(t.id));
+    if (cands.length < 4) cands = this.tracks.filter((t) => !this.cfg.trackBlacklist.includes(t.id));
+    if (!cands.length) cands = this.tracks.slice();
+    this.upcoming = shuffle(cands.slice());
   }
 
   // ------------------------------------------------------------------ people
@@ -96,15 +115,15 @@ class RoundManager {
     }
     this.roundNumber++; this.time = 0;
     if (eligible.length < this.cfg.minPlayers) { this.state = 'idle'; this.events.push({ type: 'notEnough', count: eligible.length }); return false; }
-    const sizes = arenaSizes(eligible.length, this.cfg);
+    this.layout = layoutFor(this.cfg, this.roundNumber);
+    const sizes = arenaSizes(eligible.length, Object.assign({}, this.cfg, this.layout));
     const groups = this.splitGroups(eligible, sizes);
-    // tracks: different per arena, not the ones used last round
-    let cands = this.tracks.filter((t) => !this.lastTracks.includes(t.id) && !this.cfg.trackBlacklist.includes(t.id));
-    if (cands.length < groups.length) cands = this.tracks.filter((t) => !this.cfg.trackBlacklist.includes(t.id));
-    if (cands.length < groups.length) cands = this.tracks.slice();
-    shuffle(cands);
+    // tracks: the ones the lobby showed (different per arena, none from the last round)
+    if (this.upcoming.length < groups.length) this.pickUpcoming();
+    const cands = this.upcoming;
     this.plan = groups.map((grp, i) => ({ grp, track: cands[i % cands.length] }));
     this.lastTracks = this.plan.map((p) => p.track.id);
+    this.pickUpcoming();
     for (const item of this.plan) for (const pe of item.grp) pe.status = 'planned';
     // anyone eligible but not placed (over 64) spectates
     for (const pe of eligible) if (pe.status !== 'planned') pe.status = 'none';

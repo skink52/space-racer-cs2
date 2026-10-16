@@ -19,7 +19,7 @@ let lobbyNext = 0;
 
 function buildCfg() {
   return {
-    arenaMax: CONFIG.ARENA_MAX, maxArenas: CONFIG.MAX_ARENAS, minPlayers: CONFIG.MIN_PLAYERS,
+    layout: CONFIG.ARENA_LAYOUT, arenaMin: CONFIG.ARENA_MIN, minPlayers: CONFIG.MIN_PLAYERS,
     afkWarnTics: CONFIG.AFK_WARN * TICRATE, afkKickTics: CONFIG.AFK_KICK * TICRATE,
     countdownTics: CONFIG.COUNTDOWN * TICRATE, finishWindow: CONFIG.FINISH_WINDOW, raceCap: CONFIG.RACE_CAP, endHold: CONFIG.RESULTS_HOLD, laps: CONFIG.LAPS,
     botSkill: CONFIG.BOT_SKILL, podium: CONFIG.PODIUM, shares: CONFIG.SHARES.slice(), koCredit: CONFIG.KO_CREDIT_TO_ATTACKER, tiebreak: CONFIG.TIEBREAK,
@@ -234,6 +234,8 @@ function handleArenaEvents(a, now) {
     if (f & 32) sfxCar(view, 'spin', car);
     if (f & 128) { sfxCar(view, 'reset', car); const pk = pe ? parked.get(pe.slot) : null; if (pk) pk.camYaw = null; }
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);
+    if (f & 512) sfxCar(view, 'jump', car, 0.3);
+    if (f & 1024) sfxCar(view, 'land', car, 0.3);
     if (car.boosting && !car.wasBoost) sfxCar(view, 'boost', car, 0.8);
     if (car.onCharge && !car.wasCharge) sfxCar(view, 'charge', car, 1.0);
     car.wasBoost = car.boosting; car.wasCharge = car.onCharge;
@@ -302,7 +304,7 @@ function raceInfo(pe, car, a, now, spectating) {
   else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 16).toUpperCase() + '   MOUSE 1 / 2 CHANGE CAR   E CHANGE ARENA';
   else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'A / D CHOOSE YOUR CAR - ' + car.spec.name + ' - ' + car.spec.perk : car.spec.name;
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
-  else if (pe.helpUntil > now) info.sub = 'W S DRIVE  A D STEER  MOUSE1 BOOST  MOUSE2 SPIN  SPACE DRIFT';
+  else if (pe.helpUntil > now) info.sub = 'W S DRIVE  A D STEER  MOUSE1 BOOST  MOUSE2 SPIN  SPACE DRIFT  !CAM VIEW';
   const bm = timed(botMsgs, pe.slot, now);
   info.msg = bm ? bm.text : '';
   const fl = flashes.get(pe.slot);
@@ -315,6 +317,7 @@ function lobbyInfo(pe, now) {
   const info = { line1: '', line2: '', line3: '' };
   const car = CARS[pe.carChoice] || CARS.hornet;
   info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + '   (A / D TO CHANGE, !CAR 1-4)';
+  const nextT = rm.upcoming[0];
   if (phase === 'running') {
     const rem = guard('remaining', () => Instance.GetRoundRemainingTime());
     const left = rem === undefined ? 0 : Math.max(0, Math.ceil(rem - CONFIG.ROUND_SLACK));
@@ -323,6 +326,7 @@ function lobbyInfo(pe, now) {
     if (a && a.ranking[0]) info.line3 = `${a.track.title}: ${a.state === 'over' ? 'RESULTS' : 'LEADER ' + a.ranking[0].name.slice(0, 16).toUpperCase()}`;
   } else if (phase === 'ending') {
     info.line1 = 'RACE OVER - NEXT ONE SOON';
+    if (nextT) info.line3 = `NEXT TRACK: ${nextT.title}`;
   } else {
     let waiting = 0;
     for (const p of rm.people.values()) if ((p.csTeam === 2 || p.csTeam === 3) && !(p.afk && !p.bot)) waiting++;
@@ -332,11 +336,29 @@ function lobbyInfo(pe, now) {
       const t = Math.max(0, Math.ceil(startAt - now));
       info.line1 = Instance.IsFreezePeriod() ? 'THE RACE STARTS AFTER FREEZE TIME' : t > 0 ? `THE RACE STARTS IN ${t}` : 'STARTING...';
     }
+    if (nextT) info.line3 = `NEXT TRACK: ${nextT.title} - ${nextT.laps} LAPS`;
   }
   if (pe.afk) info.line3 = 'AFK - TYPE !BACK OR PRESS A KEY TO RACE';
   else if (pe.csTeam !== 2 && pe.csTeam !== 3) info.line3 = 'JOIN T OR CT TO RACE';
-  if (pe.helpUntil > now) { info.center = 'W S DRIVE   A D STEER   MOUSE 1 BOOST   MOUSE 2 SPIN   SPACE DRIFT'; info.sub = 'CHAT: !CAR 1-4  !SPEC  !AFK  !BACK  !RACE'; }
+  if (pe.helpUntil > now) { info.center = 'W S DRIVE   A D STEER   MOUSE 1 BOOST   MOUSE 2 SPIN   SPACE DRIFT'; info.sub = 'CHAT: !CAR 1-4  !CAM  !SPEC  !AFK  !BACK  !RACE'; }
   return info;
+}
+
+// engine sound: short overlapping hum grains on every human-driven car, the band (pitch) following its speed
+const humNext = new Map();
+function engineHum(now) {
+  for (const [a, view] of views) {
+    if (a.state !== 'racing' && a.state !== 'grid') continue;
+    for (const car of a.order) {
+      if (car.isBot || !car.visible || car.state === 'wrecked') continue;
+      const due = humNext.get(car.slot) || 0;
+      if (now < due) continue;
+      const k = car.speed / Math.max(1, car.spec.maxSpeed);
+      const band = car.boosting || car.padTimer > 0 ? 3 : k < 0.15 ? 0 : k < 0.55 ? 1 : 2;
+      humNext.set(car.slot, now + 0.38);
+      playSound(view, 'hum' + band, car);
+    }
+  }
 }
 
 // ---------------------------------------------------------------- per tick
@@ -354,12 +376,14 @@ function lobbyFrame(now, dt) {
     // nothing to look at yet: a slow look around the first track from above
     if (!a0) guard('lobbycam', () => {
       if (!live(pk.cam)) return;
-      const T = rm.tracks[rm.roundNumber % rm.tracks.length];
+      // the track of the next race, the whole of it in view: a slow circle high above its edge, looking in
+      const T = rm.upcoming[0] || rm.tracks[0];
       const off = T.off || [0, 0, 0];
-      const ang = now * 0.08;
-      const r = T.ext * 1.15;
+      const ang = now * 0.06;
+      const r = T.ext * 0.92, h = T.ext * 0.8;
+      const pitch = deg(Math.atan2(h, r));
       if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
-      pk.cam.Move({ position: { x: off[0] + Math.cos(ang) * r, y: off[1] + Math.sin(ang) * r, z: off[2] + 1500 }, angles: { pitch: 28, yaw: deg(ang + Math.PI), roll: 0 } });
+      pk.cam.Move({ position: { x: off[0] + Math.cos(ang) * r, y: off[1] + Math.sin(ang) * r, z: off[2] + h }, angles: { pitch, yaw: deg(ang + Math.PI), roll: 0 } });
     });
   }
 }
@@ -405,6 +429,7 @@ function frame(dt) {
   if (acc > 3 * DT) acc = 0;
   processKills(now);
   for (const v of views.values()) guard('render', () => v.update(now));
+  if (CONFIG.ENGINE_HUM) guard('hum', () => engineHum(now));
   // cameras and HUD
   for (const pe of rm.people.values()) {
     if (pe.bot) continue;
@@ -414,7 +439,7 @@ function frame(dt) {
       if (pe.status === 'racing' && pe.car && pe.arena) {
         const a = pe.arena, v = views.get(a);
         if (!v) return;
-        if (a.state === 'over') placeOverviewCamera(pk, a, v); else placeCamera(pk, pe.car, v, dt);
+        if (a.state === 'over') placeOverviewCamera(pk, a, v); else placeCamera(pk, pe.car, v, dt, pe.cam);
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
         hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE);
       } else {
@@ -423,7 +448,7 @@ function frame(dt) {
         const a = rm.arenas[pe.spec ? pe.spec.arena : 0], v = a && views.get(a);
         const t = a && pe.spec && pe.spec.target !== null ? a.cars.get(pe.spec.target) : null;
         if (!a || !v) { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); return; }
-        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt); hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
+        if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam); hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
         else { placeOverviewCamera(pk, a, v); if (pe.car && pe.arena === a) hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false)); else { hudLobby(pe.slot, lobbyInfo(pe, now)); } rm.fixSpectate(pe, 0); }
         hudPicker(pe.slot, pe, pe.status !== 'racing' && (!pe.car || a.state === 'over'));
       }
@@ -509,6 +534,12 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
     const key = CAR_KEYS[n - 1] || CAR_KEYS.find((k) => k === arg || CARS[k].name.toLowerCase() === arg);
     if (key) { if (!rm.setCar(pe, key)) bottom(slot, 'TOO LATE TO SWAP - NEXT ROUND', 3); }
     else bottom(slot, 'CARS: 1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
+  } else if (t === '!cam' || t.startsWith('!cam ')) {
+    const names = Object.keys(CONFIG.CAMERAS);
+    const want = t.slice(4).trim();
+    const cur = pe.cam || CONFIG.CAM_DEFAULT;
+    pe.cam = names.includes(want) ? want : names[(names.indexOf(cur) + 1) % names.length];
+    bottom(slot, 'CAMERA: ' + pe.cam.toUpperCase() + '   (!CAM ' + names.join(' / ').toUpperCase() + ')', 3);
   } else if (t === '!spec' || t === '!spectate') {
     if (pe.status === 'racing' && pe.arena) { const a = pe.arena; rm.leaveArena(pe, 'spectate'); rm.spectate(pe, a); }
   } else if (t === '!afk') {

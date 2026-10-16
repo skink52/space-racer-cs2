@@ -9,7 +9,11 @@ class Track {
     this.n = data.n; this.len = data.length; this.step = data.step;
     this.x = data.x; this.y = data.y; this.z = data.z; this.tx = data.tx; this.ty = data.ty; this.hw = data.hw;
     this.rail = data.rail; this.cp = data.cp; this.feats = data.feats; this.crossing = !!data.crossing;
-    this.mm = data.mm; this.ext = data.ext;
+    this.mm = data.mm; this.ext = data.ext; this.off = data.off;
+    this.road = data.road || new Array(this.n).fill(1);
+    this.ramps = this.feats.filter((f) => f.kind === 'ramp');
+    this.rampOf = new Array(this.n).fill(null);
+    for (const f of this.ramps) for (let i = f.a, g = 0; g < this.n; g++, i++) { this.rampOf[i % this.n] = f; if (i % this.n === f.b % this.n) break; }
     // left normal
     this.nx = new Array(this.n); this.ny = new Array(this.n);
     for (let i = 0; i < this.n; i++) { this.nx[i] = -this.ty[i]; this.ny[i] = this.tx[i]; }
@@ -89,6 +93,15 @@ class Track {
     return p;
   }
 
+  // ramp height at segment i, fraction t (0 off ramps)
+  rampLift(i, t) {
+    const f = this.rampOf[((i % this.n) + this.n) % this.n];
+    if (!f) return 0;
+    const k = ((((i - f.a) % this.n) + this.n) % this.n + t) / (((f.b - f.a + this.n) % this.n) + 1);
+    return f.h * clamp(k, 0, 1);
+  }
+  rampAt(i) { return this.rampOf[((i % this.n) + this.n) % this.n]; }
+
   zAt(i, t) { const j = (i + 1) % this.n; return this.z[i] + (this.z[j] - this.z[i]) * t; }
 
   // a point on the centreline at progress s (any real; wraps)
@@ -128,7 +141,7 @@ class Track {
   // grid slot k (0 = pole): 4 abreast, rows 110 units apart behind the start line, odd rows staggered
   gridSlot(k) {
     const row = Math.floor(k / 4), col = k % 4;
-    const s = -(150 + row * 110 + (row % 2 ? 40 : 0));
+    const s = -(190 + row * 160 + (row % 2 ? 60 : 0));
     const p = this.point(s);
     const lat = (col - 1.5) * p.hw * 0.46;
     return { x: p.x - p.nx * lat, y: p.y - p.ny * lat, z: p.z, yaw: Math.atan2(p.ty, p.tx), s: ((s % this.len) + this.len) % this.len };

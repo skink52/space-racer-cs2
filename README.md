@@ -2,7 +2,7 @@
 
 A 32-car anti-gravity racing minigame that runs entirely inside one Counter-Strike 2 map as a cs_script, with no
 server plugins. Up to 64 players in two 32-car arenas, four cars with different perks, boost pads, charge
-platforms, spin attacks, wrecks, the Pulse, six original tracks, real CS2 kills for the podium and a T-vs-CT round
+platforms, jump ramps, spin attacks, wrecks, the Pulse, eight original tracks, real CS2 kills for the podium and a T-vs-CT round
 result from the top 8. 2.5D: flat neon tracks in space, seen from a chase camera, cars drawn as voxel models.
 
 Workshop: *(link to the Steam Workshop page)*
@@ -14,7 +14,11 @@ Workshop: *(link to the Steam Workshop page)*
 Everything here is original work: the name, cars, tracks, art, sounds and rules. The genre conventions it uses
 (anti-grav racers, boost pads, drafting, laps) belong to nobody; see `docs/WORKSHOP_COMPLIANCE.md`.
 
+![loading screen](preview/loading.png)
+
 ![tracks](preview/tracks.png)
+
+![the cars from eight directions](preview/car_angles.png)
 
 ## Layout
 
@@ -22,9 +26,9 @@ Everything here is original work: the name, cars, tracks, art, sounds and rules.
 |---|---|
 | `src/core/` | The game: track maths, car physics, race rules, the driving AI, the round manager. Plain JavaScript with no engine calls, so it runs in Node for tests. |
 | `src/cs2/` | The CS2 side: pawn parking and the chase camera, input, prop-pool rendering, HUD, sounds, CS2 kills, round control, chat commands. |
-| `tools/` | Generators: `tracks.py` (tracks → data, road models, minimaps), `cars.py` (voxel cars, effects), `hud.py` (Panorama layout/css), `sounds.py` (synthesised sounds + sound events), `vmap.py` (writes the whole map into the Hammer template), `build.mjs` (assembles the script), `build_all.sh`. |
+| `tools/` | Generators: `tracks.py` (tracks → data, road models, minimaps), `cars.py` (voxel cars, effects, renders), `loading.py` (loading screen, radar, map icon), `hud.py` (Panorama layout/css), `sounds.py` (synthesised sounds + sound events), `vmap.py` (writes the whole map into the Hammer template), `build.mjs` (assembles the script), `build_all.sh`. |
 | `test/` | `sim.cjs` runs bot races on the pure game; `mock_cs2.mjs` runs the real script on a stand-in cs_script API; `tsconfig.json` + `point_script.d.ts` type-check it against Valve's API. |
-| `preview/` | Pictures of the tracks, cars and HUD for checking without CS2. |
+| `preview/` | Pictures of the tracks, cars (`car_angles.png`), loading screen, HUD, and `chase_view.py`: a software render of the racer's view from the chase camera. |
 | `docs/` | `DESIGN.md` (the game), `TESTING.md` (first run in CS2), `WORKSHOP_COMPLIANCE.md`, the notes that ship with the addon. |
 | `ref/` | The Hammer map template the build writes into, and the stock sound-events file. |
 

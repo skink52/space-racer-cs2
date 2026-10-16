@@ -5,16 +5,16 @@
 
 const TICRATE = 64;                 // sim steps per second (one per CS2 server tick)
 const DT = 1 / TICRATE;
-const CAR_R = 24;                   // car collision radius (units)
-const CAR_LEN = 52;                 // for drawing / grid spacing
+const CAR_R = 36;                   // car collision radius (units)
+const CAR_LEN = 100;                 // for drawing / grid spacing
 const TEAM_NAMES = ['T', 'CT'];
 
 // The four cars. Speeds in units/s, accel in units/s^2, turn in radians/s at mid speed, grip = how fast sideways
 // speed is bled off (per second); mass only matters when cars bump.
 const CARS = {
-  hornet:  { key: 'hornet',  name: 'HORNET',  maxSpeed: 962,  accel: 580, brake: 1000, turn: 2.7,  grip: 12, driftGrip: 3.2, mass: 1.0, shield: 90,  charge: 100, boost: 1.30, padMult: 1.0, driftCharge: 2.0, spinCost: 18, ram: 1.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
+  hornet:  { key: 'hornet',  name: 'HORNET',  maxSpeed: 950,  accel: 570, brake: 1000, turn: 2.7,  grip: 12, driftGrip: 3.2, mass: 1.0, shield: 90,  charge: 100, boost: 1.30, padMult: 1.0, driftCharge: 2.0, spinCost: 18, ram: 1.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
              perk: 'DRIFT CHARGE', desc: 'LIGHT AND SHARP. DRIFTING FILLS CHARGE FAST. CHEAP SPIN ATTACK.' },
-  meteor:  { key: 'meteor',  name: 'METEOR',  maxSpeed: 1005, accel: 430, brake: 900,  turn: 2.15, grip: 10, driftGrip: 3.0, mass: 1.6, shield: 110, charge: 100, boost: 1.28, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 2.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
+  meteor:  { key: 'meteor',  name: 'METEOR',  maxSpeed: 1005, accel: 440, brake: 900,  turn: 2.35, grip: 10, driftGrip: 3.0, mass: 1.6, shield: 110, charge: 100, boost: 1.28, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 2.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
              perk: 'RAM', desc: 'HEAVY AND FAST IN A STRAIGHT LINE. BUMPS HURT THEM, NOT YOU.' },
   comet:   { key: 'comet',   name: 'COMET',   maxSpeed: 935,  accel: 470, brake: 950,  turn: 2.4,  grip: 11, driftGrip: 3.0, mass: 1.0, shield: 100, charge: 130, boost: 1.40, padMult: 1.4, driftCharge: 1.0, spinCost: 30, ram: 1.0, chargeMult: 1.3, draftMult: 1.0, draftRegen: 0,
              perk: 'AFTERBURN', desc: 'BIGGEST CHARGE TANK, STRONGEST BOOST, PADS LAST LONGER.' },
@@ -51,6 +51,9 @@ const RULES = {
   wrongWayTime: 1.0,        // seconds driving backwards before the warning
   koCreditWindow: 2.0,      // seconds: the last car to hit a wreck within this gets the kill
   slickGrip: 0.3,
+  gravity: 1150,            // units/s^2 in the air (jumps)
+  rampKick: 60,             // extra upward speed off a ramp lip
+  airControl: 0.35,         // steering left in the air
 };
 
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }

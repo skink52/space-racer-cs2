@@ -90,18 +90,26 @@ function spectatorInput(pe, pk) {
   return pickerInput(pe, pk) || any;
 }
 
-// chase camera behind a car (own or watched). The yaw eases towards the car's heading; a little roll in corners.
-function placeCamera(pk, car, view, dt) {
+// chase camera behind a car (own or watched). The yaw eases towards the car's heading, turned a little into the bend
+// ahead so the upcoming track stays in view; it pulls back at speed; a little roll in corners.
+function placeCamera(pk, car, view, dt, preset) {
   if (!live(pk.cam)) return;
-  const target = car.yaw;
+  const cp = CONFIG.CAMERAS[preset] || CONFIG.CAMERAS[CONFIG.CAM_DEFAULT] || { back: 300, up: 175, pitch: 16, speedBack: 70 };
+  const T = view.arena.track;
+  const ahead = T.point(car.s + 500 + car.speed * 0.5);
+  const toAhead = Math.atan2(ahead.y - car.y, ahead.x - car.x);
+  const target = car.state === 'falling' ? car.yaw : car.yaw + normRad(toAhead - car.yaw) * CONFIG.CAM_LOOKAHEAD;
   if (pk.camYaw === null || car.fx & 128 || car.state === 'grid') pk.camYaw = target;
   else pk.camYaw += normRad(target - pk.camYaw) * Math.min(1, CONFIG.CAM_TURN * dt);
   const cy = pk.camYaw;
-  const back = CONFIG.CAM_BACK, up = CONFIG.CAM_UP;
-  const pos = view.world(car.x - Math.cos(cy) * back, car.y - Math.sin(cy) * back, car.z + up);
+  const sp = clamp(car.speed / Math.max(1, car.spec.maxSpeed), 0, 1.5);
+  const back = cp.back + cp.speedBack * sp, up = cp.up;
+  // in the air the camera follows the car's height but not its bounces
+  const cz = car.air ? Math.max(car.tz, car.z - 40) : car.z;
+  const pos = view.world(car.x - Math.cos(cy) * back, car.y - Math.sin(cy) * back, cz + up);
   let roll = car.state === 'falling' ? 0 : clamp(-car.vl / 30, -CONFIG.CAM_ROLL, CONFIG.CAM_ROLL);
   if (car.spinTimer > 0) roll = 0;
-  const pitch = CONFIG.CAM_PITCH + (car.state === 'falling' ? Math.min(40, car.stateTime * 30) : 0);
+  const pitch = cp.pitch + (car.state === 'falling' ? Math.min(40, car.stateTime * 30) : 0);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
   pk.cam.Move({ position: pos, angles: { pitch, yaw: deg(cy), roll } });
 }
@@ -111,7 +119,7 @@ function placeOverviewCamera(pk, arena, view) {
   if (!live(pk.cam)) return;
   const T = arena.track;
   const p = T.point(0);
-  const pos = view.world(p.x - p.tx * 900, p.y - p.ty * 900, p.z + 700);
+  const pos = view.world(p.x - p.tx * 1100, p.y - p.ty * 1100, p.z + 900);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
   pk.cam.Move({ position: pos, angles: { pitch: 35, yaw: deg(Math.atan2(p.ty, p.tx)), roll: 0 } });
   pk.camYaw = null;

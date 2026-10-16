@@ -91,9 +91,9 @@ class Arena {
         if (o === c || !o.solid || o.speed < 350) continue;
         const rx = o.x - c.x, ry = o.y - c.y;
         const along = rx * fx + ry * fy;
-        if (along < 40 || along > 320) continue;
+        if (along < 60 || along > 360) continue;
         const side = Math.abs(-rx * fy + ry * fx);
-        if (side > 48 || Math.abs(o.z - c.z) > 60) continue;
+        if (side > 70 || Math.abs(o.z - c.z) > 60) continue;
         if (along < bestAlong) { best = o; bestAlong = along; }
       }
       c.draft = best;

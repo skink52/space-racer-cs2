@@ -4,7 +4,9 @@
 
 const CONFIG = {
   // ---- race rules
-  ARENA_MAX: 32, MAX_ARENAS: 2,  // 1-32 players race together; 33-64 are split evenly into two arenas
+  ARENA_LAYOUT: '2x32',          // '2x32': up to 2 arenas of 32 (33+ split evenly); '4x16': up to 4 arenas of 16; 'alternate': switch each round
+  ARENA_MIN: 8,                  // with more than one arena, none has fewer than this
+  ENGINE_HUM: true,              // engine sound on every human-driven car (pitch follows speed)
   MIN_PLAYERS: 1,                // fewer than this on T/CT (bots count): no race, everyone waits in the lobby
   LAPS: 0,                       // 0 = each track's own lap count
   COUNTDOWN: 10,                 // seconds on the grid before the lights
@@ -39,8 +41,17 @@ const CONFIG = {
   ROUND_SLACK: 15,               // the CS2 round clock runs this much longer than the race can, so the script ends it
 
   // ---- camera
-  CAM_BACK: 250, CAM_UP: 105, CAM_PITCH: 11, CAM_TURN: 7.0,   // chase camera: behind / above the car, pitch down, yaw follow speed
-  CAM_ROLL: 10,                  // max degrees of lean in corners
+  // chase camera presets (each player picks with !cam): back / up from the car, pitch down, extra pull-back at full speed.
+  // 'high' (the default) sits up and back so the track ahead is visible a long way off.
+  CAMERAS: {
+    high: { back: 290, up: 165, pitch: 15, speedBack: 60 },
+    far:  { back: 420, up: 260, pitch: 22, speedBack: 80 },
+    near: { back: 230, up: 100, pitch: 9, speedBack: 30 },
+  },
+  CAM_DEFAULT: 'high',
+  CAM_TURN: 6.0,                 // how quickly the camera swings round behind the car
+  CAM_LOOKAHEAD: 0.35,           // 0..1: how much the camera turns into the bend ahead (shows more of the upcoming track)
+  CAM_ROLL: 8,                   // max degrees of lean in corners
   HIDE_OWN_BODY: true,
 
   // ---- rendering
@@ -65,4 +76,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';

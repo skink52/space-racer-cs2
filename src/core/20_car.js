@@ -20,10 +20,12 @@ class Car {
     this.wrongWay = 0; this.wrongWayFlag = false; this.offLine = false;
     this.fallTimer = 0; this.fx = 0;   // fx bits for the renderer: 1 hit, 2 rail, 4 pulsed, 8 pad, 16 fell
     this.pulsed = 0; this.noDamage = 0; this.calm = 0;   // seconds of no-damage after the start
+    this.air = false; this.tz = 0; this.lift = 0; this.airTime = 0;   // jumps: airborne flag, track height, ramp height under the car
   }
 
   placeAt(x, y, z, yaw, track) {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.vx = 0; this.vy = 0; this.vz = 0; this.speed = 0; this.vf = 0; this.vl = 0;
+    this.air = false; this.tz = z; this.lift = 0;
     const p = track.locateAll(x, y, z);
     this.seg = p.i; this.t = p.t; this.d = p.d; this.s = p.s; this.prevS = p.s;
   }
@@ -47,8 +49,9 @@ class Car {
     // finished cars coast on autopilot for a moment, then leave
     const throttle = finished ? 0.4 : clamp(c.throttle, -1, 1);
     const steer = finished ? this.autoSteer(track) : (this.spinTimer > 0 ? 0 : clamp(c.steer, -1, 1));
-    const wantBoost = !finished && c.boost && this.charge > 0;
-    this.drifting = !finished && c.drift && this.speed > 250;
+    const air = this.air;
+    const wantBoost = !finished && !air && c.boost && this.charge > 0;
+    this.drifting = !finished && !air && c.drift && this.speed > 250;
     // spin attack
     if (!finished && c.spin && this.spinCd <= 0 && this.charge >= sp.spinCost && this.spinTimer <= 0) {
       this.charge -= sp.spinCost; this.spinTimer = RULES.spinTime; this.spinCd = RULES.spinCooldown; this.fx |= 32;
@@ -63,6 +66,7 @@ class Car {
     if (this.drifting) turnRate *= 1.45;
     if (this.slick) turnRate *= 0.8;
     if (this.spinTimer > 0) turnRate *= 0.3;
+    if (air) turnRate *= RULES.airControl;
     this.yaw += turnRate * steer * dt * (this.vf < 0 ? -1 : 1);
     fx = Math.cos(this.yaw); fy = Math.sin(this.yaw);
     const lx = -fy, ly = fx;
@@ -76,19 +80,21 @@ class Car {
     if (this.draft) mult *= RULES.draftSpeed;
     const target = sp.maxSpeed * mult;
     let acc = sp.accel * (this.boosting ? 1.6 : 1) * (this.padTimer > 0 ? 1.5 : 1) * (this.draft ? 1.15 : 1);
-    if (throttle > 0) {
+    if (air) {
+      vf -= vf * 0.05 * dt;            // no thrust or brakes in the air
+    } else if (throttle > 0) {
       if (vf < target) vf = Math.min(target, vf + acc * throttle * dt);
     } else if (throttle < 0) {
       vf = Math.max(-RULES.reverseMax, vf + sp.brake * throttle * dt);
     } else {
       vf -= vf * RULES.coastDrag * dt;
     }
-    if (vf > target) vf -= (vf - target) * 3 * dt;
+    if (vf > target && !air) vf -= (vf - target) * 3 * dt;
     // grip: bleed off sideways speed
     let grip = this.drifting ? sp.driftGrip : sp.grip;
     if (this.slick) grip *= RULES.slickGrip;
     if (this.spinTimer > 0) grip *= 0.5;
-    const g = Math.exp(-grip * dt);
+    const g = air ? 1 : Math.exp(-grip * dt);
     this.sliding = Math.abs(vl) > 90 && absv > 300;
     if (this.drifting && this.sliding) this.charge = Math.min(sp.charge, this.charge + RULES.driftChargeRate * sp.driftCharge * dt);
     vl *= g;
@@ -97,9 +103,37 @@ class Car {
     this.speed = Math.hypot(this.vx, this.vy);
     this.x += this.vx * dt; this.y += this.vy * dt;
     // where on the track are we now
-    const p = track.locate(this.x, this.y, this.z, this.seg);
-    this.seg = p.i; this.t = p.t; this.d = p.d; this.z = p.z;
+    const p = track.locate(this.x, this.y, this.tz, this.seg);
+    this.seg = p.i; this.t = p.t; this.d = p.d; this.tz = p.z;
     this.prevS = this.s; this.s = p.s;
+    // height: ramps lift the car, the lip of a ramp throws it, an open gap drops it
+    const lift = track.rampLift(p.i, p.t);
+    const ground = p.z + lift;
+    const road = track.road[p.i];
+    if (this.air) {
+      this.airTime += dt;
+      this.vz -= RULES.gravity * dt;
+      this.z += this.vz * dt;
+      if (this.z <= ground && road && !finished) {
+        this.air = false; this.z = ground; this.fx |= 1024;
+        if (this.vz < -850 && this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, (-this.vz - 850) * 0.03), null, tic);
+        this.vz = 0;
+      } else if (!road && this.z < ground - 40 && !finished) {
+        this.state = 'falling'; this.stateTime = 0; this.fallTimer = RULES.fallTime; this.fx |= 16; this.air = false;
+      } else if (finished && this.z <= ground) { this.air = false; this.z = ground; this.vz = 0; }
+    } else if (this.lift > 0 && lift === 0 && (!road || track.rampLift((p.i - 1 + track.n) % track.n, 0.99) > 0)) {
+      // off the lip: fly with the ramp's slope
+      const along = this.vx * track.tx[p.i] + this.vy * track.ty[p.i];
+      const f = track.rampAt(p.i - 1);
+      const slope = f ? f.h / ((f.b - f.a + 1) * track.step) : 0.3;
+      this.air = true; this.airTime = 0; this.z = p.z + this.lift; this.vz = Math.max(0, along) * slope + RULES.rampKick; this.fx |= 512;
+    } else if (!road && !finished) {
+      this.state = 'falling'; this.stateTime = 0; this.fallTimer = RULES.fallTime; this.vz = 0; this.fx |= 16;
+    } else {
+      this.z = ground;
+    }
+    this.lift = this.air ? 0 : lift;
+    if (this.state === 'falling') { this.speed = Math.hypot(this.vx, this.vy); return; }
     // rails and gaps
     const limit = p.hw - CAR_R * 0.7;
     if (Math.abs(this.d) > limit) {
@@ -131,7 +165,7 @@ class Car {
     this.progress(track, tic);
     // features under the car
     this.onCharge = false; this.slick = false;
-    const feats = track.featuresAt(this.seg, -this.d / Math.max(1, p.hw));
+    const feats = this.air ? null : track.featuresAt(this.seg, -this.d / Math.max(1, p.hw));
     if (feats && !finished) {
       for (const f of feats) {
         if (f.kind === 'boost') {
@@ -177,7 +211,7 @@ class Car {
       const p = track.point(s);
       this.x = p.x; this.y = p.y; this.z = p.z; this.yaw = Math.atan2(p.ty, p.tx);
       this.vx = 0; this.vy = 0; this.vz = 0; this.speed = 0; this.vf = 0; this.vl = 0;
-      this.seg = p.i; this.s = s; this.prevS = s; this.d = 0;
+      this.seg = p.i; this.s = s; this.prevS = s; this.d = 0; this.air = false; this.tz = p.z; this.lift = 0;
       this.state = 'racing'; this.stateTime = 0; this.ghost = 1.5; this.padTimer = 0;
       this.shield -= RULES.fallPenalty;
       this.fx |= 128;

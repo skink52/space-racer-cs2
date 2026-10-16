@@ -9,6 +9,7 @@ from PIL import Image
 
 OUT = sys.argv[1]
 NAME = sys.argv[2] if len(sys.argv) > 2 else 'space_racer'
+MAP = sys.argv[3] if len(sys.argv) > 3 else 'mg_' + NAME
 IMG = 'file://{images}/custom_game/spr/'
 FONT = 'Stratum2, "Stratum2 Bold", Arial'
 css = []
@@ -65,7 +66,7 @@ rule('.Flash.wreck', background_color='#ff600080')
 # minimap: the track outline (per track image) with the player's dot and the leader's dot
 MM = 200
 rule('.MiniMap', width='%dpx' % MM, height='%dpx' % MM, margin_left='28px', margin_top='28px', background_size='100% 100%', background_repeat='no-repeat', opacity='0.9')
-for tid in ('oval', 'hairpin', 'crosswire', 'nullgap', 'spire', 'ringworld'):
+for tid in [t['id'] for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))]:
     rule('.MiniMap.mm_%s' % tid, background_image='url("%smm_%s.png")' % (IMG, tid))
 rule('.Dot', width='14px', height='14px', border_radius='7px', background_color='#ffffff', visibility='collapse', box_shadow='0px 0px 6px #000000')
 rule('.Dot.On', visibility='visible')
@@ -180,8 +181,14 @@ help_ = P('spr_help', 'Help', [L(None, 'HelpTitle', 'SPACE RACER - CONTROLS')] +
     'W / S  ACCELERATE / BRAKE AND REVERSE', 'A / D  STEER (PICK A CAR WHEN NOT RACING)', 'MOUSE 1  BOOST (USES CHARGE)',
     'MOUSE 2  SPIN ATTACK (COSTS CHARGE)', 'SPACE  DRIFT', 'BOOST PADS: FREE SPEED.  CHARGE PLATFORMS: REFILL CHARGE AND SHIELD',
     'THE PULSE: A WAVE FROM THE BACK OF THE FIELD TOPS UP EVERYONE IT PASSES', 'SPECTATING: MOUSE 1 / 2 CHANGE CAR, E CHANGE ARENA',
-    'CHAT: !CAR 1-4   !SPEC   !AFK   !BACK   !RACE')])
+    'JUMP RAMPS: HIT THEM FAST OR FALL INTO THE GAP', 'CHAT: !CAR 1-4   !CAM (VIEW)   !SPEC   !AFK   !BACK   !RACE')])
+# never shown: these make CS2 compile the loading screen picture, the radar and the map icon along with the HUD
+for cls, src in (('SprPre1', 'map_icons/screenshots/1080p/%s.png' % MAP), ('SprPre2', 'overheadmaps/%s_radar.psd' % MAP),
+                 ('SprPre3', 'map_icons/map_icon_%s.svg' % MAP)):
+    rule('.' + cls, width='1px', height='1px', opacity='0', visibility='collapse', background_image='url("file://{images}/%s")' % src)
+rule('.SprPreload', width='1px', height='1px', visibility='collapse')
 root = P('spr_root', 'SprRoot', [
+    P(None, 'SprPreload', [P(None, 'SprPre1'), P(None, 'SprPre2'), P(None, 'SprPre3')]),
     P('spr_flash', 'Flash'),
     P('spr_mm', 'MiniMap', [P('spr_dot', 'Dot'), P('spr_ldot', 'Dot Lead')]),
     P(None, 'TopBlock', [P(None, 'PosRow', [L('spr_pos', 'Pos'), L('spr_posof', 'PosOf')]), L('spr_lap', 'Lap')]),
