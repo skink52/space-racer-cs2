@@ -28,7 +28,7 @@ The map's main entities:
 | `env_sky` | `spr_sky` | `materials/spr/sky/sky.vmat` |
 
 Plus: `prop_static` for the eight tracks (one model each, two layers of 2 x 2 boxes, 13,800 units each) inside
-moondome + tools/skybox shells (one pixel-art sky per track) with vis hints,
+moondome shells (each showing its track's own pixel-art sky), vis hints (Low along the roads, Lowest elsewhere),
 `spr_cache_*` props that make every car and effect model available to the script, and the lobby with 32 T and
 32 CT spawns about 12,000 units below the tracks.
 

@@ -1,5 +1,6 @@
 """Writes the whole Space Racer map into a Hammer map (binary DMX .vmap): the eight track props in their boxes in the
-void (two layers of 2 x 2), a moondome (pixel-art sky shell, one per theme) and tools/skybox shell around each box, vis hints, the lobby, the pawn booth,
+void (two layers of 2 x 2), a moondome (pixel-art sky shell, one per track theme) around each box, vis hints (Low along
+the roads, Lowest everywhere else), the lobby, the pawn booth,
 the model cache room, spawns and every entity the script needs.
 
 usage: vmap.py <template_or_current.vmap> <out.vmap> <addon_out_dir> [script_name]
@@ -106,9 +107,24 @@ for tp in tracks:
     hb = tp['half']
     box = (ox - hb, oy - hb, oz + tp['floor'] - 500, ox + hb, oy + hb, oz + tp['zmax'] + 4800)   # tall enough for the lobby's overview camera
     boxes.append(box)
-    shell(box, SKY_MATS[tp['id']], 0)
-    shell(box, TOOLSSKY, 1)
-    hint(box, HINT_LOW)
+    shell(box, SKY_MATS[tp['id']], 0)      # the track's own sky; no toolsskybox shell (it would show the one env_sky instead)
+# vis: nothing inside a track box blocks sight (track and scenery are props that don't occlude), so fine vis only
+# matters where cameras go. Low hints cover a band along the road: chunks of the centreline, padded sideways and
+# up for the chase / flyover / results cameras; everything else in the box is left to the whole-map Lowest hint.
+TRACKDATA = {t['id']: t for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))}
+CHUNK, PAD_XY, PAD_DOWN, PAD_UP = 40, 900, 350, 1100
+band_hints = 0
+for tp, box in zip(tracks, boxes):
+    T = TRACKDATA[tp['id']]
+    ox, oy, oz = tp['off']
+    n = T['n']
+    for a0 in range(0, n, CHUNK):
+        idx = [(a0 + k) % n for k in range(CHUNK + 1)]
+        xs = [T['x'][i] for i in idx]; ys = [T['y'][i] for i in idx]; zs = [T['z'][i] for i in idx]
+        hw = max(T['hw'][i] for i in idx)
+        b = (max(box[0] + 8, ox + min(xs) - hw - PAD_XY), max(box[1] + 8, oy + min(ys) - hw - PAD_XY), max(box[2] + 8, oz + min(zs) - PAD_DOWN),
+             min(box[3] - 8, ox + max(xs) + hw + PAD_XY), min(box[4] - 8, oy + max(ys) + hw + PAD_XY), min(box[5] - 8, oz + max(zs) + PAD_UP))
+        hint(b, HINT_LOW); band_hints += 1
 for i, a in enumerate(boxes):
     for b in boxes[i + 1:]:
         assert a[3] <= b[0] or b[3] <= a[0] or a[4] <= b[1] or b[4] <= a[1] or a[5] <= b[2] or b[5] <= a[2], (a, b)
@@ -176,7 +192,8 @@ for c in kept:
 
 pre = {a[0]: a for a in d.prefix[0]}
 refs = pre['map_asset_references'][2]
-for m in list(materials_used) + [TOOLSSKY, 'materials/tools/toolsnavattribute.vmat']:
+refs[:] = [r for r in refs if r != TOOLSSKY]          # older builds put a toolsskybox shell in every box
+for m in list(materials_used) + ['materials/tools/toolsnavattribute.vmat']:
     if m not in refs: refs.append(m)
 names = sorted(counts)
 pre['map_subasset_reference_types'][2] = ['entity'] * len(names)
@@ -193,5 +210,6 @@ for c in kids[2]:
     ents.append(dict(classname=ep.get('classname'), targetname=ep.get('targetname', ''), origin=list(c.get('origin'))))
 os.makedirs('build', exist_ok=True)
 json.dump(ents, open('build/entities.json', 'w'))
+print('vmap: %d vis hints along the roads' % band_hints)
 print('vmap: %d entities, %d track boxes, replaced %d old nodes, world %s..%s -> %s' % (
     sum(counts.values()), len(boxes), removed, tuple(int(x) for x in whole[:3]), tuple(int(x) for x in whole[3:]), OUTPATH))

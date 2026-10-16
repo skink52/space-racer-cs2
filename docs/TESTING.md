@@ -6,7 +6,8 @@ Valve's type declarations. These are the things only the real game can show, in 
 ## A. Hammer
 
 1. Open `maps/mg_space_racer.vmap`. Expect: eight track props in two layers of 2 x 2 boxes (13,800 units each; the
-   lower layer around z -5000, the upper around z +3600), each inside a moondome box; the lobby/booth/cache rooms
+   lower layer around z -5000, the upper around z +3600), each inside a moondome box (no toolsskybox shells any
+   more) with a chain of Low vis hints along the road and one Lowest hint over everything; the lobby/booth/cache rooms
    at z -12,000; the entities listed in README_SPACE_RACER.md.
 2. Check the `point_script` has its script and the `custom_hud_layout` its layout (keys `cs_script`, `layout`).
 3. Build. Expect no missing materials (`materials/spr/...`) or models (`models/spr/...`).
