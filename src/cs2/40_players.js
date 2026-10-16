@@ -141,13 +141,40 @@ function placeCamera(pk, car, view, dt, preset) {
   pk.cam.Move({ position: pos, angles: { pitch, yaw: deg(cy), roll } });
 }
 
-// a fixed overview of an arena (results / nothing to follow): high above the start line
+// grid flyover: before the last seconds of the countdown the camera swoops low along the track towards the grid,
+// looking back at the waiting field, then cuts to the chase camera
+function placeFlyover(pk, arena, view, now) {
+  if (!live(pk.cam)) return;
+  const T = arena.track;
+  const total = arena.cfg.countdownTics, left = arena.countdown;
+  const span = total - CONFIG.FLYOVER_CUT * TICRATE;
+  const t = clamp((total - left) / Math.max(1, span), 0, 1);
+  const e = 1 - (1 - t) * (1 - t) * (1 - t);             // ease out: fast at first, settling over the grid
+  const s = CONFIG.FLYOVER_FROM * (1 - e) + 250;         // progress ahead of the start line
+  const p = T.point(s), q = T.point(s - 600);
+  let hT = 160 + 520 * (1 - e);
+  // stay under the roof where the road runs through a tube
+  for (let k = -10; k <= 10; k += 2) if (T.tube[((p.i + k) % T.n + T.n) % T.n]) { hT = Math.min(hT, 170); break; }
+  if (pk.flyH === undefined || left >= total - 1) pk.flyH = hT;
+  pk.flyH += (hT - pk.flyH) * 0.12;
+  const h = pk.flyH;
+  const pos = view.world(p.x, p.y, p.z + h);
+  const look = Math.atan2(q.y - p.y, q.x - p.x);
+  const pitch = deg(Math.atan2(h - 40, 900));
+  if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
+  pk.cam.Move({ position: pos, angles: { pitch, yaw: deg(look), roll: Math.sin(now * 0.7) * 3 } });
+  pk.camYaw = null;
+}
+
+// results / nothing to follow: a slow circle round the start gantry, high enough to see the field warp out
 function placeOverviewCamera(pk, arena, view) {
   if (!live(pk.cam)) return;
   const T = arena.track;
   const p = T.point(0);
-  const pos = view.world(p.x - p.tx * 1100, p.y - p.ty * 1100, p.z + 900);
+  const ang = Instance.GetGameTime() * 0.12;
+  const r = 1500, h = 650;
+  const pos = view.world(p.x + Math.cos(ang) * r, p.y + Math.sin(ang) * r, p.z + h);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
-  pk.cam.Move({ position: pos, angles: { pitch: 35, yaw: deg(Math.atan2(p.ty, p.tx)), roll: 0 } });
+  pk.cam.Move({ position: pos, angles: { pitch: deg(Math.atan2(h - 250, r)), yaw: deg(ang + Math.PI), roll: 0 } });
   pk.camYaw = null;
 }

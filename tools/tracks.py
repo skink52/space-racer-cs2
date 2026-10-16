@@ -588,6 +588,10 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
     c = ((l[0] + r[0]) / 2, (l[1] + r[1]) / 2, top + 4 * vox + 10)
     tv, tw, thh = voxel_text(track['title'], c, right, (0, 0, 1), fwd, vox, 20, 'letter', 'letter2')
     tris += tv
+    # the same name on the far side, reading the right way for anyone coming the other way (the grid flyover)
+    c2 = (c[0] + tan[0, 0] * 26, c[1] + tan[0, 1] * 26, c[2])
+    tv2, _, _ = voxel_text(track['title'], c2, (-right[0], -right[1], 0), (0, 0, 1), (-fwd[0], -fwd[1], 0), vox, 20, 'letter', 'letter2')
+    tris += tv2
     span = max(tw / 2 + 60, math.hypot(r[0] - l[0], r[1] - l[1]) / 2)
     bl = (c[0] - right[0] * span, c[1] - right[1] * span); br = (c[0] + right[0] * span, c[1] + right[1] * span)
     for z0, z1, mat in ((top - 30, top, 'gate'), (top + thh + 20, top + thh + 40, 'gate')):

@@ -6,7 +6,8 @@ _gen/music.json (loop lengths for the script).
 
 Every sound is made from the four voices of an old sound chip: two pulse waves (duty 12.5 / 25 / 50 %), a triangle
 and a noise channel, with stepped (4-bit) volume envelopes and a 22 kHz sample-and-hold for the crunch.
-The music is three original pieces written below as note lists: a lobby loop, a race loop and a results jingle.
+The music is four original pieces written below as note lists: a lobby loop, two race loops (they take turns)
+and a results jingle.
 """
 import os, sys, math, wave, json
 import numpy as np
@@ -20,11 +21,24 @@ rng = np.random.RandomState(5)
 def n_of(sec): return int(round(SR * sec))
 def tt(n): return np.arange(n) / SR
 
+def _blep(t, dt):
+    """polyBLEP correction for a step at phase 0 (t = phase 0..1, dt = phase step per sample)"""
+    out = np.zeros_like(t)
+    m = t < dt
+    x = t[m] / dt[m]; out[m] = x + x - x * x - 1
+    m2 = t > 1 - dt
+    x = (t[m2] - 1) / dt[m2]; out[m2] = x * x + x + x + 1
+    return out
+
 def pulse(freq, n, duty=0.5):
-    """pulse wave; freq may be an array (sweeps)"""
+    """pulse wave (band-limited with polyBLEP so high notes don't alias into hiss); freq may be an array"""
     f = np.broadcast_to(np.asarray(freq, np.float64), (n,))
-    ph = np.cumsum(f) / SR
-    return np.where((ph % 1.0) < duty, 1.0, -1.0) - (2 * duty - 1)     # without the DC offset (the chip's output is AC-coupled)
+    dt = np.clip(f / SR, 1e-6, 0.5)
+    ph = (np.cumsum(f) / SR) % 1.0
+    x = np.where(ph < duty, 1.0, -1.0)
+    x += _blep(ph, dt)
+    x -= _blep((ph - duty) % 1.0, dt)
+    return x - (2 * duty - 1)     # without the DC offset (the chip's output is AC-coupled)
 
 def tri(freq, n):
     """the chip triangle: 16 steps per cycle"""
@@ -71,9 +85,19 @@ def decay(n, sec):
 def exp_sweep(f0, f1, n):
     return f0 * (f1 / f0) ** (np.arange(n) / max(1, n - 1))
 
-def crunch(x):
-    """22 kHz sample-and-hold and a gentle 8-bit quantise"""
+def lowpass(x, cutoff):
+    """one-pole low-pass (vectorised via lfilter-free recursion in chunks)"""
+    a = 1 - math.exp(-2 * math.pi * cutoff / SR)
+    y = np.empty_like(x); acc = 0.0
+    for i in range(len(x)):
+        acc += a * (x[i] - acc); y[i] = acc
+    return y
+
+def crunch(x, music=False):
+    """the chip's colour: effects get a 22 kHz sample-and-hold and 8-bit steps; music only a soft top end
+    (whole tracks through 8 bits would hiss)"""
     x = x - x.mean()
+    if music: return x
     y = x.copy()
     y[1::2] = y[0::2][:len(y[1::2])]
     return np.round(y * 127) / 127
@@ -200,8 +224,31 @@ def song_race():
     # counter line in the first half: long notes on the 50 % pulse
     counter = bars_of(chords[:8], lambda c: [(CH[c][2], 6), (CH[c][1], 2), (CH[c][3], 8)]) + [('-', 16 * 8)]
     parts = [render_part(steps, step, 'p1', arp, 0.33, 0.35), render_part(steps, step, 'tri', bass, 0.9),
-             render_part(steps, step, 'drum', drums, 0.8), render_part(steps, step, 'p2', lead, 0.55, -0.2, vib=0.012),
+             render_part(steps, step, 'drum', drums, 0.6), render_part(steps, step, 'p2', lead, 0.55, -0.2, vib=0.012),
              render_part(steps, step, 'p3', counter, 0.28, -0.35, vib=0.008)]
+    return parts, steps * step
+
+def song_race2():
+    """'Starlight Circuit' - 168 bpm, E minor; a bouncing octave bass, a call-and-answer lead and a fast arp"""
+    bpm = 168; step = 60 / bpm / 4
+    chords = ['Em', 'C', 'D', 'B', 'Em', 'C', 'Am', 'B'] * 2
+    CH2 = dict(CH); CH2['D'] = ['D4', 'F#4', 'A4', 'D5']; CH2['B'] = ['B3', 'D#4', 'F#4', 'B4']
+    BASS2 = dict(BASS); BASS2['D'] = 'D3'; BASS2['B'] = 'B2'
+    steps = 16 * len(chords)
+    arp = bars_of(chords, lambda c: [(oct_up(CH2[c][k]), 1) for k in (0, 2, 1, 3, 0, 2, 1, 3, 3, 2, 1, 0, 1, 2, 3, 2)])
+    bass = bars_of(chords, lambda c: [(BASS2[c], 1), ('-', 1), (oct_up(BASS2[c]), 1), ('-', 1)] * 4)
+    drums = bars_of(chords, lambda c: [('k', 2), ('h', 1), ('h', 1), ('s', 2), ('h', 2), ('k', 1), ('k', 1), ('h', 2), ('s', 2), ('h', 1), ('s', 1)])
+    call = [('E5', 2), ('G5', 2), ('B5', 4), ('A5', 2), ('G5', 2), ('F#5', 4)]
+    lead = [('-', 16 * 4)] + \
+        call + [('E5', 4), ('G5', 2), ('C6', 6), ('B5', 4)] + \
+        [('A5', 2), ('B5', 2), ('D6', 4), ('C6', 2), ('B5', 2), ('A5', 4)] + [('F#5', 4), ('A5', 2), ('B5', 6), ('-', 4)] + \
+        call + [('E5', 4), ('G5', 2), ('C6', 6), ('E6', 4)] + \
+        [('D6', 2), ('C6', 2), ('B5', 4), ('A5', 2), ('C6', 2), ('E6', 4)] + [('D#6', 4), ('B5', 4), ('F#6', 6), ('-', 2)] + \
+        [('G6', 6), ('F#6', 2), ('E6', 4), ('B5', 4)] + [('E6', 4), ('D6', 4), ('C6', 8)] + [('-', 16)] * 2
+    lead_steps = sum(n for _, n in lead)
+    if lead_steps < steps: lead.append(('-', steps - lead_steps))
+    parts = [render_part(steps, step, 'p1', arp, 0.26, 0.35), render_part(steps, step, 'tri', bass, 0.95),
+             render_part(steps, step, 'drum', drums, 0.6), render_part(steps, step, 'p2', lead, 0.5, -0.25, vib=0.014)]
     return parts, steps * step
 
 def song_lobby():
@@ -238,12 +285,14 @@ def mix(parts, sec, gain=0.85):
     L = np.zeros(n); R = np.zeros(n)
     for a, b in parts: L[:len(a)] += a; R[:len(b)] += b
     m = max(np.abs(L).max(), np.abs(R).max()) or 1
-    L = crunch(L / m * gain); R = crunch(R / m * gain)
+    L = lowpass(crunch(L / m * gain, True), 9000); R = lowpass(crunch(R / m * gain, True), 9000)
+    m = max(np.abs(L).max(), np.abs(R).max()) or 1
+    L *= gain / m; R *= gain / m
     # 5 ms fades at both ends so a retrigger never clicks
     f = n_of(0.005)
     for ch in (L, R): ch[:f] *= np.linspace(0, 1, f); ch[-f:] *= np.linspace(1, 0, f)
     return np.stack([L, R], 1)
-for name, fn in (('mus_race', song_race), ('mus_lobby', song_lobby), ('mus_results', song_results)):
+for name, fn in (('mus_race', song_race), ('mus_race2', song_race2), ('mus_lobby', song_lobby), ('mus_results', song_results)):
     parts, sec = fn()
     MUSIC[name] = (mix(parts, sec), sec)
 
@@ -253,7 +302,7 @@ RANGE = {'beep': 6000, 'beep2': 6000, 'go': 7000, 'wreck': 3500, 'finish': 2500,
          'hum0': 900, 'hum1': 1000, 'hum2': 1100, 'hum3': 1200, 'jump': 1500, 'land': 1500}
 VOL = {'scrape': 0.45, 'hit': 0.6, 'rail': 0.6, 'charge': 0.5, 'boost': 0.6, 'pulsed': 0.55, 'hum0': 0.3, 'hum1': 0.33, 'hum2': 0.36, 'hum3': 0.4,
        'beep': 0.7, 'beep2': 0.75, 'go': 0.75}
-MUSIC_VOL = {'mus_race': 0.32, 'mus_lobby': 0.3, 'mus_results': 0.38}
+MUSIC_VOL = {'mus_race': 0.32, 'mus_race2': 0.32, 'mus_lobby': 0.3, 'mus_results': 0.38}
 
 d = os.path.join(OUT, 'sounds/spr'); os.makedirs(d, exist_ok=True)
 def write_wav(path, x, channels):

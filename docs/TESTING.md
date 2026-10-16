@@ -78,6 +78,12 @@ Valve's type declarations. These are the things only the real game can show, in 
 - Camera shake on hits, rail strikes, landings and wrecks (`CAM_SHAKE` 0 turns it off).
 - Effects are pixel art now (explosion, warp-out, the Pulse, the hover shadow).
 - Lap records: after a race, the lobby's NEXT line shows a record for tracks that have one; chat announces new ones.
+- Grid flyover: for the first 6 seconds on the grid the camera swoops low along the track towards the waiting
+  field (the start gantry's name reads correctly from that side too), then cuts behind your car 4 seconds before
+  the lights (`FLYOVER`, `FLYOVER_CUT`, `FLYOVER_FROM`).
+- Results: a pulsing RESULTS banner at the top and a camera circling the start gantry.
+- Boosting (or on a pad): flickering pixel speed lines round the edges of the screen.
+- Two race songs take turns ("Neon Overdrive", "Starlight Circuit").
 
 ## D. Things to look at and tune
 

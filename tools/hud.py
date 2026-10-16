@@ -129,11 +129,48 @@ yy, xx = np.mgrid[0:V, 0:V]
 r = np.hypot((xx + 0.5) / V - 0.5, (yy + 0.5) / V - 0.5) * 2
 vg = np.zeros((V, V, 4), np.uint8); vg[..., 3] = (np.clip((r - 0.75) / 0.6, 0, 1) * 160).astype(np.uint8) // 32 * 32
 save(up(vg, 4), 'vignette.png')
+# boost speed lines: pixel streaks radiating from the centre, only round the edges of the screen (two frames)
+def speedlines(seed):
+    W_, H_ = 480, 270
+    rng = np.random.RandomState(seed)
+    img = np.zeros((H_, W_, 4), np.uint8)
+    cx, cy = W_ / 2, H_ / 2
+    for _ in range(70):
+        a = rng.rand() * 2 * np.pi
+        r0 = rng.uniform(0.62, 0.85); r1 = r0 + rng.uniform(0.15, 0.45)
+        col = (WHITE, ICE, FROST)[rng.randint(3)]
+        for k in np.linspace(r0, r1, 120):
+            x = int(cx + np.cos(a) * k * W_ * 0.62); y = int(cy + np.sin(a) * k * H_ * 0.62)
+            if 0 <= x < W_ and 0 <= y < H_: img[y, x, :3] = col; img[y, x, 3] = 150
+    return up(img, 4)
+save(speedlines(1), 'speed0.png'); save(speedlines(2), 'speed1.png')
+
+# turn-ahead arrows: one or two chevrons, left or right, blinking for hairpins
+def turn_arrow(n, right, col):
+    G = 16
+    img = np.zeros((G, G * n, 4), np.uint8)
+    for k in range(n):
+        for y in range(G):
+            dx = abs(y - (G - 1) / 2)
+            for t in range(4):
+                x = int(k * G + 4 + dx * 0.7 + t)
+                if x < (k + 1) * G:
+                    img[y, x, :3] = col; img[y, x, 3] = 255
+    # outline
+    a_ = img[..., 3] > 0
+    o = np.zeros_like(a_)
+    for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)): o |= np.roll(np.roll(a_, dy, 0), dx, 1)
+    img[o & ~a_] = (0, 0, 0, 255)
+    if right: img = img[:, ::-1]
+    return up(img, 4)
+for n in (1, 2):
+    for right in (0, 1):
+        save(turn_arrow(n, right, GOLD if n == 1 else SALMON), 'turn_%s%d.png' % ('r' if right else 'l', n))
+
 # the SPACE RACER logo: chrome-gradient pixel letters with an outline and a deep drop shadow, synthwave stripes
 logo = pixfont.logo
 LOGO = logo('SPACE RACER')
 save(LOGO, 'logo.png')
-save(logo('RESULTS', 6), 'logo_results.png')
 
 # picker car pictures: pixelated versions of cars.py's renders (they are smooth); quantised to the palette
 for k in KEYS:
@@ -172,6 +209,11 @@ rule('.SprRoot.Spec .Bars', opacity='0.75')
 rule('.Crt', width='100%', height='100%', background_image='url("%sscan.png")' % IMG, background_size='6px 6px', background_repeat='repeat', opacity='0.55')
 rule('.Vig', width='100%', height='100%', background_image='url("%svignette.png")' % IMG, background_size='100% 100%', opacity='0.9')
 rule('.SprOpts.nocrt .Crt', visibility='collapse')
+for k in (0, 1):
+    rule('.Speed%d' % k, width='100%', height='100%', background_image='url("%sspeed%d.png")' % (IMG, k), background_size='100% 100%',
+         visibility='collapse', animation_name='SprBlink', animation_duration='0.16s', animation_iteration_count='infinite',
+         animation_delay='%.2fs' % (k * 0.08))
+    rule('.SprRoot.Boost .Speed%d' % k, visibility='visible')
 rule('.SprOpts.nocrt .Vig', visibility='collapse')
 
 # full-screen flash
@@ -208,6 +250,12 @@ rule('#spr_suf', margin_bottom='12px', margin_left='4px')
 rule('#spr_posof', margin_bottom='12px', margin_left='12px')
 rule('#spr_pos', animation_name='SprPop', animation_duration='0.25s')
 rule('#spr_lap', margin_top='4px')
+rule('.Turn', horizontal_align='center', margin_top='6px', height='64px', width='128px', background_size='contain', background_repeat='no-repeat', background_position='center', visibility='collapse')
+for side in ('l', 'r'):
+    for n in (1, 2):
+        rule('.Turn.%s%d' % (side, n), visibility='visible', background_image='url("%sturn_%s%d.png")' % (IMG, side, n))
+rule('.Turn.l2', animation_name='SprBlink', animation_duration='0.4s', animation_iteration_count='infinite')
+rule('.Turn.r2', animation_name='SprBlink', animation_duration='0.4s', animation_iteration_count='infinite')
 rule('.ClockBox', horizontal_align='right', margin_right='26px', margin_top='22px', flow_children='down', padding='10px 14px 8px 14px', **framed('pink'))
 rule('.ClockBox .Txt', horizontal_align='right')
 
@@ -280,6 +328,12 @@ for k in KEYS:
 rule('.Logo', horizontal_align='center', vertical_align='top', margin_top='80px', width='%dpx' % (LOGO.shape[1] * 1.1), height='%dpx' % (LOGO.shape[0] * 1.1),
      background_image='url("%slogo.png")' % IMG, background_size='100% 100%', background_repeat='no-repeat',
      animation_name='SprPulse', animation_duration='2.4s', animation_iteration_count='infinite')
+RES = pixfont.logo('RESULTS', 6)
+save(RES, 'logo_results.png')
+rule('.ResLogo', visibility='collapse', horizontal_align='center', vertical_align='top', margin_top='150px', width='%dpx' % RES.shape[1], height='%dpx' % RES.shape[0],
+     background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%', animation_name='SprPulse', animation_duration='1.2s', animation_iteration_count='infinite')
+rule('.SprRoot.Res .ResLogo', visibility='visible')
+rule('.SprRoot.Res .TopBlock', visibility='collapse')
 rule('.LobbyLines', horizontal_align='center', vertical_align='bottom', margin_bottom='34px', flow_children='down', width='1600px')
 rule('.LobbyLines .Txt', margin_bottom='8px')
 
@@ -311,11 +365,14 @@ rule('.SprPreload', width='1px', height='1px', visibility='collapse')
 root = P('spr_root', 'SprRoot', [
     P(None, 'SprPreload', [P(None, 'SprPre1'), P(None, 'SprPre2'), P(None, 'SprPre3')]),
     P('spr_flash', 'Flash'),
+    P(None, 'Speed0'), P(None, 'Speed1'),
     P(None, 'Logo'),
+    P(None, 'ResLogo'),
     P('spr_mm', 'MiniMap', [P('spr_mmimg', 'MapImg', [P('spr_ldot', 'Dot Lead'), P('spr_dot', 'Dot me')])]),
     P(None, 'TopBlock', [
         P(None, 'PosRow', [gtext('spr_pos', 2, 'XXL', 'W'), gtext('spr_suf', 2, 'L', 'W'), gtext('spr_posof', 3, 'M', 'P')]),
         gtext('spr_lap', 9, 'M', 'Y'),
+        P('spr_turn', 'Turn'),
     ]),
     P(None, 'ClockBox', [stext('TIME', 'XS', 'P', align='right'), gtext('spr_clock', 7, 'M', 'W', align='right')]),
     gtext('spr_ctr', 20, 'XL', 'W', extra_cls='Ctr'),

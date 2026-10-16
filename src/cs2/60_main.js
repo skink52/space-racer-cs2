@@ -215,7 +215,7 @@ function handleArenaEvents(a, now) {
         // track records (kept while the map runs)
         const rec = records.get(T.id);
         if (e.last > 3 && (!rec || e.last < rec.time)) {
-          records.set(T.id, { time: e.last, name: e.car.name.slice(0, 12).toUpperCase(), who: e.car.name, arena: a });
+          records.set(T.id, { time: e.last, name: e.car.name.slice(0, 10).toUpperCase(), who: e.car.name, arena: a });
           a.newRecord = true;
           const rp = e.car.person;
           if (rec && rec.arena !== a && rp && !rp.bot) center(rp.slot, 'LAP RECORD!', 2, 'gold');
@@ -408,7 +408,8 @@ function lobbyFrame(now, dt) {
 let musCur = null, musAt = 0;
 function musicFrame(now) {
   if (!CONFIG.MUSIC) { if (musCur) { musicStop(musCur); musCur = null; } return; }
-  const want = phase === 'lobby' ? 'mus_lobby' : phase === 'running' ? 'mus_race' : 'mus_results';
+  const race = rm.roundNumber % 2 === 0 && MUSIC_LEN.mus_race2 ? 'mus_race2' : 'mus_race';   // the two race loops take turns
+  const want = phase === 'lobby' ? 'mus_lobby' : phase === 'running' ? race : 'mus_results';
   if (want !== musCur) {
     if (musCur) musicStop(musCur);
     musCur = want; musAt = now + (MUSIC_LEN[want] || 20);
@@ -475,7 +476,9 @@ function frame(dt) {
       if (pe.status === 'racing' && pe.car && pe.arena) {
         const a = pe.arena, v = views.get(a);
         if (!v) return;
-        if (a.state === 'over') placeOverviewCamera(pk, a, v); else placeCamera(pk, pe.car, v, dt, pe.cam);
+        if (a.state === 'over') placeOverviewCamera(pk, a, v);
+        else if (a.state === 'grid' && CONFIG.FLYOVER && a.countdown > CONFIG.FLYOVER_CUT * TICRATE) placeFlyover(pk, a, v, now);
+        else placeCamera(pk, pe.car, v, dt, pe.cam);
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
         hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE);
       } else {

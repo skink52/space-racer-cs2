@@ -52,6 +52,9 @@ def crt(img):
 # ---------------------------------------------------------------- race
 bg = Image.open(BG).convert('RGBA').resize((W, H), Image.NEAREST)
 img = bg.copy()
+for k in (0,):
+    sp = Image.open(os.path.join(IMG, 'speed%d.png' % k)).convert('RGBA').resize((W, H), Image.NEAREST)
+    img.alpha_composite(sp)
 # minimap
 box(img, 24, 24, 24 + 216, 24 + 216, 'cyan')
 pic(img, 'mm_oval.png', 32, 32, 200, 200)
@@ -63,6 +66,7 @@ gtext(img, W / 2 - 120, 14, '3', 'XXL', 'G')
 gtext(img, W / 2 - 120 + 76, 14 + 84 - 40 - 12, 'RD', 'L', 'G')
 gtext(img, W / 2 - 120 + 76 + 72 + 12, 14 + 84 - 30 - 12, '/32', 'M', 'P')
 gtext(img, W / 2, 106, 'FINAL LAP', 'M', 'R', 'center')
+pic(img, 'turn_l2.png', W / 2 - 64, 142, 128, 64)
 # clock
 cw = text_w('1:42', 'M') + 28
 box(img, W - 26 - cw - 40, 22, W - 26, 22 + 70, 'pink')

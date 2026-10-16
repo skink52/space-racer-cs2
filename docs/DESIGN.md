@@ -171,7 +171,8 @@ platform), speed bottom-right, the top-8 standings down the right edge (a side-c
 highlighted), a pixelated track map with square dots (yours blinks), centre messages (countdown, GO!, FINAL LAP,
 WRONG WAY blinking, WRECKED, FINISHED 3RD, LAP RECORD!), the car picker (four framed cards with pixelated car
 pictures and stat bars, the chosen one pulsing) in the lobby and on the grid, the SPACE RACER logo and three
-status lines in the lobby, and CRT scanlines plus a vignette over everything (`!crt` turns them off for you).
+status lines in the lobby, a pulsing RESULTS banner at the end, flickering pixel speed lines round the screen
+edges while boosting, and CRT scanlines plus a vignette over everything (`!crt` turns them off for you).
 
 How the pixel text works: each text row is a line of small image panels, one per character. The script sets each
 panel's glyph class (`g65` = A) and the row's colour class, and only for characters that changed; whole rows are
@@ -230,6 +231,8 @@ preview/    PNG renders of tracks and cars for checking without CS2
   The mouse does nothing during a race.
 - Readability at a distance: tall beacon pylons with glowing caps every ~480 units on alternating sides, and a
   chevron sign on the outside of every real corner, facing the approaching cars. No fog, nothing fades out.
+- On the grid the camera first does a flyover: a low swoop along the track towards the waiting field, cutting to
+  the chase camera 4 seconds before the lights. At the results it circles the start gantry.
 - The camera leans with banked bends (60% of the road's angle), shakes a little on hits, rail strikes, landings and
   wrecks (`CAM_SHAKE`), and drops lower inside tubes.
 - Cars are true 3D voxel models (about 115 units long), so every viewing angle is drawn correctly - the chase camera
@@ -241,8 +244,9 @@ preview/    PNG renders of tracks and cars for checking without CS2
   and the look is the same on every setting.
 - Sounds: `point_soundevent` per sound, pointed at the car prop (or an anchor) and started, as in FreeDM. All
   chiptune: pulse waves, a 16-step triangle, shift-register noise, 4-bit envelopes, a 22 kHz sample-and-hold.
-- Music: three original pieces written as note lists in `tools/sounds.py` - "Parking Orbit" (lobby loop, 100 bpm,
-  D minor), "Neon Overdrive" (race loop, 156 bpm, A minor) and a results fanfare. They play for everyone at once,
+- Music: four original pieces written as note lists in `tools/sounds.py` - "Parking Orbit" (lobby loop, 100 bpm,
+  D minor), "Neon Overdrive" (race loop, 156 bpm, A minor), "Starlight Circuit" (race loop, 168 bpm, E minor; the
+  two race loops take turns) and a results fanfare. They play for everyone at once,
   not placed in the world (stereo, no distance fall-off); the script restarts each loop as it ends. `MUSIC: false`
   in CONFIG turns it off; the volume is `MUSIC_VOL` in `tools/sounds.py`.
 

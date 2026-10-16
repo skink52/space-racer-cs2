@@ -143,6 +143,12 @@ class Track {
     return null;
   }
 
+  // the bend ahead of progress s: heading change over the stretch from `from` to `to` units ahead (radians, + = left)
+  turnAhead(s, from, to) {
+    const a = this.point(s + from), b = this.point(s + to);
+    return normRad(Math.atan2(b.ty, b.tx) - Math.atan2(a.ty, a.tx));
+  }
+
   // grid slot k (0 = pole): 4 abreast, rows 110 units apart behind the start line, odd rows staggered
   gridSlot(k) {
     const row = Math.floor(k / 4), col = k % 4;

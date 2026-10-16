@@ -53,6 +53,9 @@ const CONFIG = {
   CAM_TURN: 6.0,                 // how quickly the camera swings round behind the car
   CAM_LOOKAHEAD: 0.35,           // 0..1: how much the camera turns into the bend ahead (shows more of the upcoming track)
   CAM_ROLL: 8,                   // max degrees of lean in corners
+  FLYOVER: true,                 // on the grid the camera first swoops along the track towards the field
+  FLYOVER_CUT: 4,                // ... and cuts to the chase camera this many seconds before the lights
+  FLYOVER_FROM: 5000,            // ... starting this far ahead of the start line
   CAM_SHAKE: 1.0,                // camera shake on hits / landings / wrecks (0 = off, 2 = double)
   CAM_BANK: 0.6,                 // how much of a banked bend's lean the camera copies
   CAM_TUBE_UP: 150, CAM_TUBE_BACK: 300,   // camera height / distance limits inside tubes

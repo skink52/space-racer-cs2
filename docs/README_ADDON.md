@@ -24,7 +24,7 @@ The map's main entities:
 | `prop_dynamic` | `spr_src_prop` | Model = `models/spr/null.vmdl`, not solid |
 | `info_target` | `spr_booth` | Centre of the sealed room where players' bodies wait |
 | `info_map_parameters` | `spr_map_params` | The script ends each CS2 round through its FireWinCondition input |
-| `point_soundevent` ×28 | `spr_snd_<name>` | Sound Event Name = `spr.<name>` (the three `mus_*` ones are the music) |
+| `point_soundevent` ×29 | `spr_snd_<name>` | Sound Event Name = `spr.<name>` (the four `mus_*` ones are the music) |
 | `env_sky` | `spr_sky` | `materials/spr/sky/sky.vmat` |
 
 Plus: `prop_static` for the eight tracks (one model each, two layers of 2 x 2 boxes, 13,800 units each) inside

@@ -119,6 +119,7 @@ function dotClasses(track, x, y) {
 
 function hudRaceCommon(slot, arena, info) {
   hudSwap(slot, 'spr_root', 'On', 'on');
+  hudSwap(slot, 'spr_root', arena.state === 'over' ? 'Res' : null, 'res');
   hudSwap(slot, 'spr_mmimg', 'mm_' + arena.track.id, 'map');
   hudText(slot, 'spr_clock', info.clock || '', info.clock === 'GRID' || info.clock === 'RESULTS' ? 'cY' : 'cW');
   hudCenter(slot, info.center, info.centerCls);
@@ -160,6 +161,16 @@ function hudRace(slot, car, arena, info) {
   if ((arena.tic & 7) === 0 || car.speed < 10) hudText(slot, 'spr_spd', String(Math.round(car.speed * 0.18) * 2).padStart(4, ' '), car.boosting || car.padTimer > 0 ? 'cY' : 'cW');
   hudSwap(slot, 'spr_spfill', pct(car.speed, car.spec.maxSpeed * 1.5));
   hudSwap(slot, 'spr_speed', car.padTimer > 0 ? 'pad' : null, 'pad');
+  // the bend ahead: an arrow (two blinking ones for a hairpin), looking further ahead the faster the car goes
+  let turnCls = null;
+  if (car.state === 'racing' && (arena.tic & 3) === 0) {
+    const look = 500 + car.speed * 0.9;
+    const turn = arena.track.turnAhead(car.s, look * 0.3, look + 900);
+    const a = Math.abs(turn);
+    if (a > 0.75) turnCls = (turn > 0 ? 'l' : 'r') + (a > 1.9 ? '2' : '1');
+    hudSwap(slot, 'spr_turn', turnCls, 'dir');
+  } else if (car.state !== 'racing') hudSwap(slot, 'spr_turn', null, 'dir');
+  hudSwap(slot, 'spr_root', (car.boosting || car.padTimer > 0) && car.state === 'racing' && !info.spectating ? 'Boost' : null, 'boost');
   if (car.visible) { const dc = dotClasses(arena.track, car.x, car.y); hudSwap(slot, 'spr_dot', dc[0], 'x'); hudSwap(slot, 'spr_dot', dc[1], 'y'); hudSwap(slot, 'spr_dot', 'On', 'on'); }
   else hudSwap(slot, 'spr_dot', null, 'on');
   hudSwap(slot, 'spr_root', info.spectating ? 'Spec' : null, 'spec');
@@ -170,6 +181,8 @@ function hudRace(slot, car, arena, info) {
 function hudLobby(slot, info) {
   hudSwap(slot, 'spr_root', 'Lobby', 'lobby');
   hudSwap(slot, 'spr_root', null, 'on');
+  hudSwap(slot, 'spr_root', null, 'res');
+  hudSwap(slot, 'spr_root', null, 'boost');
   hudSwap(slot, 'spr_root', null, 'spec');
   hudText(slot, 'spr_lob1', info.line1 || '', 'cW', info.blink1 ? 'blink' : null);
   hudText(slot, 'spr_lob2', info.line2 || '', 'cY');

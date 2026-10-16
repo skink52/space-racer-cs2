@@ -9,7 +9,7 @@ OUT, TID, FRAC, PRESET, PNG = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.
 CARKEY = sys.argv[6] if len(sys.argv) > 6 else 'meteor'
 W, H = 960, 540
 FOV = 106.0   # CS2's 90 degrees at 4:3 is about 106 across a 16:9 screen
-CAMS = {'high': (290, 165, 15, 60), 'far': (420, 260, 22, 80), 'near': (230, 100, 9, 30)}
+CAMS = {'high': (290, 165, 15, 60), 'far': (420, 260, 22, 80), 'near': (230, 100, 9, 30), 'fly': (290, 165, 15, 60)}
 
 T = [t for t in json.load(open(os.path.join(OUT, '_gen/tracks.json'))) if t['id'] == TID][0]
 tex_cache = {}
@@ -64,12 +64,33 @@ fwd = np.array([math.cos(cam_yaw) * math.cos(math.radians(pitch)), math.sin(cam_
 right = np.cross(fwd, [0, 0, 1]); right /= np.linalg.norm(right); upv = np.cross(right, fwd)
 roll = math.radians(-math.degrees(math.atan(bank(s0))) * 0.6)     # CS2 roll: positive = right side down
 right, upv = right * math.cos(roll) - upv * math.sin(roll), upv * math.cos(roll) + right * math.sin(roll)
+if PRESET == 'fly':
+    # the grid flyover (40_players.js placeFlyover) at progress FRAC (0..1), with a grid of cars to look at
+    e = 1 - (1 - FRAC) ** 3
+    sc = 5000 * (1 - e) + 250
+    px, py, pz, ptx, pty = point(sc); qx, qy, qz, _, _ = point(sc - 600)
+    h = 160 + 520 * (1 - e)
+    cam = np.array([px, py, pz + h])
+    look = math.atan2(qy - py, qx - px); pt = math.atan2(h - 40, 900)
+    fwd = np.array([math.cos(look) * math.cos(pt), math.sin(look) * math.cos(pt), -math.sin(pt)])
+    right = np.cross(fwd, [0, 0, 1]); right /= np.linalg.norm(right); upv = np.cross(right, fwd)
 f = (W / 2) / math.tan(math.radians(FOV / 2))
 
 vmdl = os.path.join(OUT, 'models/spr/track/%s.vmdl' % TID)
 tris = load_smd(vmdl.replace('.vmdl', '.smd'), load_vmdl_mats(vmdl))
 cm = os.path.join(OUT, 'models/spr/cars/%s_boost.vmdl' % CARKEY)
-tris += load_smd(cm.replace('.vmdl', '.smd'), load_vmdl_mats(cm), off=(cx, cy_, cz), yaw=car_yaw)
+if PRESET == 'fly':
+    keys = ['hornet', 'meteor', 'comet', 'bastion']
+    for k in range(16):
+        row, col = k // 4, k % 4
+        sg = -(190 + row * 160 + (row % 2) * 60)
+        _, _, _, _, _ = point(sg)
+        hw0 = T['hw'][int((sg % T['length']) / T['step']) % T['n']]
+        gx, gy, gz, gtx, gty = point(sg, -(col - 1.5) * hw0 * 0.46)
+        m = os.path.join(OUT, 'models/spr/cars/%s.vmdl' % keys[(k * 7) % 4])
+        tris += load_smd(m.replace('.vmdl', '.smd'), load_vmdl_mats(m), off=(gx, gy, gz), yaw=math.atan2(gty, gtx))
+else:
+    tris += load_smd(cm.replace('.vmdl', '.smd'), load_vmdl_mats(cm), off=(cx, cy_, cz), yaw=car_yaw)
 # a few more cars ahead
 for k, (ds, lat, key) in enumerate(((700, 120, 'hornet'), (1300, -100, 'bastion'), (2100, 60, 'comet'), (3000, -140, 'meteor'))):
     px, py, pz, ptx, pty = point(s0 + ds, lat)
