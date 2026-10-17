@@ -219,6 +219,32 @@ function handleArenaEvents(a, now) {
       case 'beep': { const p = T.point(0); if (view) playSound(view, e.n === 1 ? 'beep2' : 'beep', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, String(e.n), 1.1, 'red'); break; }
       case 'launch': { const pe = e.car.person; if (pe && !pe.bot) { bottom(pe.slot, 'TURBO START!', 2); hudFlash(pe.slot, 'pulse', 0.3); shake(pe.slot, 0.3, 8); } if (view) sfxCar(view, 'boost', e.car, 0.8); break; }
       case 'stall': { const pe = e.car.person; if (pe && !pe.bot) bottom(pe.slot, 'TOO EARLY - ENGINE STALLED', 2); break; }
+      case 'ability': {
+        // the E abilities: a sound for everyone near, an effect, a shake for the cars caught in a Shockwave
+        const c = e.car, pe = c.person, human = pe && !pe.bot;
+        if (view) sfxCar(view, e.kind === 'quake' ? 'quake' : e.kind === 'nova' ? 'nova' : e.kind === 'aegis' ? 'aegis' : 'dash', c);
+        if (e.kind === 'quake') {
+          if (view) view.effect(c.x, c.y, c.z, c.yaw, [CAR_MODELS.fx.quake0, CAR_MODELS.fx.quake1, CAR_MODELS.fx.quake2], 0.45, now);
+          for (const o of a.order) {
+            const op = o.person;
+            if (!op || op.bot || Math.hypot(o.x - c.x, o.y - c.y) > RULES.quakeRadius * 1.5) continue;
+            shake(op.slot, 0.5, o === c ? 10 : 18);
+          }
+          if (human && e.hits) bottom(pe.slot, 'SHOCKWAVE HIT ' + e.hits + (e.hits === 1 ? ' CAR' : ' CARS'), 2);
+        } else if (e.kind === 'aegis') {
+          if (human) bottom(pe.slot, e.hits ? 'AEGIS - ' + e.hits + ' TEAMMATE' + (e.hits === 1 ? '' : 'S') + ' +' + RULES.aegisShare + ' SHIELD' : 'AEGIS UP', 2);
+          for (const o of a.order) if (o !== c && o.person && !o.person.bot && o.team === c.team && o.team >= 0 && Math.hypot(o.x - c.x, o.y - c.y) <= RULES.aegisRange && o.state === 'racing') bottom(o.person.slot, '+' + RULES.aegisShare + ' SHIELD FROM ' + c.name.slice(0, 16).toUpperCase(), 2);
+        } else if (e.kind === 'nova') {
+          if (human) { hudFlash(pe.slot, 'pulse', 0.3); shake(pe.slot, 0.35, 9); }
+        }
+        break;
+      }
+      case 'fire': {
+        const f = e.fire;
+        // Nova fire: two frames flickering for as long as it burns
+        if (view) view.effect(f.x, f.y, f.z, f.yaw, FIRE_FRAMES, RULES.fireTime, now);
+        break;
+      }
       case 'spinHit': {
         // a spin attack landed: a hard shake for the car shoved across the road, a little one for the attacker
         const vp = e.car.person, ap = e.attacker.person;
@@ -289,11 +315,15 @@ function handleArenaEvents(a, now) {
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);
     if (f & 512) sfxCar(view, 'jump', car, 0.3);
     if (f & 1024) { sfxCar(view, 'land', car, 0.3); if (human) shake(pe.slot, 0.3, 12); }
+    if (f & 4096) { sfxCar(view, 'pulsed', car, 0.4); if (human) bottom(pe.slot, 'BIG AIR! +' + RULES.bigAirCharge + ' CHARGE', 2); }
     if (car.boosting && !car.wasBoost) sfxCar(view, 'boost', car, 0.8);
     if (car.onCharge && !car.wasCharge) sfxCar(view, 'charge', car, 1.0);
     car.wasBoost = car.boosting; car.wasCharge = car.onCharge;
   }
 }
+
+// Nova fire flickers between its two frames (the effect steps through the list over its lifetime)
+const FIRE_FRAMES = Array.from({ length: Math.round(RULES.fireTime * 8) }, (_, k) => (k % 2 ? CAR_MODELS.fx.fire1 : CAR_MODELS.fx.fire0));
 
 const flashes = new Map();   // slot -> { cls, until }
 function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: Instance.GetGameTime() + secs }); }
@@ -367,7 +397,7 @@ function raceInfo(pe, car, a, now, spectating) {
   else if (car.offLine && car.state === 'racing') { info.center = 'MISSED CHECKPOINT'; info.centerCls = 'red'; }
   const sm = timed(subMsgs, pe.slot, now);
   if (sm) info.sub = sm.text;
-  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  !CAR';
+  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  R CAR';
   // (the turbo start - gas on the third beep - is a secret: nothing on screen gives it away)
   else if (a.state === 'grid') info.sub = 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + (a.countdown > 3 * TICRATE ? '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : '');
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
@@ -382,7 +412,7 @@ let lobbyCycle = 0;
 function lobbyInfo(pe, now) {
   const info = { line1: '', line2: '', line3: '' };
   const car = CARS[pe.carChoice] || CARS.hornet;
-  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + (pe.pickShown ? '  (A / D TO CHANGE)' : '  (!CAR TO CHANGE)');
+  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + (pe.pickShown ? '  (A / D, E TO CONFIRM)' : '  (R TO CHANGE)');
   const nextT = rm.upcoming[0];
   if (phase === 'running') {
     const rem = guard('remaining', () => Instance.GetRoundRemainingTime());

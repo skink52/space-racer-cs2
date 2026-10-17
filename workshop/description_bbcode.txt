@@ -21,12 +21,13 @@
 [*][b]COMET (Afterburn)[/b]: the biggest charge tank and the strongest boost, and boost pads last longer.
 [*][b]BASTION (Slipstream)[/b]: the toughest shield. Drafting fills its charge twice as fast and repairs it.
 [/list]
+Each car has its own ability on [b]E[/b]: the Hornet's [b]Phase Dash[/b] slips sideways through traffic, the Meteor's [b]Shockwave[/b] shoves everyone nearby across the road, the Comet's [b]Nova Burn[/b] dumps all its charge into an overdrive that leaves a trail of fire, and the Bastion's [b]Aegis[/b] throws up a shell nothing can hurt and tops up teammates' shields.
 Each car shows its speed, acceleration, turning, shield and charge on the picker cards. Your choice is remembered between rounds. The light cars win a little more often; the heavy ones wreck more rivals.
 
 [h2]Eight original tracks[/h2]
 [list]
 [*][b]Solar Oval[/b]: a huge speedway at sunset, with an elevated back straight, a chicane and a tube.
-[*][b]Hairpin Harbour[/b]: long straights and banked hairpins climbing terrace by terrace, then down through the harbour tube.
+[*][b]Hairpin Harbour[/b]: long straights with two big jumps and banked hairpins climbing terrace by terrace, then down through the harbour tube.
 [*][b]Crosswire[/b]: a neon figure-8. One pass spirals a full loop round the crossing while the other threads through underneath it.
 [*][b]Null Gap[/b]: narrow, rail-less roads over the void that roll like a roller coaster. Mind the gap.
 [*][b]Switchback Spire[/b]: four stacked switchbacks to the summit, a long banked sweep, then a dive through a tube.
@@ -62,7 +63,9 @@ Pixel-art tracks, cities, asteroids and skies in one 32-colour palette. The pixe
 [h2]Controls[/h2]
 [list]
 [*][b]W / S[/b]: accelerate / brake and reverse
-[*][b]A / D[/b]: steer (and change car while the car picker is up)
+[*][b]A / D[/b]: steer (and choose a car while the car picker is up)
+[*][b]E[/b]: your car's ability (and confirm your car on the picker)
+[*][b]R[/b]: bring the car picker back
 [*][b]Mouse 1[/b]: boost (uses charge)
 [*][b]Mouse 2[/b]: spin attack (uses charge)
 [*][b]Space[/b]: drift (fills charge)

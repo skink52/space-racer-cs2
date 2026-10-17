@@ -76,7 +76,7 @@ def write_model(out_dir, rel_dir, name, tris, default_mats, skins=None):
     return '%s/%s.vmdl' % (rel_dir, name)
 
 
-def write_material(out_dir, rel_path, color_png, alpha_png=None, blend=0, backfaces=False, tint=(1, 1, 1), comment=''):
+def write_material(out_dir, rel_path, color_png, alpha_png=None, blend=0, backfaces=False, tint=(1, 1, 1), comment='', extra=()):
     """rel_path like 'materials/spr/road_a' (no extension). blend: 0 opaque, 1 translucent, 2 alpha test."""
     d = os.path.join(out_dir, os.path.dirname(rel_path))
     os.makedirs(d, exist_ok=True)
@@ -89,6 +89,7 @@ def write_material(out_dir, rel_path, color_png, alpha_png=None, blend=0, backfa
         Image.fromarray(np.ascontiguousarray(alpha_png)).save(os.path.join(d, base + '_trans.png'))
         lines.append('\tTextureTranslucency "%s_trans.png"' % rel_path)
         if blend == 2: lines.append('\tg_flAlphaTestReference "0.500"')
+    lines += ['\t' + e for e in extra]
     lines += ['\tg_vColorTint "[%.6f %.6f %.6f 0.000000]"' % tuple(tint), '\tg_flModelTintAmount "1.000"', '}']
     open(os.path.join(d, base + '.vmat'), 'w', newline='\n').write('\n'.join(lines) + '\n')
     return rel_path + '.vmat'

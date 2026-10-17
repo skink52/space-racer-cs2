@@ -173,6 +173,28 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
   light cars get wrecked in about 1 race in 8. Changes: Hornet shield 90 -> 105 and boost +30% -> +32%, Comet
   shield 100 -> 105, Meteor acceleration 495 -> 515, Bastion top speed 1035 -> 1043, shield repair 1.5 -> 2.2/s.
 
+## C7. Abilities, flames, jumps (17 Oct, night)
+
+- **E abilities** (DESIGN.md "E abilities"): Hornet Phase Dash (steer + E: a sideways dash, see-through for a moment),
+  Meteor Shockwave (a ring on the road, nearby cars shoved sideways, a hard shake for them), Comet Nova Burn (all
+  charge into a long overdrive and a trail of blue fire), Bastion Aegis (a spinning hexagon shell; teammates near get
+  +20 shield). The HUD's third bar (under charge) is the cooldown: gold and pulsing when ready, red when short of
+  charge. Check the new sounds (dash, quake, nova, aegis) and the effects (shockwave ring, fire, shell) show.
+- **Flames**: each car has its own animated flames (Hornet pink needles, Meteor one fat red-orange flame, Comet three
+  long blue tails, Bastion four short green thrusters) and a boost pad / turbo start gives longer gold flames and gold
+  speed lines (Mouse 1 boost: white speed lines). The animation is the material's own (`F_TEXTURE_ANIMATION`, as on
+  Valve's animated TV-static material): bright pulses running down the flame. If a flame shows a striped
+  rainbow-ish block instead of flickering, the animation settings didn't take - tell me.
+- **Steep roads**: cars at the foot of a climb (Spire, Helix, the Crosswire loop) should ride on their nose and tail,
+  not sink into the road.
+- **Picker**: A / D move through the cars, **E confirms** (the cards go, the bottom line says your car and its E
+  ability); **R** brings them back when you're not driving; `!car` still works. Watching a race, E changes arena unless
+  the cards are up.
+- **Hornet**: holding drift and flicking left-right while boosting no longer refills charge.
+- **Jumps** (DESIGN.md "Jumps everywhere"): new gap jumps on Oval, Hairpin (2), Crosswire, Spire (2), Helix and two
+  kickers on Skyway. Take one slowly and you drop in (-20 shield). A clean long jump says BIG AIR! +15 CHARGE.
+  These change the track models: copy, then compile the map in Hammer.
+
 ## D. Things to look at and tune
 
 - Speed feel: `CARS[*].maxSpeed`, `RULES.padSpeed`, the camera presets in `CONFIG.CAMERAS`.

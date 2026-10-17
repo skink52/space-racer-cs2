@@ -69,6 +69,21 @@ in `src/core/00_defs.js`.
 Speeds are CS2 units per second (a player sprinting is 250). A full-speed car crosses a 640-unit-wide track in
 under a second.
 
+## E abilities
+
+Every car has one ability on E (it costs charge and has a cooldown; the HUD shows it under the charge bar: gold and
+pulsing when ready, red when there isn't enough charge). Bots use them too.
+
+| | Ability | Cost / cooldown | What it does |
+|---|---|---|---|
+| HORNET | **Phase Dash** | 15 / 5 s | A sideways dash (steer to pick the side, else back towards the middle of the road) at 900 u/s; for 0.4 s the car is a ghost - other cars and spin attacks pass through it. Dodge a spin, slip past a blocker - or dash off a rail-less edge. Rail hits during the dash do 40% damage. |
+| METEOR | **Shockwave** | 40 / 12 s | Slams the road: every car within 320 units is shoved sideways away from the Meteor (300 x its mass / theirs, more the closer), skids for 0.3 s and loses a little shield; the Meteor loses 8% of its speed. A ring of light shows the blast; everyone caught gets a hard camera shake. |
+| COMET | **Nova Burn** | at least 40 / 12 s | Spends all its charge at once: a 220 u/s kick, then an overdrive (1.5x top speed, double acceleration) for 0.7 s + 0.012 s per point of charge, and a trail of blue fire for the first 0.8 s. Anyone else driving through the fire loses grip and 2 shield every half second (credited to the Comet). |
+| BASTION | **Aegis** | 30 / 12 s | A 2.5-second hexagon shell: no damage and no shoves, and cars bounce off it as if it weighed four times as much. Teammates within 500 units get +20 shield. |
+
+Balance aim (`test/sim.cjs ... even`, 240 races, 17 Oct): the light cars win a little more often, the heavy ones wreck
+more rivals and finish in the top 8 more steadily; about 3.6 wrecks a race; light cars are wrecked in about 1 race in 5.
+
 ## Track mechanics
 
 - **Track**: a closed loop with walls (rails) on both sides. The rail bounces you back, costs speed and a little
@@ -82,7 +97,8 @@ under a second.
 - **Boost** (hold Mouse 1): spends charge for about 30-45% more top speed and extra acceleration. Charge drains in
   roughly 3 seconds from full. No charge, no boost.
 - **Drift** (hold Space): the car slides; sharper turning, more speed loss, and the drift fills charge a little
-  (a lot in a Hornet).
+  (a lot in a Hornet) - but only through a slide held one way for 0.35 s, and not while boosting (before 17 Oct a
+  Hornet could hold drift, flick left-right and boost for ever).
 - **Slipstream**: directly behind another car (within ~300 units, in a 20 degree cone) you get less drag and a
   trickle of charge. Teammates (same CS2 side) in each other's slipstream get the trickle doubled (**convoy**).
 - **Spin attack** (Mouse 2): costs 30 charge (18 in a Hornet), 3 second cooldown. The car spins for half a second,
@@ -98,6 +114,13 @@ under a second.
   dealt the last blow within the last 2 seconds, that player gets the CS2 kill immediately (killfeed and all).
 - **The Pulse**: once per lap a ring of light sets off from the back of the field and travels the track at 1.5x
   top speed. Every car it overtakes gets +40 charge. It is a catch-up mechanic you can see coming.
+- **Jumps everywhere** (17 Oct): besides Skyway's two big downhill jumps there are gap jumps on Solar Oval (the top
+  straight before the chicane), Hairpin Harbour (two straights), Crosswire (after the start), Switchback Spire (two)
+  and Helix (the bottom straight), each a 6-sample ramp 110 high and a 670-720-unit gap - about 800 u/s clears it,
+  so full speed always makes it and a car slowed by a bump, a spin or a Shockwave drops in (falling costs 20 shield
+  now) - and two kickers on Skyway's straights (a ramp with the road carrying on: air time, no gap). A spin or a
+  Shockwave mid-air pushes a car sideways for the whole flight, off the edge of a gap. **Big air**: landing cleanly
+  after 0.7 s or more in the air pays 15 charge.
 - **Jump ramps**: a full-width striped ramp, then open space. Off the lip the car flies with the ramp's slope
   (gravity 1150, a little steering, no thrust); land on the road beyond, or fall into the gap. Skyway's ramps rise
   110 units and the landings are 240 lower than the lips - about 700 u/s is needed to clear the 720-unit gap. A hard
@@ -192,10 +215,12 @@ wreck, or watching as a late joiner, is not idling. Idle through 2 minutes of lo
 | Key | Action |
 |---|---|
 | W / S | accelerate / brake and reverse |
-| A / D | steer (and change car while the car picker is up) |
+| A / D | steer (and move through the cars while the car picker is up) |
+| E | the car's ability (and confirm your car on the picker) |
+| R | bring the car picker back (when not driving) |
 | Mouse 1 | boost (spends charge) |
 | Mouse 2 | spin attack |
-| Space | drift |
+| Space | drift (fills charge through a slide held one way, not while boosting) |
 | Mouse (look) | nothing — the camera follows the car |
 | Mouse 1 / Mouse 2 / E (spectating) | next car / previous car / next arena |
 

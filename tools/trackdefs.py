@@ -6,7 +6,8 @@ pts: control points (x, y, z, half-width) in driving order; the loop closes back
 start/finish line, so keep the ~1500 units before it straight and flat (the grid sits there).
 feats: (kind, from, to, lat0, lat1): from/to fractions of the lap, lat -1 (left edge) .. 1 (right edge).
 gaps: (from, to) fractions with no rails.
-jumps: (lip, ramp_samples, void_samples, ramp_height): a ramp ending at fraction `lip`, then open space.
+jumps: (lip, ramp_samples, void_samples, ramp_height): a ramp ending at fraction `lip`, then open space (void 0: a
+kicker - the road carries on under the car, it just flies).
 tunnels: (from, to) fractions inside a tube.
 bank: the most a bend leans, degrees (banking is worked out from the curvature).
 """
@@ -63,7 +64,7 @@ TRACKS.append(dict(id='oval', title='SOLAR OVAL', laps=3, theme='oval', bank=16,
            ('charge', 0.23, 0.31, 0.45, 1.0), ('boost', 0.45, 0.47, -0.5, 0.5),
            ('slick', 0.50, 0.53, -1.0, 1.0), ('boost', 0.62, 0.64, -0.6, 0.6),
            ('charge', 0.74, 0.82, 0.45, 1.0), ('boost', 0.92, 0.94, -0.6, 0.6)],
-    gaps=[], tunnels=[(0.55, 0.62)],
+    gaps=[], tunnels=[(0.55, 0.62)], jumps=[(0.401, 6, 14, 110)],
     slogans=['32 CARS 1 WINNER', 'SOLAR OVAL', 'DRAFT TO WIN']))
 
 # 2. Hairpin Harbour: four long straights joined by three hairpins, climbing a terrace each time, then a wide
@@ -92,7 +93,7 @@ TRACKS.append(dict(id='hairpin', title='HAIRPIN HARBOUR', laps=2, theme='hairpin
            ('charge', 0.10, 0.125, -1.0, -0.35), ('charge', 0.26, 0.285, 0.35, 1.0), ('charge', 0.42, 0.445, -1.0, -0.35),
            ('charge', 0.58, 0.605, 0.35, 1.0),
            ('boost', 0.70, 0.72, -0.6, 0.6), ('charge', 0.80, 0.84, 0.4, 1.0), ('boost', 0.93, 0.95, -0.6, 0.6)],
-    gaps=[], tunnels=[(0.775, 0.865)],
+    gaps=[], tunnels=[(0.775, 0.865)], jumps=[(0.2426, 6, 14, 110), (0.6804, 6, 15, 110)],
     slogans=['HAIRPIN HARBOUR', 'BRAKE LATE', 'DRIFT = CHARGE']))
 
 def hermite_heights(cum, keys):
@@ -145,7 +146,7 @@ TRACKS.append(dict(id='crosswire', title='CROSSWIRE', laps=3, theme='crosswire',
     feats=[('boost', 0.03, 0.05, -0.6, 0.6), ('slick', 0.15, 0.17, -1.0, 1.0), ('charge', 0.25, 0.31, 0.4, 1.0),
            ('boost', 0.42, 0.44, -0.5, 0.5), ('charge', 0.56, 0.62, -1.0, -0.4), ('slick', 0.76, 0.78, -1.0, 1.0),
            ('charge', 0.83, 0.88, -1.0, -0.4), ('boost', 0.935, 0.955, -0.6, 0.6)],
-    gaps=[], tunnels=[],
+    gaps=[], tunnels=[], jumps=[(0.1204, 6, 15, 110)],
     slogans=['CROSSWIRE', 'THREAD THE LOOP', 'NO BRAKES']))
 
 # 4. Null Gap: a kidney-shaped loop over the void; two long rail-less sections on narrow roads that roll up and
@@ -197,7 +198,7 @@ TRACKS.append(dict(id='spire', title='SWITCHBACK SPIRE', laps=2, theme='spire', 
     feats=[('boost', 0.015, 0.035, -0.5, 0.5), ('charge', 0.095, 0.125, 0.4, 1.0), ('charge', 0.265, 0.295, -1.0, -0.4),
            ('charge', 0.435, 0.465, 0.4, 1.0), ('boost', 0.56, 0.58, -0.5, 0.5), ('boost', 0.70, 0.72, -0.6, 0.6),
            ('boost', 0.84, 0.86, -0.6, 0.6), ('slick', 0.76, 0.79, -1.0, 1.0)],
-    gaps=[], tunnels=[(0.885, 0.95)],
+    gaps=[], tunnels=[(0.885, 0.95)], jumps=[(0.180, 6, 14, 110), (0.5172, 6, 15, 110)],
     slogans=['SWITCHBACK SPIRE', 'GOING UP', 'HOLD MOUSE 1']))
 
 # 6. Ringworld: a figure-8 with a big and a small lobe; one pass through the middle is a bridge 920 units up, the
@@ -233,7 +234,7 @@ TRACKS.append(dict(id='skyway', title='SKYWAY', laps=3, theme='skyway', bank=26,
     feats=[('boost', 0.022, 0.045, -0.6, 0.6), ('boost', 0.47, 0.493, -0.6, 0.6),
            ('charge', 0.16, 0.22, 0.4, 1.0), ('charge', 0.33, 0.39, 0.4, 1.0), ('charge', 0.65, 0.71, 0.4, 1.0), ('charge', 0.83, 0.89, 0.4, 1.0),
            ('slick', 0.27, 0.29, -1.0, 1.0)],
-    gaps=[], tunnels=[], jumps=[(0.07, 6, 15, 110), (0.52, 6, 15, 110)], zmod=sky_zmod,
+    gaps=[], tunnels=[], jumps=[(0.07, 6, 15, 110), (0.52, 6, 15, 110), (0.41, 4, 0, 70), (0.76, 4, 0, 70)], zmod=sky_zmod,
     slogans=['SKYWAY', 'FULL SPEED OR FALL', 'BOOST = SPEED']))
 
 # 8. Helix: up a stacked spiral (1.5 turns, 1300 units of climb), then off the west side and a banked dive home
@@ -252,7 +253,7 @@ TRACKS.append(dict(id='helix', title='HELIX', laps=3, theme='helix', bank=20, sc
     feats=[('boost', 0.025, 0.045, -0.6, 0.6), ('charge', 0.09, 0.13, 0.4, 1.0), ('boost', 0.20, 0.215, -0.5, 0.5),
            ('charge', 0.33, 0.37, -1.0, -0.4), ('boost', 0.46, 0.475, -0.5, 0.5), ('charge', 0.55, 0.59, -1.0, -0.4),
            ('boost', 0.72, 0.74, -0.6, 0.6), ('slick', 0.80, 0.82, -1.0, 1.0), ('boost', 0.93, 0.95, -0.6, 0.6)],
-    gaps=[], tunnels=[(0.83, 0.90)], crossing=True,
+    gaps=[], tunnels=[(0.83, 0.90)], crossing=True, jumps=[(0.1817, 6, 15, 110)],
     slogans=['HELIX', 'SPIN TO WIN', 'GOING DOWN']))
 
 # ---------------------------------------------------------------- themes: all colours from the retro palette

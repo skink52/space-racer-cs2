@@ -67,14 +67,16 @@ class ArenaView {
     this.props = new Map();      // car slot -> prop
     this.fx = [];                // { prop, kind, until, frames, start, x, y, z, yaw }
     this.pulseProp = null;
+    this.shells = new Map();     // car slot -> prop: the Aegis shell round a Bastion
     this.anchors = null;
   }
 
   world(x, y, z) { return { x: this.off[0] + x, y: this.off[1] + y, z: this.off[2] + z }; }
 
+  // the flames: gold and longer on a boost pad (or a turbo start), the car's own colour when it boosts (Mouse 1, Nova)
   carModel(car) {
     const m = CAR_MODELS.cars[car.cls] || CAR_MODELS.cars.hornet;
-    return car.boosting || car.padTimer > 0 ? m.boost : m.base;
+    return car.padTimer > 0 ? m.pad : car.boosting || car.novaTimer > 0 ? m.boost : m.base;
   }
 
   update(now) {
@@ -92,19 +94,27 @@ class ArenaView {
       propSkin(p, car.team === 0 ? SKIN_INDEX.t : car.team === 1 ? SKIN_INDEX.ct : SKIN_INDEX.neutral);
       propAlpha(p, car.state === 'wrecked' ? 90 : car.ghost > 0 && car.state === 'racing' ? 140 : car.state === 'finished' ? 160 : 255);
       // angles: yaw from the heading (+ spin), pitch from the slope, roll from the bank and the slide
-      const i = car.seg, j = (i + 1) % T.n;
+      const i = car.seg;
       const rf = car.lift > 0 ? T.rampAt(i) : null;
       const rampTilt = rf ? -deg(Math.atan2(rf.h, (((rf.b - rf.a + T.n) % T.n) + 1) * T.step)) : 0;
-      const pitch = car.state === 'falling' ? Math.min(60, car.stateTime * 50)
-        : car.air ? clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25)
-        : -deg(Math.atan2(T.z[j] - T.z[i], T.step)) + rampTilt;
+      // on the road the car rests on its nose and tail: the slope between the road under each end, and where the road
+      // curves up (the foot of a climb) it sits on its ends instead of on the road under its middle, so it doesn't sink
+      let pitch, lift = 0;
+      if (car.state === 'falling') pitch = Math.min(60, car.stateTime * 50);
+      else if (car.air) pitch = clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25);
+      else {
+        const half = CAR_LEN * 0.45, zMid = T.point(car.s).z;
+        const zf = T.point(car.s + half).z, zr = T.point(car.s - half).z;
+        pitch = -deg(Math.atan2(zf - zr, 2 * half)) + rampTilt;
+        if (!rf) lift = Math.max(0, (zf + zr) / 2 - zMid);
+      }
       // roll (+ = right side down): the lean of a banked road (bank > 0 = left side low) plus leaning into the turn
       // (turning right = yaw falling = lean right)
       const bankRoll = car.air ? 0 : -deg(Math.atan(car.bank));
       const turnRoll = clamp(-(car.yawRate || 0) * CONFIG.CAR_LEAN, -CONFIG.CAR_LEAN_MAX, CONFIG.CAR_LEAN_MAX);
       const roll = car.state === 'falling' ? 0 : CONFIG.PROP_ROLL_SIGN * (bankRoll + turnRoll);
       const yaw = deg(car.yaw + car.spinYaw);
-      const pos = this.world(car.x, car.y, car.z);
+      const pos = this.world(car.x, car.y, car.z + lift);
       if (car.state === 'wrecked') pos.z -= Math.min(8, car.stateTime * 6);
       const ang = { pitch, yaw, roll };
       // Teleport only for the first placement and real jumps (respawns); everything else Moves, the grid included
@@ -112,7 +122,19 @@ class ArenaView {
       if (!lp || (car.fx & 128) || Math.abs(pos.x - lp.x) + Math.abs(pos.y - lp.y) + Math.abs(pos.z - lp.z) > CONFIG.TELEPORT_DIST) p.ent.Teleport({ position: pos, angles: ang });
       else p.ent.Move({ position: pos, angles: ang });
       p.lastPos = pos;
+      // the Aegis shell follows the car while it is up
+      let sh = this.shells.get(car.slot);
+      if (car.aegis > 0 && car.state === 'racing') {
+        if (!sh) { sh = takeProp(); if (sh) { this.shells.set(car.slot, sh); sh.hidden = false; sh.lastPos = null; sh.model = ''; sh.alpha = -1; } }
+        if (sh && live(sh.ent)) {
+          propModel(sh, CAR_MODELS.fx.aegis);
+          const sa = { pitch: 0, yaw: (now * 90) % 360, roll: 0 };
+          if (!sh.lastPos) sh.ent.Teleport({ position: pos, angles: sa }); else sh.ent.Move({ position: pos, angles: sa });
+          sh.lastPos = pos;
+        }
+      } else if (sh) { releaseProp(sh); this.shells.delete(car.slot); }
     }
+    for (const [slot, sh] of this.shells) if (!a.cars.get(slot) || !a.cars.get(slot).visible) { releaseProp(sh); this.shells.delete(slot); }
     // the Pulse wave
     if (a.pulse.active && RULES.pulseEnabled) {
       if (!this.pulseProp) { this.pulseProp = takeProp(); if (this.pulseProp) { this.pulseProp.hidden = false; this.pulseProp.lastPos = null; this.pulseProp.model = ''; this.pulseProp.alpha = -1; } }
@@ -161,6 +183,8 @@ class ArenaView {
   destroy() {
     for (const p of this.props.values()) releaseProp(p);
     this.props.clear();
+    for (const p of this.shells.values()) releaseProp(p);
+    this.shells.clear();
     for (const e of this.fx) releaseProp(e.prop);
     this.fx = [];
     if (this.pulseProp) { releaseProp(this.pulseProp); this.pulseProp = null; }

@@ -60,30 +60,36 @@ function sampleInput(slot, car, pk) {
   c.boost = pressed('ATTACK');
   c.drift = pressed('JUMP') || pressed('DUCK');
   if (pawn.WasInputJustPressed(CSInputs.ATTACK2)) c.spin = true;
+  if (pawn.WasInputJustPressed(CSInputs.USE)) c.ability = true;          // the car's E ability
   const ang = pawn.GetEyeAngles();
-  const active = fwd || back || left || right || c.boost || c.drift || c.spin || Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2 || Math.abs(ang.pitch - pk.lastPitch) > 2;
+  const active = fwd || back || left || right || c.boost || c.drift || c.spin || c.ability || Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2 || Math.abs(ang.pitch - pk.lastPitch) > 2;
   pk.lastYaw = ang.yaw; pk.lastPitch = ang.pitch;
   return active;
 }
 
-// The car picker. It comes up by itself only for someone who has not chosen a car yet and has not raced (in the
-// lobby and on the grid). After that it stays away - so it never covers the results - until !car (or /car) brings
-// it back for a few seconds. A / D change the car only while the cards are on screen (hudPicker notes that in
-// pe.pickShown).
+// The car picker. It comes up by itself only for someone who has not confirmed a car yet and has not raced (in the
+// lobby and on the grid). A / D move through the cars, E confirms and the cards go away; after that they stay away -
+// so they never cover the results - until R (or !car) brings them back. hudPicker notes in pe.pickShown whether the
+// cards are on screen; A / D and E only work on them while they are.
 function pickerAuto(pe) { return !pe.picked && !pe.raced; }
 function pickerOpen(pe, now) { return (pe.pickUntil || 0) > now; }
 
-// A / D while the picker is up; returns true on any input (AFK tracking)
+// A / D / E on the picker, R to bring it back; returns true on any input (AFK tracking)
 function pickerInput(pe, pk) {
   const pawn = pk.pawn;
   if (!live(pawn)) return false;
   const l = pawn.WasInputJustPressed(CSInputs.LEFT), r = pawn.WasInputJustPressed(CSInputs.RIGHT);
-  let any = l || r;
-  if (any && pe.pickShown) {
-    rm.cycleCar(pe, l ? -1 : 1);
-    pe.picked = true;
-    pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;      // the cards stay up while they keep choosing
-  }
+  const use = pawn.WasInputJustPressed(CSInputs.USE), reload = pawn.WasInputJustPressed(CSInputs.RELOAD);
+  let any = l || r || use || reload;
+  const now = Instance.GetGameTime();
+  if (pe.pickShown) {
+    if (l || r) { rm.cycleCar(pe, l ? -1 : 1); pe.pickUntil = now + CONFIG.PICK_SHOW; }   // still choosing: keep them up
+    if (use) {
+      pe.picked = true; pe.pickUntil = 0; pe.pickShown = false;
+      const car = CARS[pe.carChoice] || CARS.hornet;
+      bottom(pe.slot, 'YOUR CAR: ' + car.name + ' - E ' + car.abilityName, 3);
+    }
+  } else if (reload) pe.pickUntil = now + CONFIG.PICK_SHOW;
   if (pawn.IsInputPressed(CSInputs.FORWARD | CSInputs.BACK | CSInputs.ATTACK | CSInputs.JUMP | CSInputs.USE)) any = true;
   const ang = pawn.GetEyeAngles();
   if (Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2) any = true;
@@ -97,7 +103,8 @@ function spectatorInput(pe, pk) {
   let any = false;
   if (pawn.WasInputJustPressed(CSInputs.ATTACK)) { rm.fixSpectate(pe, 1); any = true; }
   if (pawn.WasInputJustPressed(CSInputs.ATTACK2)) { rm.fixSpectate(pe, -1); any = true; }
-  if (pawn.WasInputJustPressed(CSInputs.USE) || pawn.WasInputJustPressed(CSInputs.JUMP)) { rm.fixSpectate(pe, 'arena'); any = true; }
+  // E is the picker's confirm while the cards are up (Space still changes arena)
+  if ((pawn.WasInputJustPressed(CSInputs.USE) && !pe.pickShown) || pawn.WasInputJustPressed(CSInputs.JUMP)) { rm.fixSpectate(pe, 'arena'); any = true; }
   return pickerInput(pe, pk) || any;
 }
 

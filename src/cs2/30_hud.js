@@ -250,6 +250,12 @@ function hudRace(slot, car, arena, info) {
   hudSwap(slot, 'spr_shield', car.shield < car.spec.shield * 0.3 ? 'low' : null, 'low');
   hudSwap(slot, 'spr_chfill', pct(car.charge, car.spec.charge));
   hudSwap(slot, 'spr_charge', car.boosting ? 'boosting' : car.onCharge ? 'charging' : null, 'st');
+  // the E ability: name, and a bar that refills over the cooldown; gold when ready, red when short of charge
+  const sp = car.spec, ready = car.abilCd <= 0;
+  const short = ready && car.charge < sp.abilityCost;
+  hudText(slot, 'spr_abtxt', 'E ' + sp.abilityName, ready && !short ? 'cY' : short ? 'cR' : 'cW', ready && !short && !info.spectating ? 'pulse' : null);
+  hudSwap(slot, 'spr_abfill', pct(ready ? sp.abilityCd : sp.abilityCd - car.abilCd, sp.abilityCd));
+  hudSwap(slot, 'spr_abil', short ? 'low' : ready ? 'ready' : null, 'st');
   // "km/h" for the dial (units/s x 0.36 reads like a racing speedo), 8 updates a second in steps of 2
   if ((arena.tic & 7) < 2 || car.speed < 10) hudText(slot, 'spr_spd', String(Math.round(car.speed * 0.18) * 2).padStart(4, ' '), car.boosting || car.padTimer > 0 ? 'cY' : 'cW');
   hudSwap(slot, 'spr_spfill', pct(car.speed, car.spec.maxSpeed * 1.5));
@@ -263,7 +269,9 @@ function hudRace(slot, car, arena, info) {
     if (a > 0.75) turnCls = (turn > 0 ? 'l' : 'r') + (a > 1.9 ? '2' : '1');
     hudSwap(slot, 'spr_turn', turnCls, 'dir');
   } else if (car.state !== 'racing') hudSwap(slot, 'spr_turn', null, 'dir');
-  hudSwap(slot, 'spr_root', (car.boosting || car.padTimer > 0) && car.state === 'racing' && !info.spectating ? 'stBoost' : null, 'boost');
+  // speed lines: white for the car's own boost (Mouse 1, Nova Burn), gold for a boost pad or a turbo start
+  const fast = car.state === 'racing' && !info.spectating;
+  hudSwap(slot, 'spr_root', fast && car.padTimer > 0 ? 'stPadb' : fast && (car.boosting || car.novaTimer > 0) ? 'stBoost' : null, 'boost');
   hudDots(slot, arena, car);
   hudSwap(slot, 'spr_root', info.spectating ? 'stSpec' : null, 'spec');
   hudSwap(slot, 'spr_root', null, 'lobby');

@@ -306,6 +306,7 @@ def race_state(grid=False, results=False):
         add('spr_turn', 'l2')
     text('spr_spd', '1286', 'gold')
     add('spr_shfill', 'w14'); add('spr_chfill', 'w9'); add('spr_spfill', 'w17'); add('spr_speed', 'pad')
+    text('spr_abtxt', 'E PHASE DASH', 'cY'); add('spr_abfill', 'w20'); add('spr_abil', 'ready')
     names = ['SKINK52', 'BOT14', 'YOU', 'BOT3', 'MARLOW', 'BOT28', 'VEXIS', 'BOT9']
     for i, nm in enumerate(names):
         BYID['spr_stn%d' % i].text = '%d  %s' % (i + 1, nm)

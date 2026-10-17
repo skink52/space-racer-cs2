@@ -160,6 +160,16 @@ n = n_of(0.28); S('land', noise(exp_sweep(3000, 300, n), n) * decay(n, 0.08) + 0
 # new: the countdown's last beep, a "new best lap" chime, a position-gained blip
 S('beep2', blip(hz('A6'), 0.2, 0.5, 0, 0.04, 0.6, 0.08))
 S('best', cat(*[blip(hz(f), 0.07, 0.25, 0, 0.02, 0.7, 0.01) for f in ('E6', 'G#6', 'B6')], blip(hz('E7'), 0.3, 0.25, 0, 0.05, 0.6, 0.2)))
+# the cars' E abilities: Phase Dash (a zip up), Shockwave (a deep thump and rumble), Nova Burn (a rising roar),
+# Aegis (a shimmering chord)
+n = n_of(0.22); S('dash', pulse(exp_sweep(500, 4200, n), n, 0.125) * env(n, 0, 0.05, 0.8, 0.08) + 0.5 * noise(exp_sweep(4000, 16000, n), n) * decay(n, 0.12))
+n = n_of(0.8); S('quake', tri(exp_sweep(150, 28, n), n) * env(n, 0, 0.3, 0.7, 0.4) * 1.3 + noise(exp_sweep(3000, 200, n), n) * decay(n, 0.3))
+n = n_of(1.0)
+nova_f = np.array([hz('C5'), hz('G5'), hz('C6'), hz('E6')])[np.minimum(3, (tt(n) * 6).astype(int))]
+S('nova', noise(exp_sweep(800, 14000, n), n) * env(n, 0.05, 0.3, 0.8, 0.35) + 0.6 * pulse(nova_f, n, 0.25) * env(n, 0, 0.2, 0.6, 0.3))
+n = n_of(0.7)
+aeg_f = np.array([hz('C6'), hz('E6'), hz('G6'), hz('C7')])[(tt(n) * 40).astype(int) % 4]
+S('aegis', tri(aeg_f, n) * env(n, 0.02, 0.2, 0.7, 0.3) + 0.4 * pulse(aeg_f * 0.5, n, 0.5) * env(n, 0.02, 0.2, 0.5, 0.3))
 
 # ---------------------------------------------------------------- music
 # A tiny tracker: each part is a list of (note or '-' rest, length in steps). Voices: 'p1' pulse 12.5 %, 'p2' pulse
@@ -297,10 +307,10 @@ for name, fn in (('mus_race', song_race), ('mus_race2', song_race2), ('mus_lobby
     MUSIC[name] = (mix(parts, sec), sec)
 
 # ---------------------------------------------------------------- files
-RANGE = {'beep': 6000, 'beep2': 6000, 'go': 7000, 'wreck': 3500, 'finish': 2500, 'warp': 2500, 'lap': 1200, 'best': 1200, 'pulse': 3500, 'pulsed': 1200,
+RANGE = {'dash': 1500, 'quake': 2500, 'nova': 2500, 'aegis': 1800, 'beep': 6000, 'beep2': 6000, 'go': 7000, 'wreck': 3500, 'finish': 2500, 'warp': 2500, 'lap': 1200, 'best': 1200, 'pulse': 3500, 'pulsed': 1200,
          'hit': 1200, 'rail': 1200, 'scrape': 900, 'pad': 1500, 'fall': 1800, 'spin': 1500, 'reset': 1200, 'boost': 1800, 'charge': 1200,
          'hum0': 900, 'hum1': 1000, 'hum2': 1100, 'hum3': 1200, 'jump': 1500, 'land': 1500}
-VOL = {'scrape': 0.45, 'hit': 0.6, 'rail': 0.6, 'charge': 0.5, 'boost': 0.6, 'pulsed': 0.55, 'hum0': 0.3, 'hum1': 0.33, 'hum2': 0.36, 'hum3': 0.4,
+VOL = {'quake': 0.8, 'nova': 0.7, 'dash': 0.6, 'aegis': 0.6, 'scrape': 0.45, 'hit': 0.6, 'rail': 0.6, 'charge': 0.5, 'boost': 0.6, 'pulsed': 0.55, 'hum0': 0.3, 'hum1': 0.33, 'hum2': 0.36, 'hum3': 0.4,
        'beep': 0.7, 'beep2': 0.75, 'go': 0.75}
 MUSIC_VOL = {'mus_race': 0.32, 'mus_race2': 0.32, 'mus_lobby': 0.3, 'mus_results': 0.38}
 

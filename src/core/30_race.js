@@ -28,6 +28,7 @@ class Arena {
     this.result = null;
     this.finishedAt = 0;
     this.lastBeep = -1;
+    this.fires = [];                // Nova Burn fire on the road: { x, y, z, until, owner }
   }
 
   addCar(slot, name, clsKey, team) {
@@ -61,6 +62,62 @@ class Arena {
     if (car.racing || car.state === 'grid') { car.state = 'withdrawn'; car.wreckTotal = car.total; car.wreckTime = this.raceTic; car.stateTime = 0; }
     car.left = why === 'left';
     this.events.push({ type: 'withdraw', car, why });
+  }
+
+  // ---------------------------------------------------------------- the E abilities' effects on other cars
+  abilities(cars, dt) {
+    for (const c of cars) {
+      if (c.fired) {
+        const kind = c.fired;
+        c.fired = null;
+        let hits = 0;
+        if (kind === 'quake') {
+          // SHOCKWAVE: every car close by is shoved sideways away from the Meteor, harder the closer it is
+          for (const o of cars) {
+            if (o === c || !o.solid || o.noDamage > 0 || Math.abs(o.z - c.z) > 120) continue;
+            const dx = o.x - c.x, dy = o.y - c.y, dist = Math.hypot(dx, dy);
+            if (dist > RULES.quakeRadius) continue;
+            const k = 1 - 0.5 * dist / RULES.quakeRadius;
+            if (shove(c, o, dx / (dist || 1), dy / (dist || 1), RULES.quakeKnock * k, RULES.quakeStagger)) {
+              o.damage(RULES.quakeDamage * k, c, this.raceTic); o.fx |= 1; hits++;
+            }
+          }
+        } else if (kind === 'aegis') {
+          // AEGIS: teammates close by get a share of the shell as shield
+          for (const o of cars) {
+            if (o === c || o.state !== 'racing' || o.team < 0 || o.team !== c.team) continue;
+            if (Math.hypot(o.x - c.x, o.y - c.y) > RULES.aegisRange) continue;
+            o.shield = Math.min(o.spec.shield, o.shield + RULES.aegisShare); o.fx |= 4; hits++;
+          }
+        }
+        this.events.push({ type: 'ability', car: c, kind, hits });
+      }
+      // NOVA BURN leaves fire on the road behind it
+      if (c.novaTimer > 0 && c.novaLeft - c.novaTimer < RULES.fireFor && c.state === 'racing' && !c.air) {
+        c.fireT -= dt;
+        if (c.fireT <= 0) {
+          c.fireT = RULES.fireGap;
+          const f = { x: c.x - Math.cos(c.yaw) * 70, y: c.y - Math.sin(c.yaw) * 70, z: c.z, yaw: c.yaw, until: this.time + RULES.fireTime, owner: c };
+          this.fires.push(f);
+          this.events.push({ type: 'fire', fire: f });
+        }
+      }
+    }
+    if (!this.fires.length) return;
+    // fire burns anyone else driving through it: a little shield, less grip, credited to the Comet
+    const R2 = RULES.fireRadius * RULES.fireRadius;
+    this.fires = this.fires.filter((f) => f.until > this.time);
+    for (const o of cars) {
+      if (!o.solid || o.air) continue;
+      for (const f of this.fires) {
+        if (f.owner === o || Math.abs(o.z - f.z) > 80) continue;
+        const dx = o.x - f.x, dy = o.y - f.y;
+        if (dx * dx + dy * dy > R2) continue;
+        o.scorch = 0.25;
+        if (o.burnCd <= this.time && o.noDamage <= 0) { o.damage(RULES.fireDamage, f.owner, this.raceTic); o.burnCd = this.time + RULES.fireEvery; o.fx |= 1; }
+        break;
+      }
+    }
   }
 
   // ---------------------------------------------------------------- per tic
@@ -118,6 +175,7 @@ class Arena {
     }
     // drive
     for (const c of cars) c.step(this.track, dt, this.raceTic);
+    this.abilities(cars, dt);
     // bumps
     for (let i = 0; i < cars.length; i++) {
       const a = cars[i];

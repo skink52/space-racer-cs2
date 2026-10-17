@@ -112,4 +112,37 @@ function botThink(arena, car) {
       if (Math.abs(along) < 50 && side < 70 && rnd() < b.aggression * 0.12) { c.spin = true; break; }
     }
   }
+  // the E ability
+  b.abilThink = (b.abilThink || 0) - dt;
+  if (!ramp && b.abilThink <= 0 && car.abilCd <= 0 && car.charge >= car.spec.abilityCost) { b.abilThink = 0.25; botAbility(arena, car, b, c, straight); }
+}
+
+// when a bot uses its car's E ability: dodge a spin or slip past a blocker (Phase Dash), a Shockwave into a crowd,
+// Nova Burn down a straight, Aegis when hurt in traffic or boxed in
+function botAbility(arena, car, b, c, straight) {
+  const kind = car.spec.ability;
+  const fx = Math.cos(car.yaw), fy = Math.sin(car.yaw);
+  let near = 0, alongside = null, ahead = null;
+  for (const o of arena.order) {
+    if (o === car || !o.solid) continue;
+    const rx = o.x - car.x, ry = o.y - car.y;
+    if (Math.abs(rx) > 600 || Math.abs(ry) > 600) continue;
+    const along = rx * fx + ry * fy, side = -rx * fy + ry * fx;     // side > 0: on our left
+    const foe = !(o.team >= 0 && o.team === car.team);
+    if (foe && Math.hypot(rx, ry) < RULES.quakeRadius * 0.8) near++;
+    if (foe && Math.abs(along) < 70 && Math.abs(side) < 120 && (!alongside || Math.abs(side) < Math.abs(alongside.side))) alongside = { o, side };
+    if (along > 40 && along < 220 && Math.abs(side) < 70 && (!ahead || along < ahead.along)) ahead = { o, along };
+  }
+  const roll = rnd();
+  if (kind === 'dash') {
+    if (alongside && alongside.o.spinTimer > 0 && roll < 0.6) { c.ability = true; c.abilityDir = alongside.side > 0 ? -1 : 1; }
+    else if (ahead && car.speed - ahead.o.speed > 80 && roll < 0.4 * b.aggression) c.ability = true;
+  } else if (kind === 'quake') {
+    if (near >= 2 && roll < 0.1) c.ability = true;
+    else if (near === 1 && alongside && roll < 0.05 * b.aggression) c.ability = true;
+  } else if (kind === 'nova') {
+    if (straight && car.charge >= 80 && roll < 0.1) c.ability = true;
+  } else if (kind === 'aegis') {
+    if ((car.shield < car.spec.shield * 0.5 && near >= 1 && roll < 0.5) || (near >= 3 && roll < 0.08)) c.ability = true;
+  }
 }

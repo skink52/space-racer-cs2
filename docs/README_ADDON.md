@@ -74,12 +74,14 @@ radar and map icon are in `panorama/images/` and compile with the HUD. The radar
 | Key | Action |
 |---|---|
 | W / S | accelerate / brake and reverse |
-| A / D | steer; change car while the car picker is up |
+| A / D | steer; move through the cars while the car picker is up |
+| E | the car's ability (Hornet Phase Dash, Meteor Shockwave, Comet Nova Burn, Bastion Aegis); confirms your car on the picker |
+| R | brings the car picker back (when not driving) |
 | Mouse 1 | boost (uses charge) |
 | Mouse 2 | spin attack |
 | Space | drift |
 | Mouse | nothing while racing - the camera follows the car and turns a little into the bend ahead |
-| Mouse 1 / 2, E (watching) | next car / previous car / next arena |
+| Mouse 1 / 2, E (watching) | next car / previous car / next arena (E confirms instead while the picker is up; Space changes arena too) |
 
 Chat (`!` or `/`): `!car` (the car picker for 6 seconds; also `!pick`), `!car 1-4` or a name (pick straight away),
 `!cam` (camera: high = default, far, near), `!tilt` (camera lean in corners on / off for you), `!crt` (CRT

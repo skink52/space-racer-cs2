@@ -105,7 +105,7 @@ def car_hornet(g, boost):
     for cy in (-2.4, 2.4):
         g.cylinder_x(1, 7, cy, 2.6, 1.7, 3)                           # engines
         g.cylinder_x(0, 1.5, cy, 2.6, 1.3, 5)                         # glow
-        if boost: flame(g, 0, cy, 2.6, 1.4, 11)
+        if boost: flame(g, 0, cy, 2.6, 1.2, flen(boost, 13))          # twin needle jets
     g.box(L - 6, L - 1, -1.2, 1.2, 1.2, 2.2, 2)                       # nose trim
     g.box(14, L - 4, -0.6, 0.6, 3.0, 3.4, 10)                        # spine stripe
 
@@ -118,7 +118,7 @@ def car_meteor(g, boost):
     g.box(4, 12, -8.5, -6.5, 1.0, 4.0, 1); g.box(4, 12, 6.5, 8.5, 1.0, 4.0, 1)   # side armour
     g.cylinder_x(0, 6, 0, 3.0, 2.9, 3)                               # big engine
     g.cylinder_x(0, 1.5, 0, 3.0, 2.3, 5)
-    if boost: flame(g, 0, 0, 3.0, 2.3, 14)
+    if boost: flame(g, 0, 0, 3.0, 2.6, flen(boost, 13))                # one fat roaring flame
     g.box(2, 5, -7, -5, 3.4, 6.6, 1); g.box(2, 5, 5, 7, 3.4, 6.6, 1)   # wing struts
     g.box(0, 4, -8.5, 8.5, 6.6, 7.6, 0)                              # wide rear wing
     g.box(0, 1, -8.5, 8.5, 6.6, 7.6, 10)
@@ -138,7 +138,7 @@ def car_comet(g, boost):
     for cy, cz in ((-2.6, 2.4), (2.6, 2.4), (0, 4.8)):
         g.cylinder_x(0, 5, cy, cz, 1.4, 3)
         g.cylinder_x(0, 1.5, cy, cz, 1.1, 5)
-        if boost: flame(g, 0, cy, cz, 1.2, 15)
+        if boost: flame(g, 0, cy, cz, 1.2, flen(boost, 17))           # three long plasma tails
     g.box(0, 1, -4.6, -3.6, 1.6, 2.6, 8); g.box(0, 1, 3.6, 4.6, 1.6, 2.6, 8)
 
 def car_bastion(g, boost):
@@ -156,14 +156,61 @@ def car_bastion(g, boost):
     for cy, cz in ((-3.6, 2.8), (-1.2, 2.8), (1.2, 2.8), (3.6, 2.8)):
         g.cylinder_x(0, 4, cy, cz, 1.1, 3)
         g.cylinder_x(0, 1.5, cy, cz, 0.85, 5)
-        if boost: flame(g, 0, cy, cz, 1.0, 10)
+        if boost: flame(g, 0, cy, cz, 1.0, flen(boost, 9))            # four short stubby thrusters
+
+def flen(boost, n):
+    """flame length: the car's own boost, or 35% longer on a boost pad / turbo start"""
+    return n if boost in (True, 'boost') else int(round(n * 1.35))
+
+FLAME0 = 100          # flame voxels use colour indices 100 + layer * 8 + band (layer 0 outer .. 2 core, band 0 at
+FLAME_BANDS = 8       # the nozzle .. 7 at the tip); they get their own animated material (flame_material)
+FLAME_X = 24          # room behind the hull for the longest flame
 
 def flame(g, x0, cy, cz, r, length):
-    """a boost flame: cones of flame colours pointing backwards (negative x) from x0"""
-    for k, (rr, ln, c) in enumerate(((r * 1.15, length, 7), (r * 0.85, length * 0.75, 5), (r * 0.5, length * 0.5, 6))):
+    """a boost flame: cones pointing backwards (negative x) from x0, outer / mid / core, each cut into bands along its
+    length so the animated material can send bright pulses down it"""
+    for k, (rr, ln) in enumerate(((r * 1.15, length), (r * 0.85, length * 0.75), (r * 0.5, length * 0.5))):
         t = np.clip((x0 - g.X) / max(ln, 0.1), 0, 1)
         m = (g.X < x0) & (g.X >= x0 - ln) & ((g.Y - cy) ** 2 + (g.Z - cz) ** 2 <= (rr * (1 - t * 0.85)) ** 2)
-        g.paint(m, c)
+        band = np.clip(((x0 - g.X) / max(length, 0.1) * FLAME_BANDS).astype(int), 0, FLAME_BANDS - 1)
+        for b in range(FLAME_BANDS):
+            g.paint(m & (band == b), FLAME0 + k * FLAME_BANDS + b)
+
+# flame colours, dark to bright, per style (each car's own boost, and the gold boost-pad flame)
+FLAME_STYLES = {
+    'hornet': [PURPLE, MAGENTA, PINK, PALE, WHITE],
+    'meteor': [WINE, RED, ORANGE, GOLD, CREAM],
+    'comet': [NAVY, BLUE, SKYBLUE, ICE, WHITE],
+    'bastion': [DEEPTEAL, TEAL, GREEN, LIME, MINT],
+    'pad': [RUST, ORANGE, GOLD, CREAM, WHITE],
+}
+FLAME_FRAMES, FLAME_CELL = 4, 24     # animation frames; texture pixels per frame (3 layers x 8 bands)
+WAVE = [1.0, 0.8, 0.55, 0.35, 0.25, 0.35, 0.55, 0.8]
+
+def flame_rgb(style, layer, band, frame):
+    """the colour of one flame band in one frame: a bright pulse travels from the nozzle to the tip, the core is
+    brighter than the outside, the tip fades"""
+    grad = FLAME_STYLES[style]
+    w = WAVE[(band - 2 * frame) % len(WAVE)]
+    lvl = 0.6 + layer * 0.9 + w * 2.2 - band * 0.22
+    return grad[int(np.clip(round(lvl), 0, len(grad) - 1))]
+
+def flame_uv(c):
+    k = c - FLAME0
+    return (k + 0.5) / FLAME_CELL, 0.5
+
+def flame_material(style):
+    """4 frames side by side; CS2's texture animation (as on Valve's animated TV static) steps through them"""
+    img = np.zeros((4, FLAME_FRAMES * FLAME_CELL, 3), np.uint8)
+    for f in range(FLAME_FRAMES):
+        for layer in range(3):
+            for band in range(FLAME_BANDS):
+                img[:, f * FLAME_CELL + layer * FLAME_BANDS + band] = flame_rgb(style, layer, band, f)
+    img = np.repeat(np.repeat(img, 4, 0), 4, 1)          # 384 x 16: each colour a 4-pixel block
+    rate = 0.045 if style == 'pad' else 0.07
+    return s2.write_material(OUT, '%s/flame_%s' % (PAL_DIR, style), img, comment='animated boost flame ' + style,
+                             extra=('F_TEXTURE_ANIMATION 1', 'g_nNumAnimationCells "%d"' % FLAME_FRAMES,
+                                    'g_vAnimationGrid "[%d.000000 1.000000]"' % FLAME_FRAMES, 'g_flAnimationTimePerFrame "%.3f"' % rate))
 
 CARS = {'hornet': car_hornet, 'meteor': car_meteor, 'comet': car_comet, 'bastion': car_bastion}
 DIMS = {'hornet': (34, 24, 9), 'meteor': (32, 18, 9), 'comet': (36, 16, 12), 'bastion': (31, 17, 9)}
@@ -179,7 +226,7 @@ def mesh_voxels(occ, col, origin, scale):
     for fi, d in enumerate(dirs):
         neigh = pad[1 + d[0]:nx + 1 + d[0], 1 + d[1]:ny + 1 + d[1], 1 + d[2]:nz + 1 + d[2]]
         exposed = occ & ~neigh
-        colr = np.where(exposed, col.astype(np.int32) * 4 + shade[fi], -1)
+        colr = np.where(exposed, col.astype(np.int32) * 4 + np.where(col >= FLAME0, 0, shade[fi]), -1)
         axis = [i for i in range(3) if d[i] != 0][0]
         ua, va = [i for i in range(3) if i != axis]
         for s in range(occ.shape[axis]):
@@ -205,10 +252,12 @@ def mesh_voxels(occ, col, origin, scale):
                     n = (float(d[0]), float(d[1]), float(d[2]))
                     e1 = np.subtract(corners[1], corners[0]); e2 = np.subtract(corners[2], corners[0])
                     if np.dot(np.cross(e1, e2), n) < 0: corners = corners[::-1]
-                    u, v = pal_uv(int(c))
+                    ci = int(c) // 4
+                    mat = 'spr_flame' if ci >= FLAME0 else 'spr_pal'
+                    u, v = flame_uv(ci) if ci >= FLAME0 else pal_uv(int(c))
                     cv = [(p[0], p[1], p[2], u, v) for p in corners]
-                    tris.append(('spr_pal', (cv[0], cv[1], cv[2]), n))
-                    tris.append(('spr_pal', (cv[0], cv[2], cv[3]), n))
+                    tris.append((mat, (cv[0], cv[1], cv[2]), n))
+                    tris.append((mat, (cv[0], cv[2], cv[3]), n))
     return tris
 
 def shadow_tris(L, W):
@@ -227,21 +276,23 @@ def write_shadow_material():
     col = np.zeros((G * 4, G * 4, 3), np.uint8)
     return s2.write_material(OUT, PAL_DIR + '/shadow', col, up(alpha, 4), blend=1, comment='hover shadow')
 
-def build_car(key, boost, pal_paths, shadow_mat):
+def build_car(key, boost, pal_paths, shadow_mat, flame_mats):
+    """boost: False (no flames), 'boost' (the car's own Mouse 1 flames) or 'pad' (the longer gold boost-pad flames)"""
     L, W, H = DIMS[key]
-    g = Grid(L + (16 if boost else 0), W, H)
+    g = Grid(L + (FLAME_X if boost else 0), W, H)
     # the hull sits in the front part; flames extend behind x=0 of the hull -> shift the hull when boosting
     if boost:
         g2 = Grid(L, W, H); CARS[key](g2, False)
-        g.occ[16:, :, :] = g2.occ; g.col[16:, :, :] = g2.col
-        CARS[key](ShiftedGrid(g, 16), True)
+        g.occ[FLAME_X:, :, :] = g2.occ; g.col[FLAME_X:, :, :] = g2.col
+        CARS[key](ShiftedGrid(g, FLAME_X), boost)
     else:
         CARS[key](g, False)
-    origin = (-(L / 2) * VOX - (16 * VOX if boost else 0), -(W / 2) * VOX, HOVER)
+    origin = (-(L / 2) * VOX - (FLAME_X * VOX if boost else 0), -(W / 2) * VOX, HOVER)
     tris = mesh_voxels(g.occ, g.col, origin, VOX) + shadow_tris(L, W)
     mats = {'spr_pal': pal_paths['neutral'], 'spr_shadow': shadow_mat}
+    if boost: mats['spr_flame'] = flame_mats['pad' if boost == 'pad' else key]
     skins = [(name, [(pal_paths['neutral'], pal_paths[name])]) for name in ('t', 'ct', 'gold')]
-    name = key + ('_boost' if boost else '')
+    name = key + ('_' + boost if boost else '')
     return s2.write_model(OUT, MDIR, name, tris, mats, skins), g
 
 class ShiftedGrid:
@@ -351,13 +402,58 @@ def write_effects():
     q = [(-d / 2, -w / 2, zf, 0, 0), (d / 2, -w / 2, zf, 1, 0), (d / 2, w / 2, zf, 1, w / d), (-d / 2, w / 2, zf, 0, w / d)]
     tris += [('spr_fl', (q[0], q[1], q[2]), (0, 0, 1)), ('spr_fl', (q[0], q[2], q[3]), (0, 0, 1))]
     out['pulse'] = s2.write_model(OUT, MDIR, 'pulse', tris, {'spr_fx': fence, 'spr_fl': strip})
+    # SHOCKWAVE: a ring of light flat on the road, three frames growing to the blast radius (320)
+    for f in range(3):
+        G = 32
+        yy, xx = np.mgrid[0:G, 0:G]
+        r = np.hypot(xx + 0.5 - G / 2, yy + 0.5 - G / 2) / (G / 2)
+        ring = (r > 0.82 - f * 0.08) & (r < 0.98)
+        img = np.zeros((G, G, 3), np.uint8); img[:] = (ORANGE, GOLD, CREAM)[f]
+        img[(r > 0.9) & ring] = (GOLD, CREAM, WHITE)[f]
+        cracks = ((np.abs(xx - yy) < 1) | (np.abs(xx + yy - G) < 1) | (np.abs(xx - G / 2) < 0.6) | (np.abs(yy - G / 2) < 0.6)) & (r > 0.3) & (r < 0.85) & (f == 0)
+        img[cracks] = RED
+        mat = s2.write_material(OUT, '%s/quake%d' % (PAL_DIR, f), up(img, 4), up(((ring | cracks) * 255).astype(np.uint8), 4), blend=2, backfaces=True, comment='shockwave ring %d' % f)
+        R = (140, 230, 320)[f]
+        q = [(-R, -R, 6, 0, 1), (R, -R, 6, 1, 1), (R, R, 6, 1, 0), (-R, R, 6, 0, 0)]
+        out['quake%d' % f] = s2.write_model(OUT, MDIR, 'quake%d' % f, [('spr_fx', (q[0], q[1], q[2]), (0, 0, 1)), ('spr_fx', (q[0], q[2], q[3]), (0, 0, 1))], {'spr_fx': mat})
+    # NOVA BURN fire on the road: low pixel flames on three crossed planes, two frames that the script alternates
+    for f in range(2):
+        G = 16
+        rng = np.random.RandomState(70 + f)
+        yy, xx = np.mgrid[0:G, 0:G]
+        h = (G - 1 - yy) / G                                   # 0 at the bottom .. 1 at the top
+        tongue = 0.55 + 0.35 * np.sin(xx * 1.3 + f * 2.1) + rng.rand(G, G) * 0.12
+        m = h < tongue * (1 - np.abs(xx + 0.5 - G / 2) / (G / 2) * 0.6)
+        img = np.zeros((G, G, 3), np.uint8)
+        img[:] = SKYBLUE; img[h < tongue * 0.75] = ICE; img[h < tongue * 0.4] = WHITE
+        mat = s2.write_material(OUT, '%s/fire%d' % (PAL_DIR, f), up(img, 4), up((m * 255).astype(np.uint8), 4), blend=2, backfaces=True, comment='nova fire %d' % f)
+        out['fire%d' % f] = s2.write_model(OUT, MDIR, 'fire%d' % f, star_tris('spr_fx', 150, 55 + f * 12, 0), {'spr_fx': mat})
+    # AEGIS: a shell of light hexagons round the car (eight panels and a lid), see-through between the cells
+    G = 32
+    yy, xx = np.mgrid[0:G, 0:G]
+    hx = (xx // 8 + (yy // 7) % 2 * 0.5)
+    cell = ((xx + (yy // 7) % 2 * 4) % 8 == 0) | (yy % 7 == 0)
+    img = np.zeros((G, G, 3), np.uint8); img[:] = ICE; img[cell] = WHITE
+    alpha = (cell | ((xx + yy) % 5 == 0)).astype(np.uint8) * 255
+    mat = s2.write_material(OUT, PAL_DIR + '/aegis', up(img, 4), up(alpha, 4), blend=2, backfaces=True, comment='aegis shell')
+    tris = []
+    Rs, Hs, K = 80, 64, 8
+    for k in range(K):
+        a0, a1 = 2 * math.pi * k / K, 2 * math.pi * (k + 1) / K
+        p0 = (Rs * math.cos(a0), Rs * math.sin(a0)); p1 = (Rs * math.cos(a1), Rs * math.sin(a1))
+        a = (p0[0], p0[1], 2, 0, 1); b = (p1[0], p1[1], 2, 1, 1); c = (p1[0] * 0.75, p1[1] * 0.75, Hs, 1, 0); d = (p0[0] * 0.75, p0[1] * 0.75, Hs, 0, 0)
+        n = (math.cos((a0 + a1) / 2), math.sin((a0 + a1) / 2), 0.3)
+        tris += [('spr_fx', (a, b, c), n), ('spr_fx', (a, c, d), n)]
+        tc = (0, 0, Hs + 16, 0.5, 0.5)
+        tris.append(('spr_fx', (d, c, tc), (0, 0, 1)))
+    out['aegis'] = s2.write_model(OUT, MDIR, 'aegis', tris, {'spr_fx': mat})
     # null model (nothing visible) for idle props and sound anchors
     tiny = [('spr_fx', ((0, 0, 0, 0, 0), (0.01, 0, 0, 0, 0), (0, 0.01, 0, 0, 0)), (0, 0, 1))]
     out['null'] = s2.write_model(OUT, 'models/spr', 'null', tiny, {'spr_fx': fence})
     return out
 
 # ---------------------------------------------------------------- pictures (HUD car picker + preview)
-def render_voxels(g, pal, size=256, az=200.0, el=24.0, fill=0.78, ss=3):
+def render_voxels(g, pal, size=256, az=200.0, el=24.0, fill=0.78, ss=3, style=None):
     """Shaded voxel render. az = where the camera stands around the car in degrees (180 = straight behind,
     0 = in front), el = degrees above the horizon. Exposed faces only, far to near, supersampled."""
     from PIL import ImageDraw
@@ -380,8 +476,12 @@ def render_voxels(g, pal, size=256, az=200.0, el=24.0, fill=0.78, ss=3):
         xs, ys, zs = np.where(occ & ~nb)
         for x, y, z in zip(xs, ys, zs):
             c = int(col[x, y, z])
-            base = pal[c * 4 + shade_of[fi]].astype(np.float32)
-            if c not in GLOW:
+            if c >= FLAME0:       # flames: frame 0 of the car's flame style (orange if none given)
+                k = c - FLAME0
+                base = np.array(flame_rgb(style, k // FLAME_BANDS, k % FLAME_BANDS, 0) if style else pal[(7, 5, 6)[k // FLAME_BANDS] * 4], np.float32)
+            else:
+                base = pal[c * 4 + shade_of[fi]].astype(np.float32)
+            if c not in GLOW and c < FLAME0:
                 base = base * (0.7 + 0.45 * max(0.0, float(np.dot(d, light))))
             # the face square (4 corners) in grid coordinates (y is centred)
             o = np.array([x, y - W / 2, z], float)
@@ -411,12 +511,13 @@ def main():
     shadow_mat = write_shadow_material()
     models = {}
     grids = {}
+    flame_mats = {style: flame_material(style) for style in FLAME_STYLES}
     for key in CARS:
         models[key] = {}
-        for boost in (False, True):
-            path, g = build_car(key, boost, pal_paths, shadow_mat)
-            models[key]['boost' if boost else 'base'] = path
-            grids[key + ('_boost' if boost else '')] = g
+        for boost in (False, 'boost', 'pad'):
+            path, g = build_car(key, boost, pal_paths, shadow_mat, flame_mats)
+            models[key][boost or 'base'] = path
+            grids[key + ('_' + boost if boost else '')] = g
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
@@ -425,11 +526,11 @@ def main():
     pdir = os.path.join(OUT, 'panorama/images/custom_game/spr'); os.makedirs(pdir, exist_ok=True)
     for key in CARS:
         for skin in ('neutral', 't', 'ct'):
-            img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86)
+            img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86, style=key)
             img.save(os.path.join(pdir, 'car_%s_%s.png' % (key, skin)))
     # big renders for the loading screen
     for i, key in enumerate(CARS):
-        render_voxels(grids[key + '_boost'], palette(*SKINS['t' if i % 2 == 0 else 'ct']), size=420, az=200, el=18, fill=0.9).save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
+        render_voxels(grids[key + '_boost'], palette(*SKINS['t' if i % 2 == 0 else 'ct']), size=420, az=200, el=18, fill=0.9, style=key).save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
     if PREVIEW:
         # every car from 8 directions (the models are true 3D, so every angle is drawn correctly in game)
         cell = 200
@@ -442,7 +543,7 @@ def main():
         for r, key in enumerate(CARS):
             skin = ('t', 'ct', 't', 'ct')[r]
             for i, az in enumerate(angles):
-                im = render_voxels(grids[key + '_boost'] if i == 0 else grids[key], palette(*SKINS[skin]), size=cell, az=az, el=20, fill=0.8)
+                im = render_voxels(grids[key + ('_boost' if i == 0 else '_pad' if i == 7 else '')], palette(*SKINS[skin]), size=cell, az=az, el=20, fill=0.8, style='pad' if i == 7 else key)
                 sheet.alpha_composite(im, (i * cell, 30 + r * cell))
             dr.text((8, 30 + r * cell + 8), key.upper(), fill=(255, 220, 90))
         sheet.save(PREVIEW)

@@ -160,20 +160,21 @@ r = np.hypot((xx + 0.5) / V - 0.5, (yy + 0.5) / V - 0.5) * 2
 vg = np.zeros((V, V, 4), np.uint8); vg[..., 3] = (np.clip((r - 0.75) / 0.6, 0, 1) * 160).astype(np.uint8) // 32 * 32
 save(up(vg, 4), 'vignette.png')
 # boost speed lines: pixel streaks radiating from the centre, only round the edges of the screen (two frames)
-def speedlines(seed):
+def speedlines(seed, cols=(WHITE, ICE, FROST), n=70):
     W_, H_ = 480, 270
     rng = np.random.RandomState(seed)
     img = np.zeros((H_, W_, 4), np.uint8)
     cx, cy = W_ / 2, H_ / 2
-    for _ in range(70):
+    for _ in range(n):
         a = rng.rand() * 2 * np.pi
         r0 = rng.uniform(0.62, 0.85); r1 = r0 + rng.uniform(0.15, 0.45)
-        col = (WHITE, ICE, FROST)[rng.randint(3)]
+        col = cols[rng.randint(len(cols))]
         for k in np.linspace(r0, r1, 120):
             x = int(cx + np.cos(a) * k * W_ * 0.62); y = int(cy + np.sin(a) * k * H_ * 0.62)
             if 0 <= x < W_ and 0 <= y < H_: img[y, x, :3] = col; img[y, x, 3] = 150
     return up(img, 4)
 save(speedlines(1), 'speed0.png'); save(speedlines(2), 'speed1.png')
+save(speedlines(3, (GOLD, CREAM, ORANGE), 95), 'speedp0.png'); save(speedlines(4, (GOLD, CREAM, ORANGE), 95), 'speedp1.png')
 
 # turn-ahead arrows: one or two chevrons, left or right, centred in a 32 x 16 picture (saved 4x: 128 x 64) so every
 # arrow fills the same panel
@@ -260,6 +261,7 @@ rule('.SprRoot.stOn.stRes .TopBlock', opacity='0')
 show_when('ResBoard', 'stRes')
 rule('.SprRoot.stOn.stRes .Stand', opacity='0')       # the results board takes over from the standings
 show_when('SpeedFx', 'stBoost')
+show_when('SpeedFxPad', 'stPadb')       # a boost pad / turbo start: gold streaks instead of the white ones
 
 # CRT overlay (on unless the player turns it off with !crt)
 rule('.Crt', background_image='url("%sscan.png")' % IMG, background_size='6px 6px', background_repeat='repeat', opacity='0.55')
@@ -270,6 +272,9 @@ for k in (0, 1):
     rule('.Speed%d' % k, background_image='url("%sspeed%d.png")' % (IMG, k), background_size='100% 100%',
          animation_name='sprblink', animation_duration='0.16s', animation_iteration_count='infinite',
          animation_delay='%.2fs' % (k * 0.08))
+    rule('.SpeedP%d' % k, background_image='url("%sspeedp%d.png")' % (IMG, k), background_size='100% 100%',
+         animation_name='sprblink', animation_duration='0.12s', animation_iteration_count='infinite',
+         animation_delay='%.2fs' % (k * 0.06))
 # full-screen flash
 rule('.Flash', background_color='#00000000', transition_property='background-color', transition_duration='0.08s')
 rule('.Flash.hit', background_color='#ff303040')
@@ -366,14 +371,21 @@ rule('#spr_chfill', background_image=barimg('cyan'))
 rule('#spr_charge.boosting #spr_chfill', background_image=barimg('gold'))
 rule('#spr_charge.charging #spr_chfill', background_image=barimg('pink'))
 rule('#spr_spfill', background_image=barimg('white'))
+# the E ability: its name and a bar that refills over the cooldown (gold and blinking when ready, red when short of charge)
+rule('#spr_abfill', background_image=barimg('white'))
+rule('#spr_abil.ready #spr_abfill', background_image=barimg('gold'))
+rule('#spr_abil.low #spr_abfill', background_image=barimg('red'))
 rule('.Speed.pad #spr_spfill', background_image=barimg('orange'))
 rule('.Speed.pad', border='%dpx solid %s' % (BORDER, hexc(ORANGE)))
 BOX_Y = 852
-bars = P(None, box('Bars', 'cyan', 432, 124, right=24, y=BOX_Y - (124 + 2 * BORDER) - 12), [
+BARS_H = 182
+bars = P(None, box('Bars', 'cyan', 432, BARS_H, right=24, y=BOX_Y - (BARS_H + 2 * BORDER) - 12), [
     stext('SHIELD', 'S', 'G', x=14, y=8),
     P('spr_shield', 'Bar ' + place(x=14, y=34, w=BAR_W, h=BAR_H), [P('spr_shfill', 'Fill')]),
     stext('CHARGE', 'S', 'C', x=14, y=66),
     P('spr_charge', 'Bar ' + place(x=14, y=92, w=BAR_W, h=BAR_H), [P('spr_chfill', 'Fill')]),
+    gtext('spr_abtxt', 14, 'S', 'W', align='left', x=14, y=124),
+    P('spr_abil', 'Bar ' + place(x=14, y=150, w=BAR_W, h=BAR_H), [P('spr_abfill', 'Fill')]),
 ])
 speed = P('spr_speed', box('Speed', 'gold', 432, 124, right=24, y=BOX_Y), [
     gtext('spr_spd', 4, 'XL', 'W', align='right', right=14 + row_w(4, 'S') + 6, y=8),
@@ -456,7 +468,7 @@ for i, k in enumerate(KEYS):
 PICK_W = 4 * (CARD_W + 2 * BORDER) + 3 * CARD_GAP
 # (high enough that the last half-dozen chat lines, bottom-left, show under the cards)
 pick = P('spr_pick', 'Pick ' + place(center=True, y=326, w=PICK_W, h=46 + CARD_H + 2 * BORDER + 20),
-         [stext('CHOOSE YOUR MACHINE   A / D', 'M', 'Y', extra='blink', center=True, y=0)] + cards)
+         [stext('A / D CHOOSE   E TO CONFIRM', 'M', 'Y', extra='blink', center=True, y=0)] + cards)
 
 # the small picker on the grid: four little cards along the bottom right (where shield / charge and speed come up
 # once the lights start) so the flyover's view of the field stays clear and CS2's chat (bottom-left) stays readable
@@ -477,7 +489,7 @@ for i, k in enumerate(KEYS):
     ]))
 MPICK_W = 4 * (MC_W + 2 * BORDER) + 3 * MC_GAP
 pickmini = P('spr_mpick', 'PickMini ' + place(right=24, y=1080 - 96 - (28 + MC_H + 2 * BORDER), w=MPICK_W, h=28 + MC_H + 2 * BORDER),
-             [stext('A / D  CHOOSE YOUR CAR', 'S', 'Y', extra='blink', center=True, y=0)] + mcards)
+             [stext('A / D CHOOSE   E TO CONFIRM', 'S', 'Y', extra='blink', center=True, y=0)] + mcards)
 
 # ---------------------------------------------------------------- lobby: the logo and three pixel lines; results banner; help
 logo = P(None, 'Logo ' + place(center=True, y=70, w=LOGO.shape[1], h=LOGO.shape[0]))
@@ -491,9 +503,10 @@ lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 
     gtext('spr_lob2', 60, 'S', 'Y', center=True, y=34),
     gtext('spr_lob3', 60, 'S', 'C', center=True, y=68)])
 HELP = [('SPACE RACER - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
-        ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR PICK A CAR  !CAM CAMERA', 'P'), ('!TILT !CRT !SPEC !AFK !BACK', 'P')]
-help_ = P('spr_help', box('Help', 'cyan', 640, 14 * 28 + 24, center=True, y=210),
+        ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('E        YOUR CAR\'S ABILITY', 'W'), ('R        PICK A CAR', 'W'),
+        ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
+        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SPEC  !AFK  !BACK', 'P')]
+help_ = P('spr_help', box('Help', 'cyan', 640, len(HELP) * 28 + 24, center=True, y=180),
           [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
 
 # ---------------------------------------------------------------- centre messages and the bottom message line
@@ -522,6 +535,7 @@ screen = P(None, 'Screen', [
     P(None, 'SprPreload', [P(None, cls) for cls, _ in PRELOAD]),
     P('spr_flash', 'Flash Full'),
     P(None, 'SpeedFx Full', [P(None, 'Speed0 Full'), P(None, 'Speed1 Full')]),
+    P(None, 'SpeedFxPad Full', [P(None, 'SpeedP0 Full'), P(None, 'SpeedP1 Full')]),
     logo, res, minimap, top, clock,
     *centre,
     bars, speed, stand, resboard, lobby, pick, pickmini, help_,
@@ -539,7 +553,7 @@ ids = re.findall(r'id="([^"]+)"', doc)
 assert len(ids) == len(set(ids)), 'duplicate panel ids'
 # classes the script switches on and off must never have a rule of their own (a lone ".Name { }"): the panel getting
 # the class would pick up that rule's layout (the first CS2 test's bug)
-DYNAMIC = re.compile(r'^(st[A-Z]\w*|On|sel|low|boosting|charging|pad|me|T|CT|N|Out|Lead|blink|pulse|pop2?|hit|wreck|nocrt|[lr][12]|p[123]|[xyw]\d+|mm_\w+|pic_\w+|g\d+|c[WYCRGP])$')
+DYNAMIC = re.compile(r'^(st[A-Z]\w*|On|sel|low|ready|boosting|charging|pad|me|T|CT|N|Out|Lead|blink|pulse|pop2?|hit|wreck|nocrt|[lr][12]|p[123]|[xyw]\d+|mm_\w+|pic_\w+|g\d+|c[WYCRGP])$')
 lone = [m.group(1) for m in (re.match(r'^\.([\w-]+) \{', c) for c in css) if m]
 bad = sorted(set(c for c in lone if DYNAMIC.match(c)))
 assert not bad, 'switched classes with rules of their own: %s' % bad

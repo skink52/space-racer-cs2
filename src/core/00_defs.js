@@ -12,14 +12,18 @@ const TEAM_NAMES = ['T', 'CT'];
 // The four cars. Speeds in units/s, accel in units/s^2, turn in radians/s at mid speed, grip = how fast sideways
 // speed is bled off (per second); mass only matters when cars bump.
 const CARS = {
-  hornet:  { key: 'hornet',  name: 'HORNET',  maxSpeed: 1065,  accel: 640, brake: 1000, turn: 2.7,  grip: 12, driftGrip: 3.2, mass: 1.0, shield: 105, charge: 100, boost: 1.32, padMult: 1.0, driftCharge: 2.0, spinCost: 18, ram: 1.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
-             perk: 'DRIFT CHARGE', desc: 'LIGHT AND SHARP. DRIFTING FILLS CHARGE FAST. CHEAP SPIN ATTACK.' },
-  meteor:  { key: 'meteor',  name: 'METEOR',  maxSpeed: 1090, accel: 515, brake: 900,  turn: 2.35, grip: 10, driftGrip: 3.0, mass: 1.6, shield: 110, charge: 100, boost: 1.28, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 2.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
-             perk: 'RAM', desc: 'HEAVY AND FAST IN A STRAIGHT LINE. BUMPS HURT THEM, NOT YOU.' },
+  hornet:  { key: 'hornet',  name: 'HORNET',  maxSpeed: 1065,  accel: 640, brake: 1000, turn: 2.7,  grip: 12, driftGrip: 3.2, mass: 1.0, shield: 105, charge: 100, boost: 1.32, padMult: 1.0, driftCharge: 2.5, spinCost: 18, ram: 1.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
+             perk: 'DRIFT CHARGE', desc: 'LIGHT AND SHARP. DRIFTING FILLS CHARGE FAST. CHEAP SPIN ATTACK.',
+             ability: 'dash', abilityName: 'PHASE DASH', abilityCd: 5, abilityCost: 15 },
+  meteor:  { key: 'meteor',  name: 'METEOR',  maxSpeed: 1090, accel: 530, brake: 900,  turn: 2.35, grip: 10, driftGrip: 3.0, mass: 1.6, shield: 110, charge: 100, boost: 1.28, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 2.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
+             perk: 'RAM', desc: 'HEAVY AND FAST IN A STRAIGHT LINE. BUMPS HURT THEM, NOT YOU.',
+             ability: 'quake', abilityName: 'SHOCKWAVE', abilityCd: 12, abilityCost: 40 },
   comet:   { key: 'comet',   name: 'COMET',   maxSpeed: 1040,  accel: 525, brake: 950,  turn: 2.4,  grip: 11, driftGrip: 3.0, mass: 1.0, shield: 105, charge: 130, boost: 1.40, padMult: 1.4, driftCharge: 1.0, spinCost: 30, ram: 1.0, chargeMult: 1.3, draftMult: 1.0, draftRegen: 0,
-             perk: 'AFTERBURN', desc: 'BIGGEST CHARGE TANK, STRONGEST BOOST, PADS LAST LONGER.' },
+             perk: 'AFTERBURN', desc: 'BIGGEST CHARGE TANK, STRONGEST BOOST, PADS LAST LONGER.',
+             ability: 'nova', abilityName: 'NOVA BURN', abilityCd: 12, abilityCost: 40 },
   bastion: { key: 'bastion', name: 'BASTION', maxSpeed: 1043,  accel: 550, brake: 950,  turn: 2.3,  grip: 11, driftGrip: 3.0, mass: 1.3, shield: 130, charge: 100, boost: 1.33, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 1.0, chargeMult: 1.0, draftMult: 2.0, draftRegen: 3,
-             perk: 'SLIPSTREAM', desc: 'TOUGHEST SHIELD. DRAFTING FILLS CHARGE AND REPAIRS. TEAMMATES BEHIND YOU GAIN TOO.' },
+             perk: 'SLIPSTREAM', desc: 'TOUGHEST SHIELD. DRAFTING FILLS CHARGE AND REPAIRS. TEAMMATES BEHIND YOU GAIN TOO.',
+             ability: 'aegis', abilityName: 'AEGIS', abilityCd: 12, abilityCost: 30 },
 };
 const CAR_KEYS = ['hornet', 'meteor', 'comet', 'bastion'];
 
@@ -41,13 +45,14 @@ const RULES = {
   staggerGrip: 0.25, staggerSteer: 0.5, spinSlow: 0.12,  // grip and steering it keeps while skidding; forward speed lost
   contactMax: 20,           // most shield one bump or rail hit can take
   contactSoft: 250,         // closing speed below which a bump is free
+  contactDamage: 0.024,     // shield per unit of closing speed above that
   regenDelay: 4, regenRate: 2.2,   // shield repairs slowly once nothing has hit you for this long
   startProtect: 3.0,        // seconds after the lights with no damage (the first corner is crowded)
   railRestitution: 0.3,     // bounce off the rails
   contactRestitution: 0.45,
   wreckShow: 1.5,           // seconds a wreck stays visible
   fallTime: 1.2,            // seconds falling before the reset
-  fallPenalty: 15,          // shield lost for falling off
+  fallPenalty: 20,          // shield lost for falling off
   pulseSpeed: 1500, pulseCharge: 40, pulseEnabled: true,
   startCharge: 40,
   coastDrag: 0.35,          // per second when not accelerating
@@ -66,6 +71,20 @@ const RULES = {
   launchKick: 260, launchTime: 1.0,   // ... gives this much speed at once and a pad-strength boost for this long
   stallAfter: 1.9, stallTime: 0.5,    // gas held down since before the second beep: the engine stalls for a moment
   botLaunch: 0.55,          // a bot's chance of a turbo start = skill x this
+  // drifting fills charge only through a held slide one way (not while boosting, not by flicking left-right)
+  driftStreak: 0.35,
+  // big air: a clean landing after this long in the air pays some charge
+  bigAirTime: 0.7, bigAirCharge: 15,
+  // ---- the cars' E abilities (CARS[*].ability; cooldown and charge cost per car)
+  // PHASE DASH (Hornet): a sideways dash (steer to pick the side), passing through cars for a moment
+  dashSpeed: 900, dashTime: 0.3, dashGhost: 0.4, dashRail: 0.4,
+  // SHOCKWAVE (Meteor): every car close by is shoved sideways (harder the closer), skids and loses shield
+  quakeRadius: 320, quakeKnock: 300, quakeDamage: 2, quakeStagger: 0.3,
+  // NOVA BURN (Comet): all the charge at once - a kick and a long overdrive - and a trail of fire behind
+  novaKick: 220, novaSpeed: 1.5, novaTime: 0.7, novaTimePerCharge: 0.012,
+  fireGap: 0.15, fireFor: 0.8, fireTime: 2.0, fireRadius: 90, fireDamage: 2, fireEvery: 0.5,   // fire for the first second
+  // AEGIS (Bastion): an energy shell - no damage, no shoves, cars bounce off - and a shield top-up for teammates near
+  aegisTime: 2.5, aegisMass: 4, aegisBump: 1, aegisShare: 20, aegisRange: 500,
 };
 
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }

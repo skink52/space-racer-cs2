@@ -59,8 +59,8 @@ HZ = 128                                # horizon row at 1x
 S3 = 24                                 # one character of the scale-3 pixel font
 
 # the frame on every slide
-DRIVE = [('W / S', 'GAS / BRAKE'), ('A / D', 'STEER'), ('MOUSE 1', 'BOOST'), ('MOUSE 2', 'SPIN ATTACK'), ('SPACE', 'DRIFT')]
-CHAT = [('!CAR', 'CAR PICKER'), ('!CAR 1-4', 'QUICK PICK'), ('!CAM', 'CAMERA VIEW'), ('!CRT', 'SCANLINES'),
+DRIVE = [('W / S', 'GAS / BRAKE'), ('A / D', 'STEER'), ('MOUSE 1', 'BOOST'), ('MOUSE 2', 'SPIN ATTACK'), ('SPACE', 'DRIFT'), ('E', 'CAR ABILITY')]
+CHAT = [('R / !CAR', 'CAR PICKER'), ('!CAR 1-4', 'QUICK PICK'), ('!CAM', 'CAMERA VIEW'), ('!CRT', 'SCANLINES'),
         ('!AFK', 'SIT OUT'), ('!HELP', 'ALL CONTROLS')]
 WATCH = 'WATCHING: MOUSE 1/2 NEXT CAR, E NEXT ARENA'
 LOGO_Y = 104                             # the logo picture's top (its letters start 28 px lower)
@@ -70,10 +70,10 @@ FEAT_Y0, FEAT_Y1 = 604, 948              # the panel that changes
 # the slides: what the second panel shows, and whose sky is behind it (slide 0 is <map>.png, then <map>_1.png ...)
 SLIDES = [('cars', 'oval'), ('tracks', 'crosswire'), ('win', 'spire'), ('track', 'skyway')]
 
-CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'DRIFT = CHARGE']),
-        ('meteor', 'METEOR', 'RAM', ['HEAVY AND FAST', 'BUMPS HURT THEM']),
-        ('comet', 'COMET', 'AFTERBURN', ['BIGGEST BOOST', 'LONGER PADS']),
-        ('bastion', 'BASTION', 'SLIPSTREAM', ['TOUGHEST SHIELD', 'DRAFT = REPAIR'])]
+CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: PHASE DASH']),
+        ('meteor', 'METEOR', 'RAM', ['BUMPS HURT THEM', 'E: SHOCKWAVE']),
+        ('comet', 'COMET', 'AFTERBURN', ['BIGGEST BOOST', 'E: NOVA BURN']),
+        ('bastion', 'BASTION', 'SLIPSTREAM', ['TOUGHEST SHIELD', 'E: AEGIS'])]
 TRACK_TAGS = {'oval': 'FLAT OUT', 'hairpin': 'THREE HAIRPINS', 'crosswire': 'SPIRAL LOOP', 'nullgap': 'NO RAILS',
               'spire': 'CLIMB AND DIVE', 'ringworld': 'OVER AND UNDER', 'skyway': 'BIG JUMPS', 'helix': 'CORKSCREW'}
 
@@ -156,7 +156,7 @@ def pixel_car(key, px):
 
 
 def feat_cars(big, edge):
-    heading(big, CX, FEAT_Y0 + 20, 'FOUR CARS - ONE PERK EACH', GOLD, RUST)
+    heading(big, CX, FEAT_Y0 + 20, 'FOUR CARS - PERK AND E ABILITY', GOLD, RUST)
     cw = (X1 - X0) // 4
     for i, (key, name, perk, lines) in enumerate(CARS):
         cx = X0 + cw * i + cw // 2
@@ -166,7 +166,7 @@ def feat_cars(big, edge):
         pixfont.draw(big, cx, y, name, 4, WHITE, shadow=PURPLE, align='center')
         pixfont.draw(big, cx, y + 42, perk, 2, GOLD, align='center')
         for j, ln in enumerate(lines):
-            pixfont.draw(big, cx, y + 68 + j * 22, ln, 2, PALE, align='center')
+            pixfont.draw(big, cx, y + 68 + j * 22, ln, 2, PINK if ln.startswith('E:') else PALE, align='center')
 
 
 def feat_tracks(big, edge):

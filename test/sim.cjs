@@ -18,7 +18,7 @@ if (only) rm.cfg.trackBlacklist = [];
 for (let i = 0; i < N; i++) rm.addPerson(i, 'bot' + i, i % 2 ? 3 : 2, true);
 // even: the same number of each car (the bots' own picks are random), turned round every round
 const even = OPTS.includes('even');
-const classStats = {}; for (const k of C.CAR_KEYS) classStats[k] = { races: 0, posSum: 0, wins: 0, podiums: 0, wrecks: 0, top8: 0, kos: 0, spinHits: 0 };
+const classStats = {}; for (const k of C.CAR_KEYS) classStats[k] = { races: 0, posSum: 0, wins: 0, podiums: 0, wrecks: 0, top8: 0, kos: 0, spinHits: 0, abil: 0, abilHits: 0, bigAir: 0 };
 let launches = 0, stalls = 0;
 let totalWrecks = 0, totalFalls = 0, totalKO = 0, worst = 0;
 const t0 = Date.now();
@@ -36,11 +36,12 @@ for (let r = 0; r < ROUNDS; r++) {
     for (const a of rm.arenas) for (const e of a.events) {
       if (e.type === 'wreck') { wrecks[a.index] = (wrecks[a.index] || 0) + 1; if (e.attacker) { kos[a.index] = (kos[a.index] || 0) + 1; classStats[e.attacker.cls].kos++; } }
       if (e.type === 'spinHit' && e.attacker) classStats[e.attacker.cls].spinHits++;
+      if (e.type === 'ability') { classStats[e.car.cls].abil++; classStats[e.car.cls].abilHits += e.hits || 0; }
       if (e.type === 'launch') launches++;
       if (e.type === 'stall') stalls++;
       if (e.type === 'lap') { (laps[a.index] ||= []).push(e.last); }
     }
-    for (const a of rm.arenas) for (const c of a.order) if (c.fx & 128) falls[a.index] = (falls[a.index] || 0) + 1;
+    for (const a of rm.arenas) for (const c of a.order) { if (c.fx & 128) falls[a.index] = (falls[a.index] || 0) + 1; if (c.fx & 4096) classStats[c.cls].bigAir++; }
     for (const a of rm.arenas) a.events.length = 0;
     rm.events.length = 0;
     if (trace && steps % 64 === 0 && steps < 64 * 60) {
@@ -69,7 +70,7 @@ const races = Object.values(classStats).reduce((n, s) => n + s.races, 0) / 4;
 console.log('car balance (per 100 starts):');
 for (const [k, s] of Object.entries(classStats)) {
   const per = (v) => (100 * v / Math.max(1, s.races)).toFixed(1).padStart(5);
-  console.log(`  ${k.padEnd(8)} starts ${String(s.races).padStart(5)}  avg place ${(s.posSum / Math.max(1, s.races)).toFixed(2).padStart(5)}  wins ${per(s.wins)}  podiums ${per(s.podiums)}  top 8 ${per(s.top8)}  wrecked ${per(s.wrecks)}  wreck kills ${per(s.kos)}  spin hits ${per(s.spinHits)}`);
+  console.log(`  ${k.padEnd(8)} starts ${String(s.races).padStart(5)}  avg place ${(s.posSum / Math.max(1, s.races)).toFixed(2).padStart(5)}  wins ${per(s.wins)}  podiums ${per(s.podiums)}  top 8 ${per(s.top8)}  wrecked ${per(s.wrecks)}  wreck kills ${per(s.kos)}  spin hits ${per(s.spinHits)}  E uses ${per(s.abil)} (hits ${per(s.abilHits)})  big air ${per(s.bigAir)}`);
 }
 if (OPTS.includes('json')) console.log('JSON ' + JSON.stringify(classStats));
 console.log(`turbo starts ${launches}, stalls ${stalls}`);

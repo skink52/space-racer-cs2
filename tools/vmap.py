@@ -159,7 +159,7 @@ ent('point_template', (0, 2600, LZ + 48), group=GROUP, targetname='spr_tpl_prop'
     clientOnlyEntityBehavior='CREATE_FOR_CURRENTLY_CONNECTED_CLIENTS_ONLY')
 # every model the script may SetModel to must be in the map: one prop per model in the cache room
 models = []
-for key, m in cars['cars'].items(): models += [m['base'], m['boost']]
+for key, m in cars['cars'].items(): models += [m['base'], m['boost'], m['pad']]
 models += [v for k, v in cars['fx'].items() if k != 'null']
 for k, mpath in enumerate(models):
     x = -900 + (k % 16) * 120; y = 4200 - 380 + (k // 16) * 160
