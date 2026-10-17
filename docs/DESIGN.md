@@ -39,31 +39,34 @@ signature perk. Nobody gets more total "stat"; they trade speed for armour and s
 | | HORNET | METEOR | COMET | BASTION |
 |---|---|---|---|---|
 | Style | light, agile | heavy, rams | boost specialist | tank, team player |
-| Top speed | 1065 | 1090 | 1040 | 1043 |
-| Acceleration | 640 | 515 | 525 | 550 |
+| Top speed | 1064 | 1090 | 1040 | 1043 |
+| Acceleration | 640 | 535 | 525 | 550 |
 | Turning | sharpest | widest | medium | medium |
-| Shield | 105 | 110 | 105 | 130 |
+| Shield | 108 | 110 | 110 | 115 |
 | Mass (bumps, spin shoves) | 1.0 | 1.6 | 1.0 | 1.3 |
 | Charge capacity | 100 | 100 | 130 | 100 |
-| Boost strength | +32% | +28% | +40% | +33% |
+| Boost strength | +32% | +28% | +38% | +33% |
 | Spin attack cost | 18 | 30 | 30 | 30 |
-| Perk | **Drift charge**: drifting (hold Space) fills charge twice as fast; cheap spin attack | **Ram**: contact deals double damage to the other car and half to the Meteor; 1.6x mass, so it shoves | **Afterburn**: boost pads last 40% longer; charge platforms fill it 30% faster | **Slipstream**: drafting behind any car fills charge at double rate and repairs the shield; teammates drafting *it* get the convoy bonus |
+| Perk | **Drift charge**: drifting (hold Space) fills charge twice as fast; cheap spin attack | **Ram**: contact deals 1.8x damage to the other car and the Meteor takes 1/1.8; 1.6x mass, so it shoves | **Afterburn**: boost pads last 38% longer; charge platforms fill it 30% faster | **Slipstream**: drafting behind any car fills charge at double rate and repairs the shield; teammates drafting *it* get the convoy bonus |
 
 The numbers are tuned in `test/sim.cjs` (`node test/sim.cjs 64 100 even,seed=71`: bot races with the same number
 of each car) towards one shape: the light, fast cars win a little more often, the heavy ones wreck more rivals and
-finish in the top 8 more steadily. 17 Oct, 400 races of 32 at bot skill 0.5:
+finish in the top 8 more steadily. 18 Oct, 1,200 races of 32 (400 each at bot skill 0.25, 0.5 and 0.85; the
+table is the average of the three; 3,600 races in all went into the tuning):
 
 | per 100 starts | HORNET | METEOR | COMET | BASTION |
 |---|---|---|---|---|
-| wins | 3.4 | 2.8 | 3.8 | 2.6 |
-| podiums | 10.5 | 8.9 | 8.6 | 9.5 |
-| top 8 | 24 | 26 | 21 | 29 |
-| average place (of 32) | 16.9 | 15.6 | 17.9 | 15.6 |
-| wrecked | 13 | 2.5 | 13 | 0.8 |
-| rivals wrecked (KO) | 4.6 | 11.6 | 4.2 | 8.4 |
+| wins | 3.3 | 2.8 | 3.8 | 2.6 |
+| podiums | 9.3 | 9.1 | 9.2 | 10.0 |
+| top 8 | 22 | 25 | 21 | 32 |
+| average place (of 32) | 18.0 | 15.3 | 18.3 | 14.4 |
+| wrecked | 18 | 0.5 | 18 | 0.3 |
+| rivals wrecked (KO) | 4.8 | 13.4 | 6.3 | 10.7 |
 
-(An even share would be 3.1 wins per 100 starts.) About 2.3 wrecks a race, nearly all of them knock-outs. The same
-shape holds with skilled (0.85) and weak (0.25) bots, the fast cars' lead in wins a little smaller. Tune in `CARS`
+(An even share would be 3.1 wins and 9.4 podiums per 100 starts.) About 3 wrecks a race, nearly all of them
+knock-outs. The light cars are boom or bust (more wins, wrecked in about 1 race in 5); the heavy ones are steady
+(the Bastion makes the podium and the top 8 most often) and do the wrecking. Run-to-run noise at this size is
+about +-0.3 wins per 100, and top speed is very sensitive (a few units/s moves a car's wins by 1 per 100). Tune in `CARS`
 in `src/core/00_defs.js`.
 
 Speeds are CS2 units per second (a player sprinting is 250). A full-speed car crosses a 640-unit-wide track in
@@ -81,15 +84,15 @@ pulsing when ready, red when there isn't enough charge). Bots use them too.
 | COMET | **Nova Burn** | at least 40 / 12 s | Spends all its charge at once: a 220 u/s kick, then an overdrive (1.5x top speed, double acceleration) for 0.7 s + 0.012 s per point of charge, and a trail of blue fire for the first 0.8 s. Anyone else driving through the fire loses grip and 2 shield every half second (credited to the Comet). |
 | BASTION | **Aegis** | 30 / 12 s | A 2.5-second hexagon shell: no damage and no shoves, and cars bounce off it as if it weighed four times as much. Teammates within 500 units get +20 shield. |
 
-Balance aim (`test/sim.cjs ... even`, 240 races, 17 Oct): the light cars win a little more often, the heavy ones wreck
-more rivals and finish in the top 8 more steadily; about 3.6 wrecks a race; light cars are wrecked in about 1 race in 5.
+Balance with the abilities in: see the table under the cars (18 Oct). Bots use their abilities too
+(about 2.5 Phase Dashes, 2.9 Shockwaves, 1.4 Nova Burns and 1.9 Aegis shells per race).
 
 ## Track mechanics
 
 - **Track**: a closed loop with walls (rails) on both sides. The rail bounces you back, costs speed and a little
   shield (scraping is cheap, a head-on hit is not). Some tracks have **gap** sections with no rail: run off and you
-  fall into space, reappear at the last checkpoint 2.5 seconds later with 15 less shield and no speed.
-- **Boost pads**: bright chevron strips on the racing line. Driving over one gives 1.2 s of boost (1.6 s in a Comet)
+  fall into space, reappear at the last checkpoint 2.5 seconds later with 20 less shield and no speed.
+- **Boost pads**: bright chevron strips on the racing line. Driving over one gives 1.2 s of boost (1.65 s in a Comet)
   and an instant speed kick. They cost nothing.
 - **Charge platforms**: wide glowing panels, usually on the outside of a corner or on a side lane that is a bit
   longer than the racing line. While you are on one, charge refills quickly and shield slowly. The detour is the

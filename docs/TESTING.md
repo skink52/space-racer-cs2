@@ -194,6 +194,12 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 - **Jumps** (DESIGN.md "Jumps everywhere"): new gap jumps on Oval, Hairpin (2), Crosswire, Spire (2), Helix and two
   kickers on Skyway. Take one slowly and you drop in (-20 shield). A clean long jump says BIG AIR! +15 CHARGE.
   These change the track models: copy, then compile the map in Hammer.
+- **Balance** (18 Oct, bot races at three skill levels, 1,200 on the final numbers): per 100 starts the Hornet and
+  Comet win 3.3 and 3.8, the Meteor and Bastion 2.8 and 2.6; podiums are close to even (9.1-10.0); the Meteor wrecks
+  13 rivals and the Bastion 11 (Hornet 5, Comet 6); about 3 wrecks a race; the light cars are wrecked in about 1 race
+  in 5, the heavy ones almost never. Changes: Hornet shield 105 -> 108, top speed 1065 -> 1064; Comet shield
+  105 -> 110, boost +40% -> +38%, pads 1.4x -> 1.38x; Meteor ram 2x -> 1.8x, acceleration 530 -> 535; Bastion
+  shield 130 -> 115, drafting repair 3 -> 1.5/s.
 
 ## D. Things to look at and tune
 
