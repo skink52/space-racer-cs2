@@ -315,8 +315,13 @@ for i in range(MMCELLS):
     rule('.DotSqL.y%d' % i, transform='translatey(%dpx)' % int(round(c - DOTL / 2)))
 dots = [P('spr_md%d' % k, 'Dot', [P('spr_mdy%d' % k, 'DotSq')]) for k in range(MAXDOTS)]
 dots += [P('spr_ldot', 'DotL Lead', [P('spr_ldoty', 'DotSqL')]), P('spr_dot', 'DotL me', [P('spr_doty', 'DotSqL')])]
-minimap = P('spr_mm', box('MiniMap', 'cyan', MM + 12, MM + 12, x=24, y=24), [
-    P('spr_mmimg', 'MapImg ' + place(x=6, y=6, w=MM, h=MM), dots)])
+# CS2 keeps drawing its own HUD on top of ours, so ours stays out of the places it uses (preview/hud_render.py checks):
+# chat bottom-left (x 18-571, y 609-1000 at 1080 high), the kill feed top-right (from y 75 down), the team counter
+# top centre (to about y 65) and the money / health row along the bottom edge. So the left column is the minimap with
+# the clock under it, the right column the standings with shield / charge and speed below them.
+COL_W = MM + 24              # the left column's boxes: the minimap and the clock, the same width
+minimap = P('spr_mm', box('MiniMap', 'cyan', COL_W, COL_W, x=24, y=24), [
+    P('spr_mmimg', 'MapImg ' + place(x=12, y=12, w=MM, h=MM), dots)])
 
 # ---------------------------------------------------------------- top centre: position, lap, the bend ahead
 rule('.Turn', background_size='100% 100%', background_repeat='no-repeat', opacity='0')
@@ -329,7 +334,7 @@ TB_W = 620
 px0 = (TB_W - POS_W) // 2
 # the live team score under the lap: "T 5 - 3 CT" (top-8 places per side, all arenas), T in gold, CT in cyan
 TT_W, TC_W = row_w(4, 'S'), row_w(5, 'S')
-top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=224), [
+top = P(None, 'TopBlock ' + place(center=True, y=72, w=TB_W, h=224), [      # under CS2's team counter
     gtext('spr_pos', 2, 'XXL', 'W', align='right', x=px0, y=0),
     gtext('spr_suf', 2, 'L', 'W', align='left', x=px0 + row_w(2, 'XXL') + 6, y=84 - 40 - 10),
     gtext('spr_posof', 3, 'M', 'P', align='left', x=px0 + row_w(2, 'XXL') + 6 + row_w(2, 'L') + 10, y=84 - 30 - 10),
@@ -339,7 +344,7 @@ top = P(None, 'TopBlock ' + place(center=True, y=52, w=TB_W, h=224), [
     gtext('spr_tct', 5, 'S', 'C', align='left', x=TB_W // 2 + 18, y=126),
     P('spr_turn', 'Turn ' + place(center=True, y=158, w=128, h=64)),
 ])
-clock = P(None, box('ClockBox', 'pink', 216, 118, right=24, y=24), [
+clock = P(None, box('ClockBox', 'pink', COL_W, 118, x=24, y=24 + COL_W + 2 * BORDER + 12), [
     stext('TIME', 'XS', 'P', right=10, y=6),
     gtext('spr_clock', 7, 'M', 'W', align='right', right=8, y=26),
     stext('LAP', 'XS', 'P', x=10, y=67),
@@ -348,8 +353,8 @@ clock = P(None, box('ClockBox', 'pink', 216, 118, right=24, y=24), [
     gtext('spr_best', 7, 'S', 'Y', align='right', right=8, y=89),
 ])
 
-# ---------------------------------------------------------------- bars (bottom left) and speed (bottom right)
-# (bottoms at y 984, clear of CS2's own money / health row along the bottom edge)
+# ---------------------------------------------------------------- shield / charge over speed (bottom right)
+# (bottom-left is CS2's chat; the speed box ends at y 984, clear of CS2's money / health row along the bottom edge)
 rule('.Bar', background_image='url("%sbar_dark.png")' % IMG, background_size='%dpx %dpx' % (BAR_W, BAR_H))
 rule('.Fill', height='100%', width='0px', background_size='%dpx %dpx' % (BAR_W, BAR_H), background_repeat='no-repeat', background_position='0px 0px')
 for i in range(21): rule('.Fill.w%d' % i, width='%dpx' % (20 * i + 2) if i else '0px')     # whole segments: 20 px each at 4x
@@ -364,7 +369,7 @@ rule('#spr_spfill', background_image=barimg('white'))
 rule('.Speed.pad #spr_spfill', background_image=barimg('orange'))
 rule('.Speed.pad', border='%dpx solid %s' % (BORDER, hexc(ORANGE)))
 BOX_Y = 852
-bars = P(None, box('Bars', 'cyan', 432, 124, x=24, y=BOX_Y), [
+bars = P(None, box('Bars', 'cyan', 432, 124, right=24, y=BOX_Y - (124 + 2 * BORDER) - 12), [
     stext('SHIELD', 'S', 'G', x=14, y=8),
     P('spr_shield', 'Bar ' + place(x=14, y=34, w=BAR_W, h=BAR_H), [P('spr_shfill', 'Fill')]),
     stext('CHARGE', 'S', 'C', x=14, y=66),
@@ -449,10 +454,12 @@ for i, k in enumerate(KEYS):
         kids.append(P(None, 'StatBar ' + place(x=128, y=y + 3, w=130, h=12), [P(None, 'StatFill %s_%s' % (k, nm))]))
     cards.append(P('spr_card%d' % i, box('Card', 'white', CARD_W, CARD_H, x=i * (CARD_W + 2 * BORDER + CARD_GAP), y=46), kids))
 PICK_W = 4 * (CARD_W + 2 * BORDER) + 3 * CARD_GAP
-pick = P('spr_pick', 'Pick ' + place(center=True, y=430, w=PICK_W, h=46 + CARD_H + 2 * BORDER + 20),
+# (high enough that the last half-dozen chat lines, bottom-left, show under the cards)
+pick = P('spr_pick', 'Pick ' + place(center=True, y=326, w=PICK_W, h=46 + CARD_H + 2 * BORDER + 20),
          [stext('CHOOSE YOUR MACHINE   A / D', 'M', 'Y', extra='blink', center=True, y=0)] + cards)
 
-# the small picker on the grid: four little cards along the bottom so the flyover's view of the field stays clear
+# the small picker on the grid: four little cards along the bottom right (where shield / charge and speed come up
+# once the lights start) so the flyover's view of the field stays clear and CS2's chat (bottom-left) stays readable
 MC_W, MC_H, MC_GAP = 200, 172, 10
 rule('.MCard.sel', transform='scale3d(1.06, 1.06, 1)', border='%dpx solid %s' % (BORDER, hexc(FRAME['gold'])), background_color='#2a1f3ae0')
 rule('.MCard.sel .MCarPic', animation_name='sprpulse', animation_duration='0.9s', animation_iteration_count='infinite')
@@ -469,7 +476,7 @@ for i, k in enumerate(KEYS):
         stext(c['perk'], 'XS', 'C', center=True, y=MPIC + 24),
     ]))
 MPICK_W = 4 * (MC_W + 2 * BORDER) + 3 * MC_GAP
-pickmini = P('spr_mpick', 'PickMini ' + place(center=True, y=1080 - 96 - (28 + MC_H + 2 * BORDER), w=MPICK_W, h=28 + MC_H + 2 * BORDER),
+pickmini = P('spr_mpick', 'PickMini ' + place(right=24, y=1080 - 96 - (28 + MC_H + 2 * BORDER), w=MPICK_W, h=28 + MC_H + 2 * BORDER),
              [stext('A / D  CHOOSE YOUR CAR', 'S', 'Y', extra='blink', center=True, y=0)] + mcards)
 
 # ---------------------------------------------------------------- lobby: the logo and three pixel lines; results banner; help
@@ -479,7 +486,7 @@ rule('.Logo', background_image='url("%slogo.png")' % IMG, background_size='100% 
 res = P(None, 'ResLogo ' + place(center=True, y=160, w=RES.shape[1], h=RES.shape[0]))
 rule('.ResLogo', background_image='url("%slogo_results.png")' % IMG, background_size='100% 100%',
      animation_name='sprpulse', animation_duration='1.2s', animation_iteration_count='infinite')
-lobby = P(None, 'LobbyLines ' + place(center=True, y=246, w=row_w(60, 'S'), h=3 * 34), [
+lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 * 34), [
     gtext('spr_lob1', 60, 'S', 'W', center=True, y=0),
     gtext('spr_lob2', 60, 'S', 'Y', center=True, y=34),
     gtext('spr_lob3', 60, 'S', 'C', center=True, y=68)])
@@ -494,7 +501,8 @@ centre = [
     gtext('spr_ctr', 20, 'XL', 'W', center=True, y=310),
     gtext('spr_ctr2', 40, 'M', 'W', center=True, y=322),
     gtext('spr_sub', 52, 'S', 'W', center=True, y=392),
-    gtext('spr_msg', 48, 'S', 'C', center=True, y=822),
+    # 38 cells (762 px) at most, so even the longest line stays right of CS2's chat (x 571) on a 16:9 screen
+    gtext('spr_msg', 38, 'S', 'C', center=True, y=822),
 ]
 
 # never shown: these make CS2 compile the loading screen picture, the radar and the map icon along with the HUD

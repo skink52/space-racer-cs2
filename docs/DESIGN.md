@@ -180,16 +180,27 @@ Chat: `!car 1-4`, `!cam` (high / far / near view), `!tilt` (camera lean on/off),
 Panorama custom HUD, per player, all game text in the pixel font: a big position ("3RD/32", green on the podium,
 gold when leading; it pops each time you gain a place), the lap ("FINAL LAP" blinks red), the live team score
 ("T 5 - 3 CT": top-8 places per side across all arenas, the thing that decides the CS2 round) and the bend-ahead
-arrows top-centre, the race clock with the running lap time and your best lap top-right, segmented pixel bars for shield and charge bottom-left (shield blinks red when low; charge turns
-gold when boosting and pink on a charge platform), speed bottom-right, the top-8 standings down the right edge (a
-side-coloured tab per row, you highlighted), a pixelated track map top-left with a dot for every car in the race
-(T orange, CT blue, the leader gold, yours blinking white), centre messages (countdown, GO!, FINAL LAP, WRONG WAY
-blinking, WRECKED, FINISHED 3RD, LAP RECORD!; each new one pops in), the car picker (four framed cards, each with a pixel picture of the
-car in your side's colour, its perk and five stat bars; the chosen one gold and pulsing) in the lobby, and a row of
-four small cards along the bottom on the grid (so the flyover's view of the field stays clear), the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a results board at the end
-(top 8 with the winner's time and everyone else's gap, your own line swapped in if you placed lower), flickering
-pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette over everything (`!crt`
-turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.
+arrows top-centre, a pixelated track map top-left with a dot for every car in the race (T orange, CT blue, the
+leader gold, yours blinking white) and under it the race clock with the running lap time and your best lap, the
+top-8 standings down the right edge (a side-coloured tab per row, you highlighted), segmented pixel bars for shield
+and charge bottom-right (shield blinks red when low; charge turns gold when boosting and pink on a charge platform)
+over the speed, centre messages (countdown, GO!, FINAL LAP, WRONG WAY blinking, WRECKED, FINISHED 3RD, LAP RECORD!;
+each new one pops in), a bottom line for short news and the answers to chat commands, the car picker (four framed
+cards, each with a pixel picture of the car in your side's colour, its perk and five stat bars; the chosen one gold
+and pulsing) in the lobby, and a row of four small cards bottom-right on the grid (so the flyover's view of the
+field stays clear), the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a
+results board at the end (top 8 with the winner's time and everyone else's gap, your own line swapped in if you
+placed lower), flickering pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette
+over everything (`!crt` turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.
+
+CS2's own HUD stays on (a script can't hide it) and is drawn over ours, so ours keeps out of the places it uses
+(`preview/hud_cs2.png` marks them): chat bottom-left (the chat box is x 18-571, y 609-1000 at 1080 high, its
+newest lines at the bottom), the kill feed top-right (from y 75 down, a line about 36 px), the team counter
+top-centre (to about y 65) and the money / health row along the bottom edge. That is why the left column is the
+map and the clock, shield / charge sit over the speed on the right, the lobby's cards end around y 790 (the last
+half-dozen chat lines show under them) and the bottom line is 38 characters at most (at 16:9 even the longest
+stays right of the chat). On 4:3 the chat is 40% of the screen's width, so long bottom lines and the cards' left
+edge can reach it there; chat is still drawn on top.
 
 How the pixel text works: each text row is a line of small image panels, one per character. The script sets each
 panel's glyph class (`g65` = A) and the row's colour class, and only for characters that changed; whole rows are
@@ -209,7 +220,8 @@ screen, centre text stacked, the bars squashed, no car cards):
   boxes), and panels are shown and hidden with opacity instead of collapsing.
 - `preview/hud_render.py` is a small stand-in for Panorama: it lays the HUD out from the generated xml/css, draws it
   with the real pictures at 1920, 2333 (ultrawide) and 1440 (4:3) wide, and fails the build if any panel breaks
-  those rules.
+  those rules or (at 16:9 and wider, in every state) sits where CS2 draws its chat, kill feed, team counter or
+  money / health row. A text line too long for its row is a `WARNING` in the console (and fails the mock test).
 
 ## Tracks (eight, all original)
 

@@ -301,7 +301,8 @@ function onArenaEnd(a, result, now) {
     const pe = c.person;
     if (!pe || pe.bot) continue;
     const pos = r.indexOf(c) + 1;
-    if (pos > 0) bottom(pe.slot, (c.state === 'wrecked' ? 'WRECKED - ' : c.state === 'dnf' ? 'DNF - ' : '') + 'YOU: ' + ordinal(pos) + ' OF ' + r.length + (c.bestLap ? ' - BEST LAP ' + fmtTime(c.bestLap) : ''), CONFIG.RESULTS_HOLD + 2);
+    // (38 characters at most, the bottom line's width: "WRECKED - 12TH OF 32 - BEST LAP 0:29.8")
+    if (pos > 0) bottom(pe.slot, (c.state === 'wrecked' ? 'WRECKED - ' : c.state === 'dnf' ? 'DNF - ' : 'YOU: ') + ordinal(pos) + ' OF ' + r.length + (c.bestLap ? ' - BEST LAP ' + lapText(c.bestLap) : ''), CONFIG.RESULTS_HOLD + 2);
   }
   // the losers die, credited to the podium, one every few ticks
   const plan = rm.killPlan(a);
@@ -360,7 +361,6 @@ function raceInfo(pe, car, a, now, spectating) {
   else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  A/D CAR';
   else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : 'PRESS W ON THE LAST BEEP FOR A TURBO START';
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
-  else if (pe.helpUntil > now) info.sub = 'W/S DRIVE  A/D STEER  M1 BOOST  M2 SPIN  SPACE DRIFT';
   const bm = timed(botMsgs, pe.slot, now);
   info.msg = bm ? bm.text : '';
   const fl = flashes.get(pe.slot);
@@ -396,7 +396,9 @@ function lobbyInfo(pe, now) {
   }
   if (pe.afk) info.line3 = 'AFK - TYPE !BACK OR PRESS A KEY TO RACE';
   else if (pe.csTeam !== 2 && pe.csTeam !== 3) info.line3 = 'JOIN T OR CT TO RACE';
-  if (pe.helpUntil > now) { info.center = 'W/S DRIVE  A/D STEER  M1 BOOST  M2 SPIN'; info.sub = 'SPACE DRIFT   CHAT: !CAR 1-4 !CAM !CRT !SPEC !AFK'; }
+  // (!help shows the help panel itself; the answers to chat commands like !cam go on the bottom line here too)
+  const bm = timed(botMsgs, pe.slot, now);
+  info.msg = bm ? bm.text : '';
   return info;
 }
 
@@ -639,13 +641,13 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
     const n = parseInt(arg, 10);
     const key = CAR_KEYS[n - 1] || CAR_KEYS.find((k) => k === arg || CARS[k].name.toLowerCase() === arg);
     if (key) { if (!rm.setCar(pe, key)) bottom(slot, 'TOO LATE TO SWAP - NEXT ROUND', 3); }
-    else bottom(slot, 'CARS: 1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
+    else bottom(slot, '1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
   } else if (t === '!cam' || t.startsWith('!cam ')) {
     const names = Object.keys(CONFIG.CAMERAS);
     const want = t.slice(4).trim();
     const cur = pe.cam || CONFIG.CAM_DEFAULT;
     pe.cam = names.includes(want) ? want : names[(names.indexOf(cur) + 1) % names.length];
-    bottom(slot, 'CAMERA: ' + pe.cam.toUpperCase() + '   (!CAM ' + names.join(' / ').toUpperCase() + ')', 3);
+    bottom(slot, 'CAMERA: ' + pe.cam.toUpperCase() + '  (!CAM ' + names.join('/').toUpperCase() + ')', 3);
   } else if (t === '!tilt') {
     pe.tilt = pe.tilt === false;
     bottom(slot, 'CAMERA TILT ' + (pe.tilt === false ? 'OFF' : 'ON') + '   (!TILT)', 3);

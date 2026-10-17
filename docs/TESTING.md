@@ -21,8 +21,9 @@ Valve's type declarations. These are the things only the real game can show, in 
    seen from behind and above. Watch for the car model, its side colour (T orange / CT blue), the hover shadow.
 4. Drive: W accelerates, A / D steer, Mouse 1 boosts (charge bar drains, flame model), Space drifts, Mouse 2
    spins. Camera: does it lag the car nicely, roll in corners, and never clip through the track? Rails bounce you.
-5. HUD: position / lap top-centre, clock top-right, shield + charge bottom-left, speed bottom-right, standings on
-   the right, minimap top-left with your dot and the leader's dot. Centre messages: countdown, FINAL LAP, WRONG WAY.
+5. HUD: position / lap top-centre, minimap top-left with a dot for every car and the clock under it, standings on
+   the right, shield + charge over the speed bottom-right. Centre messages: countdown, FINAL LAP, WRONG WAY.
+   CS2's chat (bottom-left) and kill feed (top-right) have nothing of ours under them.
 6. Pads: boost pads (orange chevrons) kick; charge platforms (cyan grid) fill charge and shield, with a hum.
 7. Finish: "FINISHED 1ST", the car warps out, results after the window, `FireWinCondition` in the console, the CS2
    round ends with a T or CT win.
@@ -106,15 +107,20 @@ Valve's type declarations. These are the things only the real game can show, in 
 Rebuild fully after copying the files (`disconnect`, then load the map again) so the HUD and the script recompile.
 
 - **HUD placement.** Everything should now sit where `preview/hud_race.png` shows it: minimap top-left (all of it,
-  with a dot for every car: T orange, CT blue, the leader gold, yours blinking white), position + lap top-centre
-  under CS2's own top bar, clock top-right, standings on the right, shield/charge bottom-left and speed
+  with a dot for every car: T orange, CT blue, the leader gold, yours blinking white) with the clock under it,
+  position + lap top-centre under CS2's own top bar, standings on the right, shield/charge over the speed
   bottom-right, a little above CS2's money / health row. Cause of the jumble: the HUD root's "Pick" state used the
   same class name as the picker panel, so the whole HUD took the picker's layout. The layout is also fixed-size now.
+- **CS2 chat stays readable** (`preview/hud_cs2.png` marks CS2's own places). Say something in chat while racing,
+  on the grid and in the lobby: the lines bottom-left should have nothing of ours behind them (in the lobby the
+  last five or six lines show under the cards; with chat open the box covers the first card's corner, which is
+  fine). Wreck someone: the kill feed top-right has nothing of ours under it either. `!cam` in the lobby now
+  answers on the bottom line.
 - **Car picker.** Lobby (`preview/hud_lobby.png`): logo, three lines, then four cards with a picture of each car in
   your side's colour, its perk and five stat bars; A / D moves the gold highlight. Grid (`preview/hud_grid.png`):
-  the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", and a row of four small cards along the bottom (the
-  flyover's view of the field stays clear); they go 3 seconds before the lights and the bars / speed / standings
-  come back. Watching a race: the cards show for 4 seconds after you press A / D.
+  the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", and a row of four small cards bottom-right (the flyover's
+  view of the field stays clear, and chat too); they go 3 seconds before the lights and the bars / speed /
+  standings come back in the same corner. Watching a race: the cards show for 4 seconds after you press A / D.
 - **Countdown.** 3 / 2 / 1 in big red pixel digits in the middle of the screen, then GO!.
 - **Cars on the grid.** All cars visible on the grid from the moment the flyover reaches them (they were being
   teleported every tick, which CS2 doesn't draw).

@@ -62,11 +62,17 @@ function glyphClass(ch) {
 }
 const SLOT_IDS = {};
 for (const id in HUD_TEXT.slots) { SLOT_IDS[id] = []; for (let k = 0; k < HUD_TEXT.slots[id]; k++) SLOT_IDS[id].push(id + '_' + k); }
+const tooLong = new Set();
 function hudText(slot, id, text, color, fx) {
   const ids = SLOT_IDS[id];
   if (!ids) return;
   text = String(text === undefined || text === null ? '' : text);
-  if (text.length > ids.length) text = text.slice(0, ids.length);
+  if (text.length > ids.length) {
+    // (said once per line in the console: a line that doesn't fit is a bug to fix, e.g. the bottom line is 38 wide so
+    // it stays clear of CS2's chat)
+    if (!tooLong.has(id + text)) { tooLong.add(id + text); log(`WARNING: HUD text too long for ${id} (${ids.length}): ${text}`); }
+    text = text.slice(0, ids.length);
+  }
   // the row has a fixed number of cells: centre or right-align by padding
   const align = HUD_TEXT.align ? HUD_TEXT.align[id] : 'left';
   if (align === 'center') text = ' '.repeat(Math.floor((ids.length - text.length) / 2)) + text;
@@ -262,7 +268,8 @@ function hudRace(slot, car, arena, info) {
   hudSwap(slot, 'spr_root', null, 'lobby');
 }
 
-// lobby: status lines only (plus the picker)
+// lobby: status lines, the picker and the bottom line (answers to chat commands). The centre lines stay empty: the
+// picker sits where they are.
 function hudLobby(slot, info) {
   hudSwap(slot, 'spr_root', 'stLobby', 'lobby');
   hudSwap(slot, 'spr_root', null, 'on');
@@ -272,9 +279,9 @@ function hudLobby(slot, info) {
   hudText(slot, 'spr_lob1', info.line1 || '', 'cW', info.blink1 ? 'blink' : null);
   hudText(slot, 'spr_lob2', info.line2 || '', 'cY');
   hudText(slot, 'spr_lob3', info.line3 || '', 'cC');
-  hudCenter(slot, info.center, info.centerCls);
-  hudText(slot, 'spr_sub', info.sub || '', 'cW');
-  hudText(slot, 'spr_msg', '');
+  hudCenter(slot, '');
+  hudText(slot, 'spr_sub', '');
+  hudText(slot, 'spr_msg', info.msg || '', 'cC');
   hudSwap(slot, 'spr_flash', null);
 }
 

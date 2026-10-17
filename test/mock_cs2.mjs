@@ -176,7 +176,8 @@ hooks.OnActivate();
 let rounds = 0;
 const t0 = Date.now();
 let thinkMs = 0, maxThink = 0;
-const CHATS = { 12: '!car 3', 25: '!race', 40: '!car meteor', 70: '!spec', 90: '!back', 130: '!afk', 150: '!back' };
+const CHATS = { 12: '!car 3', 16: '!car', 18: '!cam', 20: '!cam near', 22: '!tilt', 23: '!tilt', 25: '!race', 28: '!crt', 29: '!crt', 32: '!music',
+  40: '!car meteor', 70: '!spec', 90: '!back', 130: '!afk', 150: '!back' };
 const phases = {};
 while (time < SECONDS) {
   time += TICK;

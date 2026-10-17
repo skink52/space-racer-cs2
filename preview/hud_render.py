@@ -2,11 +2,12 @@
 lays the panels out the way the HUD is written (fixed sizes, pinned from the top and the left / centre / right, pixel
 text rows flowing right) and draws them with the real HUD pictures. It also checks the layout rules the HUD relies on
 (every panel has a fixed size, nothing hangs off its parent, no vertical centring, no negative margins outside text
-rows) and prints anything that breaks them.
+rows), checks that nothing of ours sits where CS2 draws its own HUD over it (chat, kill feed, team counter, money /
+health row; see cs2_zones) and prints anything that breaks them.
 
 usage: hud_render.py <addon_out_dir> <background.png> <out_prefix>
-writes <out_prefix>_race.png, _grid.png, _lobby.png, _results.png, _help.png at 1920x1080 and _race_wide.png at 2333x1080
-(the screen in Zach's recording) and _race_43.png at 1440x1080."""
+writes <out_prefix>_race.png, _grid.png, _lobby.png, _results.png, _help.png at 1920x1080, _race_wide.png at 2333x1080
+(the screen in Zach's recording), _race_43.png at 1440x1080 and _cs2.png (the race HUD with CS2's own places marked)."""
 import os, re, sys, json
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageDraw, ImageFont
@@ -148,6 +149,55 @@ def color(v):
         if len(h_) == 8: return tuple(int(h_[i:i + 2], 16) for i in (0, 2, 4, 6))
     return None
 
+# ---------------------------------------------------------------- CS2's own HUD: ours keeps out of its places
+# CS2 draws chat, the kill feed, the team counter and the money / health row on top of a custom HUD, so nothing of
+# ours may sit under them (numbers from CS2's hudchat / huddeathnotice / hud styles, 1080 high). Checked at 16:9 and
+# wider; on 4:3 the chat is 40% of the screen's width, so long centre lines can reach it there.
+def cs2_zones(W, state):
+    z = [('CS2 KILL FEED', W - 430, 72, W, 190),                  # right, margin-top 72, ~36 px a line (3 lines here)
+         ('CS2 TEAM COUNTER', W / 2 - 360, 0, W / 2 + 360, 66),    # avatars, round time, scores
+         ('CS2 MONEY / HEALTH', 0, 1000, W, H)]
+    # chat (box x 18-571, its text 28-561): its last few lines always (up from about y 934), the whole box (from y 609)
+    # while someone types. In the lobby the first car card may sit behind the open chat box (CS2 draws the box over it).
+    z.append(('CS2 CHAT', 0, 800 if state == 'lobby' else 600, 576, 1010))
+    return z
+
+def drawn(item):
+    k, x, y, w, h, bw, op, st = item
+    if op <= 0.01 or w <= 0 or h <= 0 or 'Full' in k.cls: return False
+    bg = color(st.get('background-color', '#00000000'))
+    return bool((bg and bg[3]) or ('background-image' in st and picture(st['background-image']) is not None)
+                or 'border' in st or (k.tag == 'Label' and k.text))
+
+def top_of(k):
+    """the HUD piece a panel belongs to: its ancestor straight under the Screen panel"""
+    while k.parent is not None and 'Screen' not in k.parent.cls: k = k.parent
+    return k
+
+def zone_check(items, W, state):
+    rect = {id(it[0]): it[1:5] for it in items}
+    for (zn, x0, y0, x1, y1) in cs2_zones(W, state):
+        hit = []
+        for it in items:
+            if not drawn(it): continue
+            k, x, y, w, h = it[:5]
+            if x < x1 and x + w > x0 and y < y1 and y + h > y0:
+                t = top_of(k)
+                if t not in hit: hit.append(t)
+        for t in hit:
+            x, y, w, h = rect.get(id(t), (0, 0, 0, 0))
+            nm = t.id or '.'.join(sorted(c for c in t.base if not re.match(r'^L\d+$', c)))
+            problems.append('%s at %d wide: %s (%d,%d %dx%d) is under %s' % (state, W, nm, x, y, w, h, zn))
+
+def zones_picture(img, W, state, name):
+    im = img.convert('RGB')            # (drawing in RGBA onto an RGB picture blends; onto RGBA it would overwrite)
+    d = ImageDraw.Draw(im, 'RGBA')
+    f = ImageFont.truetype(FONT, 22)
+    for (zn, x0, y0, x1, y1) in cs2_zones(W, state):
+        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(255, 255, 255, 46), outline=(255, 255, 255, 220), width=3)
+        d.text((x0 + 10, y0 + 6), zn, font=f, fill=(255, 255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0, 255))
+    im.convert('RGB').save(name)
+
 def draw(items, img):
     font_cache = {}
     for (k, x, y, w, h, bw, op, st) in items:
@@ -241,6 +291,7 @@ def race_state(grid=False, results=False):
             add('spr_rb%d' % i, 'T' if i % 2 == 0 else 'CT')
             if i < 3: add('spr_rb%d' % i, 'p%d' % (i + 1))
         add('spr_rb7', 'me')
+        text('spr_msg', 'WRECKED - 12TH OF 32 - BEST LAP 0:29.8', 'cyan')     # the longest bottom line there is
     if grid:
         text('spr_ctr', 'NULL GAP', 'gold'); text('spr_sub', 'YOU START 3RD OF 32  -  LIGHTS IN 6', 'white')
         add('spr_mcard2', 'sel')
@@ -267,6 +318,7 @@ def lobby_state():
     text('spr_lob3', 'NEXT: SOLAR OVAL - 3 LAPS  RECORD 0:41.2 SKINK52', 'cyan')
     add('spr_card1', 'sel')
     for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): swap('spr_cimg%d' % i, r'^pic_', 'pic_%s_t' % k)
+    text('spr_msg', 'CAMERA: HIGH  (!CAM HIGH/FAR/NEAR)', 'cyan')
 
 def help_state():
     race_state(); add('spr_root', 'stHelp'); text('spr_ctr', ''); text('spr_msg', '')
@@ -285,14 +337,28 @@ def render(W, bgpath, name):
     img.convert('RGB').save(name)
     return img
 
+def check(W, state):
+    """layout only, then CS2's places (see cs2_zones)"""
+    ROOT.st = style(ROOT)
+    items = []
+    layout(ROOT, 0, 0, W, H, 1.0, items, W)
+    zone_check(items, W, state)
+
 shots = []
-race_state(); shots.append(render(1920, BG, PREFIX + '_race.png'))
+race_state(); img = render(1920, BG, PREFIX + '_race.png'); shots.append(img)
+zones_picture(img, 1920, 'race', PREFIX + '_cs2.png')
 race_state(); render(2333, BG, PREFIX + '_race_wide.png')
 race_state(); render(1440, BG, PREFIX + '_race_43.png')
 race_state(grid=True); shots.append(render(1920, BG, PREFIX + '_grid.png'))
 lobby_state(); shots.append(render(1920, BG, PREFIX + '_lobby.png'))
 race_state(results=True); render(1920, BG, PREFIX + '_results.png')
 help_state(); render(1920, BG, PREFIX + '_help.png')
+for W in (1920, 2333):           # 16:9 and Zach's wide screen
+    race_state(); check(W, 'race')
+    race_state(grid=True); check(W, 'grid')
+    race_state(results=True); check(W, 'results')
+    lobby_state(); check(W, 'lobby')
+    help_state(); check(W, 'help')
 seen = set()
 for p in problems:
     if p not in seen: seen.add(p); print('LAYOUT:', p)
