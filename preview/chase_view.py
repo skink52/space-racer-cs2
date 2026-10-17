@@ -1,13 +1,16 @@
 """Software render of what a racer sees: the track model and a car from the chase camera (same maths as
 src/cs2/40_players.js placeCamera). For checking framing and how far ahead the track reads, without CS2.
-usage: chase_view.py <addon_out_dir> <track id> <lap fraction> <preset high|far|near> <out.png> [car]"""
+usage: chase_view.py <addon_out_dir> <track id> <lap fraction> <preset high|far|near|fly> <out.png> [car]
+environment: SIZE=1920x1080, SKIN=t|ct|gold (our car), PACK="ds:lat:car:skin;..." (other cars: ds ahead of ours, lat to
+the left; car may be e.g. meteor_boost), EYE=x,y,z AT=x,y,z (a free camera instead of the chase camera),
+AIR=<units> (our car off the ground, mid-jump)"""
 import os, sys, json, math
 import numpy as np
 from PIL import Image
 
 OUT, TID, FRAC, PRESET, PNG = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4], sys.argv[5]
 CARKEY = sys.argv[6] if len(sys.argv) > 6 else 'meteor'
-W, H = 960, 540
+W, H = (int(v) for v in os.environ.get('SIZE', '960x540').split('x'))     # SIZE=1920x1080 for bigger shots
 FOV = 106.0   # CS2's 90 degrees at 4:3 is about 106 across a 16:9 screen
 CAMS = {'high': (290, 165, 15, 60), 'far': (420, 260, 22, 80), 'near': (230, 100, 9, 30), 'fly': (290, 165, 15, 60)}
 
@@ -17,6 +20,11 @@ def load_vmdl_mats(vmdl):
     txt = open(vmdl).read()
     import re
     return dict(re.findall(r'from = "([^"]+)\.vmat"\s*to = "([^"]+)"', txt))
+def car_mats(vmdl, skin=None):
+    """a car model's materials, in a team skin (t / ct / gold) if asked"""
+    m = load_vmdl_mats(vmdl)
+    if skin and skin != 'neutral': m['spr_pal'] = 'materials/spr/cars/pal_%s.vmat' % skin
+    return m
 def tex(vmat):
     if vmat in tex_cache: return tex_cache[vmat]
     path = os.path.join(OUT, vmat.replace('.vmat', '_color.png'))
@@ -41,12 +49,21 @@ def load_smd(path, mats, off=(0, 0, 0), yaw=0.0, pitch=0.0):
         tris.append((mats.get(m, ''), vs)); i += 4
     return tris
 
+def ramp_lift(i, t):
+    """how far a jump ramp lifts the road at segment i, fraction t (the game's Track.rampLift)"""
+    n = T['n']
+    for f in T['feats']:
+        if f['kind'] != 'ramp': continue
+        span = (f['b'] - f['a']) % n + 1
+        k = (i - f['a']) % n
+        if k < span: return f['h'] * min(1.0, max(0.0, (k + t) / span))
+    return 0.0
 def point(s, lat=0.0):
-    """centreline point at progress s, moved `lat` units to the left on the banked surface"""
+    """centreline point at progress s, moved `lat` units to the left on the banked surface (ramps included)"""
     n, step = T['n'], T['step']; s %= T['length']; f = s / step; i = int(f) % n; j = (i + 1) % n; t = f - int(f)
     bk = T['bk'][i] + (T['bk'][j] - T['bk'][i]) * t
     return (T['x'][i] + (T['x'][j] - T['x'][i]) * t - T['ty'][i] * lat, T['y'][i] + (T['y'][j] - T['y'][i]) * t + T['tx'][i] * lat,
-            T['z'][i] + (T['z'][j] - T['z'][i]) * t - lat * bk, T['tx'][i], T['ty'][i])
+            T['z'][i] + (T['z'][j] - T['z'][i]) * t - lat * bk + ramp_lift(i, t), T['tx'][i], T['ty'][i])
 def bank(s):
     n, step = T['n'], T['step']; s %= T['length']; i = int(s / step) % n
     return T['bk'][i]
@@ -54,6 +71,7 @@ def bank(s):
 s0 = FRAC * T['length']
 LAT = float(os.environ.get('LAT', '0'))
 cx, cy_, cz, tx, ty = point(s0, LAT)
+cz += float(os.environ.get('AIR', '0'))       # AIR=150: our car in the air off a jump (the camera follows it up)
 car_yaw = math.atan2(ty, tx)
 back, up, pitch, sback = CAMS[PRESET]
 ax, ay, az, _, _ = point(s0 + 500 + 900 * 0.5)
@@ -94,14 +112,17 @@ if PRESET == 'fly':
         hw0 = T['hw'][int((sg % T['length']) / T['step']) % T['n']]
         gx, gy, gz, gtx, gty = point(sg, -(col - 1.5) * hw0 * 0.46)
         m = os.path.join(OUT, 'models/spr/cars/%s.vmdl' % keys[(k * 7) % 4])
-        tris += load_smd(m.replace('.vmdl', '.smd'), load_vmdl_mats(m), off=(gx, gy, gz), yaw=math.atan2(gty, gtx))
+        tris += load_smd(m.replace('.vmdl', '.smd'), car_mats(m, 't' if k % 2 == 0 else 'ct'), off=(gx, gy, gz), yaw=math.atan2(gty, gtx))
 else:
-    tris += load_smd(cm.replace('.vmdl', '.smd'), load_vmdl_mats(cm), off=(cx, cy_, cz), yaw=car_yaw)
-# a few more cars ahead
-for k, (ds, lat, key) in enumerate(((700, 120, 'hornet'), (1300, -100, 'bastion'), (2100, 60, 'comet'), (3000, -140, 'meteor'))):
+    tris += load_smd(cm.replace('.vmdl', '.smd'), car_mats(cm, os.environ.get('SKIN')), off=(cx, cy_, cz), yaw=car_yaw)
+# more cars: PACK="ds:lat:car:skin;..." (ds ahead of ours, lat to the left), else a few ahead in the default colours
+pack = [tuple(c.split(':')) for c in os.environ['PACK'].split(';')] if os.environ.get('PACK') else \
+    [(700, 120, 'hornet', ''), (1300, -100, 'bastion', ''), (2100, 60, 'comet', ''), (3000, -140, 'meteor', '')]
+for ds, lat, key, skin in pack:
+    ds, lat = float(ds), float(lat)
     px, py, pz, ptx, pty = point(s0 + ds, lat)
     m = os.path.join(OUT, 'models/spr/cars/%s.vmdl' % key)
-    tris += load_smd(m.replace('.vmdl', '.smd'), load_vmdl_mats(m), off=(px, py, pz), yaw=math.atan2(pty, ptx))
+    tris += load_smd(m.replace('.vmdl', '.smd'), car_mats(m, skin), off=(px, py, pz), yaw=math.atan2(pty, ptx))
 
 img = np.zeros((H, W, 3), np.float32)
 yy, xx = np.mgrid[0:H, 0:W]

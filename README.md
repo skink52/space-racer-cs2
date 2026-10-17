@@ -42,6 +42,7 @@ Everything here is original work: the name, cars, tracks, art, sounds and rules.
 | `test/` | `sim.cjs` runs bot races on the pure game; `mock_cs2.mjs` runs the real script on a stand-in cs_script API; `tsconfig.json` + `point_script.d.ts` type-check it against Valve's API. |
 | `preview/` | Pictures of the tracks, skies, cars (`car_angles.png`), loading screen, HUD (`hud_render.py` lays the real HUD out like Panorama would, draws it at 16:9, ultrawide and 4:3, and fails the build if a panel breaks the layout rules or sits under CS2's own chat, kill feed, team counter or money / health row; `hud_cs2.png` marks those places), and `chase_view.py`: a software render of the racer's view from the chase camera (sky, banking and all). |
 | `docs/` | `DESIGN.md` (the game), `TESTING.md` (first run in CS2), `WORKSHOP_COMPLIANCE.md`, the notes that ship with the addon. |
+| `workshop/` | The Steam Workshop page: preview icon, eight screenshots and the description in Steam's BBCode (`workshop/README.md`). |
 | `ref/` | The Hammer map template the build writes into, and the stock sound-events file. |
 
 ## Building

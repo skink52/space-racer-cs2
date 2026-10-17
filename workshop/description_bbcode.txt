@@ -1,0 +1,83 @@
+[h1]SPACE RACER — 32-car anti-grav racing in CS2[/h1]
+
+[b]Up to 64 players race at once in two arenas on eight original tracks.[/b] You get boost pads, banked bends, jump ramps, a spiral loop, spin attacks and turbo starts, and the podium collects real CS2 kills. Retro pixel art and chiptune music throughout. No server plugins: the whole game runs inside the map.
+
+[hr][/hr]
+
+[h2]How a round works[/h2]
+[list]
+[*][b]Pick your car[/b] in the lobby while the camera circles the next track.
+[*][b]Line up on the grid.[/b] Everyone on T or CT races together. With 33–64 players there are two arenas on two different tracks, each with the same T/CT split. You can still swap cars during the 10-second countdown, up to 3 seconds before the lights.
+[*][b]Race 2–3 laps.[/b] Press W on the last beep for a turbo start. Hold W too early and you stall.
+[*][b]The top 3 survive.[/b] Everyone else takes a CS2 death, and those kills go to the podium (50% / 30% / 20%). If you wreck someone with an attack, that kill is yours on the spot.
+[*][b]Your team scores with every place.[/b] The CS2 round goes to the side with more cars in the top 8, counted over both arenas.
+[*][b]Rounds are locked.[/b] Latecomers watch: they can switch cars and arenas, and they race next round.
+[/list]
+
+[h2]Four cars[/h2]
+[list]
+[*][b]HORNET (Drift Charge)[/b]: light and sharp. Drifting fills charge fast, and its spin attack is cheap.
+[*][b]METEOR (Ram)[/b]: heavy and fast in a straight line. Bumps hurt the other car, not you.
+[*][b]COMET (Afterburn)[/b]: the biggest charge tank and the strongest boost, and boost pads last longer.
+[*][b]BASTION (Slipstream)[/b]: the toughest shield. Drafting fills its charge twice as fast and repairs it.
+[/list]
+Each car shows its speed, acceleration, turning, shield and charge on the picker cards. Your choice is remembered between rounds.
+
+[h2]Eight original tracks[/h2]
+[list]
+[*][b]Solar Oval[/b]: a huge speedway at sunset, with an elevated back straight, a chicane and a tube.
+[*][b]Hairpin Harbour[/b]: long straights and banked hairpins climbing terrace by terrace, then down through the harbour tube.
+[*][b]Crosswire[/b]: a neon figure-8. One pass spirals a full loop round the crossing while the other threads through underneath it.
+[*][b]Null Gap[/b]: narrow, rail-less roads over the void that roll like a roller coaster. Mind the gap.
+[*][b]Switchback Spire[/b]: four stacked switchbacks to the summit, a long banked sweep, then a dive through a tube.
+[*][b]Ringworld[/b]: a figure-8 among giant rings. One pass is a bridge high above, and the other runs under it through a tube.
+[*][b]Skyway[/b]: a stadium high over a sea of clouds, with steep banking and a jump on each straight. Hit the jumps fast or drop in.
+[*][b]Helix[/b]: a 1.5-turn spiral climbing into the sky, then a banked dive home through a tube.
+[/list]
+Each track has its own pixel-art sky, scenery, start gantry, sector gates and billboards. Lap records are kept while the map runs and shown in the lobby.
+
+[h2]The racing[/h2]
+[list]
+[*][b]Shield is your health and charge is your boost.[/b] When your shield hits zero you are wrecked and out.
+[*][b]Boost pads[/b] give free speed. [b]Charge platforms[/b], on the slower lines, refill charge and shield.
+[*][b]Drafting[/b] behind another car trickles in charge (twice as fast behind a teammate, so convoys pay off), and [b]drifting[/b] (Space) fills it a little.
+[*][b]Spin attack[/b] (Mouse 2) knocks rivals around and costs charge.
+[*][b]The Pulse[/b] is a wave that sweeps from the back of the field to the front once a lap and tops up everyone it passes.
+[*][b]Banked bends[/b] grip harder. [b]Jump ramps[/b] throw you over open gaps. [b]Rail-less sections[/b] let you fall off: that costs shield and a reset.
+[*]The race ends when everyone is home, 30 seconds after the winner, or at 5 minutes (ranked by distance).
+[/list]
+
+[h2]Made for CS2 servers[/h2]
+[list]
+[*]It runs entirely as a cs_script inside the map: no plugins and nothing else to install.
+[*]Up to 64 players. CS2 bots race too, using the map's own driving AI ([i]bot_quota[/i] fills the grid).
+[*]Real kills on the kill feed and scoreboard, and real T vs CT round wins.
+[*]It has its own AFK check: idle drivers sit out until they press a key or type !back.
+[*]CS2's chat and kill feed stay readable. The HUD keeps clear of them.
+[/list]
+
+[h2]Retro all the way[/h2]
+Pixel-art tracks, cities, asteroids and skies in one 32-colour palette. The pixel-font HUD shows your position, lap, live team score, a minimap with every car, lap timer and best lap, standings, shield, charge and speed, plus a results board with times and gaps. CRT scanlines are optional. All sound effects are chiptune, and there are four original music pieces.
+
+[h2]Controls[/h2]
+[list]
+[*][b]W / S[/b]: accelerate / brake and reverse
+[*][b]A / D[/b]: steer (in the lobby: pick your car)
+[*][b]Mouse 1[/b]: boost (uses charge)
+[*][b]Mouse 2[/b]: spin attack (uses charge)
+[*][b]Space[/b]: drift (fills charge)
+[*]While watching: [b]Mouse 1 / Mouse 2[/b] next / previous car, [b]E[/b] next arena
+[/list]
+[b]Chat:[/b] !car 1-4 (or a car's name), !cam (high / far / near camera), !tilt (camera lean on/off), !crt (scanlines on/off), !music, !spec, !afk, !back, !race (controls on your screen)
+
+[h2]Server notes[/h2]
+[list]
+[*]The map sets the cvars it needs: respawn on, teammates are enemies (no teamkill penalties), buying off, radar off.
+[*]On servers with plugins, turn these off for this map: AFK kickers, no-respawn and spawn-protection plugins, teamkill punishment, plugins that control rounds or round cvars, loadout or knife plugins, and noblock / anti-stuck / third-person plugins. Also check that no other plugin uses the chat commands above.
+[/list]
+
+[hr][/hr]
+[h2]Credits[/h2]
+Made by skink52. All cars, tracks, art, music and sound are original. The code was written by an AI coding agent (Claude, by Anthropic) under skink52's direction.
+Source: [url=https://github.com/skink52/space-racer-cs2]github.com/skink52/space-racer-cs2[/url]. Code is MIT; art and sound are CC BY 4.0.
+Not affiliated with or endorsed by Valve or any racing-game publisher.

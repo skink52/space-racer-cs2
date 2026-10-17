@@ -12,8 +12,8 @@ import os, re, sys, json
 import xml.etree.ElementTree as ET
 from PIL import Image, ImageDraw, ImageFont
 
-OUT, BG, PREFIX = sys.argv[1], sys.argv[2], sys.argv[3]
-IMGDIR = os.path.join(OUT, 'panorama/images/custom_game/spr')
+OUT = IMGDIR = ROOT = RULES = HT = None     # set by init() (importable: preview/workshop_shots.py lays out the HUD too)
+BYID = {}
 H = 1080
 FONT = '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf'
 
@@ -72,13 +72,18 @@ def load(out):
     css = open(os.path.join(out, 'panorama/styles/custom_game', name[:-4] + '.css')).read()
     return Node(top, None), parse_css(css)
 
-ROOT, RULES = load(OUT)
-BYID = {}
 def index(n):
     if n.id: BYID[n.id] = n
     for k in n.kids: index(k)
-index(ROOT)
-HT = json.load(open(os.path.join(OUT, '_gen/hud_text.json')))
+
+def init(out):
+    """read the generated layout, css and text table of the addon in `out`"""
+    global OUT, IMGDIR, ROOT, RULES, HT
+    OUT = out
+    IMGDIR = os.path.join(OUT, 'panorama/images/custom_game/spr')
+    ROOT, RULES = load(OUT)
+    BYID.clear(); index(ROOT)
+    HT = json.load(open(os.path.join(OUT, '_gen/hud_text.json')))
 
 def style(node):
     st = {}
@@ -344,23 +349,29 @@ def check(W, state):
     layout(ROOT, 0, 0, W, H, 1.0, items, W)
     zone_check(items, W, state)
 
-shots = []
-race_state(); img = render(1920, BG, PREFIX + '_race.png'); shots.append(img)
-zones_picture(img, 1920, 'race', PREFIX + '_cs2.png')
-race_state(); render(2333, BG, PREFIX + '_race_wide.png')
-race_state(); render(1440, BG, PREFIX + '_race_43.png')
-race_state(grid=True); shots.append(render(1920, BG, PREFIX + '_grid.png'))
-lobby_state(); shots.append(render(1920, BG, PREFIX + '_lobby.png'))
-race_state(results=True); render(1920, BG, PREFIX + '_results.png')
-help_state(); render(1920, BG, PREFIX + '_help.png')
-for W in (1920, 2333):           # 16:9 and Zach's wide screen
-    race_state(); check(W, 'race')
-    race_state(grid=True); check(W, 'grid')
-    race_state(results=True); check(W, 'results')
-    lobby_state(); check(W, 'lobby')
-    help_state(); check(W, 'help')
-seen = set()
-for p in problems:
-    if p not in seen: seen.add(p); print('LAYOUT:', p)
-print('hud render ->', PREFIX + '_*.png', '(%d layout notes)' % len(seen))
-sys.exit(1 if seen else 0)
+def main():
+    global BG, PREFIX
+    init(sys.argv[1]); BG, PREFIX = sys.argv[2], sys.argv[3]
+    shots = []
+    race_state(); img = render(1920, BG, PREFIX + '_race.png'); shots.append(img)
+    zones_picture(img, 1920, 'race', PREFIX + '_cs2.png')
+    race_state(); render(2333, BG, PREFIX + '_race_wide.png')
+    race_state(); render(1440, BG, PREFIX + '_race_43.png')
+    race_state(grid=True); shots.append(render(1920, BG, PREFIX + '_grid.png'))
+    lobby_state(); shots.append(render(1920, BG, PREFIX + '_lobby.png'))
+    race_state(results=True); render(1920, BG, PREFIX + '_results.png')
+    help_state(); render(1920, BG, PREFIX + '_help.png')
+    for W in (1920, 2333):           # 16:9 and Zach's wide screen
+        race_state(); check(W, 'race')
+        race_state(grid=True); check(W, 'grid')
+        race_state(results=True); check(W, 'results')
+        lobby_state(); check(W, 'lobby')
+        help_state(); check(W, 'help')
+    seen = set()
+    for p in problems:
+        if p not in seen: seen.add(p); print('LAYOUT:', p)
+    print('hud render ->', PREFIX + '_*.png', '(%d layout notes)' % len(seen))
+    sys.exit(1 if seen else 0)
+
+if __name__ == '__main__':
+    main()

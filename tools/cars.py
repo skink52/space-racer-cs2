@@ -12,8 +12,8 @@ import s2
 import retro
 from retro import *
 
-OUT = sys.argv[1]
-PREVIEW = sys.argv[2] if len(sys.argv) > 2 else None
+OUT = sys.argv[1] if __name__ == '__main__' else None          # (importable: tools/workshop.py renders the cars too)
+PREVIEW = sys.argv[2] if len(sys.argv) > 2 and __name__ == '__main__' else None
 VOX = 3.4                      # units per voxel (a Hornet is about 115 units long)
 HOVER = 12                     # units the hull floats above the road
 MDIR = 'models/spr/cars'
@@ -453,4 +453,5 @@ def main():
         rear.save(PREVIEW.replace('.png', '_rear.png'))
     print('car models written:', sum(len(v) for v in models.values()), 'fx', len(fx))
 
-main()
+if __name__ == '__main__':
+    main()
