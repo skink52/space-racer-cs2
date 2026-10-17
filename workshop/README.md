@@ -6,14 +6,14 @@ Everything for the Workshop page, ready to upload.
 |---|---|
 | `icon.png` | The preview image (1024 x 1024; Steam shrinks it for lists). |
 | `screenshot_1_loop.png` | Crosswire: driving into the spiral loop, the exit deck overhead (race HUD). |
-| `screenshot_2_pack.png` | Solar Oval just after a turbo start: a pack of cars, boosting. |
+| `screenshot_2_pack.png` | Solar Oval early in a race: a pack of cars, boosting, just topped up by the Pulse. |
 | `screenshot_3_jump.png` | Skyway: in the air over a jump gap, the landing ahead. |
 | `screenshot_4_grid.png` | The grid flyover with the small car picker and the countdown line. |
 | `screenshot_5_results.png` | The results board at the end of a race. |
 | `screenshot_6_lobby.png` | The lobby: the four car cards over the next track. |
 | `screenshot_7_tracks.png` | All eight tracks from the driver's seat. |
-| `screenshot_8_info.png` | The map's own loading screen (cars, tracks, controls). |
-| `description_bbcode.txt` | The page text, in Steam's BBCode (about 6,100 of the 8,000 characters allowed). |
+| `screenshot_8_info.png` | The map's own loading screen: the first of its four slides (controls and the four cars). |
+| `description_bbcode.txt` | The page text, in Steam's BBCode (about 6,400 of the 8,000 characters allowed). |
 
 All pictures are PNGs under Steam's 1 MB limit.
 

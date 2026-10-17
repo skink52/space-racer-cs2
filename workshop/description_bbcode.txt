@@ -1,14 +1,14 @@
 [h1]SPACE RACER — 32-car anti-grav racing in CS2[/h1]
 
-[b]Up to 64 players race at once in two arenas on eight original tracks.[/b] You get boost pads, banked bends, jump ramps, a spiral loop, spin attacks and turbo starts, and the podium collects real CS2 kills. Retro pixel art and chiptune music throughout. No server plugins: the whole game runs inside the map.
+[b]Up to 64 players race at once in two arenas on eight original tracks.[/b] You get boost pads, banked bends, jump ramps, a spiral loop and spin attacks, and the podium collects real CS2 kills. Retro pixel art and chiptune music throughout. No server plugins: the whole game runs inside the map.
 
 [hr][/hr]
 
 [h2]How a round works[/h2]
 [list]
-[*][b]Pick your car[/b] in the lobby while the camera circles the next track.
+[*][b]Pick your car[/b] in the lobby while the camera circles the next track. After that the picker stays out of the way: type [b]!car[/b] to bring it back.
 [*][b]Line up on the grid.[/b] Everyone on T or CT races together. With 33–64 players there are two arenas on two different tracks, each with the same T/CT split. You can still swap cars during the 10-second countdown, up to 3 seconds before the lights.
-[*][b]Race 2–3 laps.[/b] Press W on the last beep for a turbo start. Hold W too early and you stall.
+[*][b]Race 2–3 laps.[/b] Three beeps, then GO. Hold W too early and you stall.
 [*][b]The top 3 survive.[/b] Everyone else takes a CS2 death, and those kills go to the podium (50% / 30% / 20%). If you wreck someone with an attack, that kill is yours on the spot.
 [*][b]Your team scores with every place.[/b] The CS2 round goes to the side with more cars in the top 8, counted over both arenas.
 [*][b]Rounds are locked.[/b] Latecomers watch: they can switch cars and arenas, and they race next round.
@@ -21,7 +21,7 @@
 [*][b]COMET (Afterburn)[/b]: the biggest charge tank and the strongest boost, and boost pads last longer.
 [*][b]BASTION (Slipstream)[/b]: the toughest shield. Drafting fills its charge twice as fast and repairs it.
 [/list]
-Each car shows its speed, acceleration, turning, shield and charge on the picker cards. Your choice is remembered between rounds.
+Each car shows its speed, acceleration, turning, shield and charge on the picker cards. Your choice is remembered between rounds. The light cars win a little more often; the heavy ones wreck more rivals.
 
 [h2]Eight original tracks[/h2]
 [list]
@@ -41,7 +41,7 @@ Each track has its own pixel-art sky, scenery, start gantry, sector gates and bi
 [*][b]Shield is your health and charge is your boost.[/b] When your shield hits zero you are wrecked and out.
 [*][b]Boost pads[/b] give free speed. [b]Charge platforms[/b], on the slower lines, refill charge and shield.
 [*][b]Drafting[/b] behind another car trickles in charge (twice as fast behind a teammate, so convoys pay off), and [b]drifting[/b] (Space) fills it a little.
-[*][b]Spin attack[/b] (Mouse 2) knocks rivals around and costs charge.
+[*][b]Spin attack[/b] (Mouse 2) hits anyone alongside and shoves them across the road, often into the rail. A heavier car shoves harder. It costs charge.
 [*][b]The Pulse[/b] is a wave that sweeps from the back of the field to the front once a lap and tops up everyone it passes.
 [*][b]Banked bends[/b] grip harder. [b]Jump ramps[/b] throw you over open gaps. [b]Rail-less sections[/b] let you fall off: that costs shield and a reset.
 [*]The race ends when everyone is home, 30 seconds after the winner, or at 5 minutes (ranked by distance).
@@ -62,13 +62,13 @@ Pixel-art tracks, cities, asteroids and skies in one 32-colour palette. The pixe
 [h2]Controls[/h2]
 [list]
 [*][b]W / S[/b]: accelerate / brake and reverse
-[*][b]A / D[/b]: steer (in the lobby: pick your car)
+[*][b]A / D[/b]: steer (and change car while the car picker is up)
 [*][b]Mouse 1[/b]: boost (uses charge)
 [*][b]Mouse 2[/b]: spin attack (uses charge)
 [*][b]Space[/b]: drift (fills charge)
 [*]While watching: [b]Mouse 1 / Mouse 2[/b] next / previous car, [b]E[/b] next arena
 [/list]
-[b]Chat:[/b] !car 1-4 (or a car's name), !cam (high / far / near camera), !tilt (camera lean on/off), !crt (scanlines on/off), !music, !spec, !afk, !back, !race (controls on your screen)
+[b]Chat (! or /):[/b] !car (the car picker), !car 1-4 or a car's name (pick straight away), !cam (high / far / near camera), !tilt (camera lean on/off), !crt (scanlines on/off), !music, !spec, !afk, !back, !help (controls on your screen)
 
 [h2]Server notes[/h2]
 [list]

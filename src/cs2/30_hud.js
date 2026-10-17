@@ -127,6 +127,7 @@ function pct(v, max) { return 'w' + clamp(Math.round(v / Math.max(1, max) * 20),
 // false = none
 function hudPicker(slot, pe, show) {
   const mini = show === 'mini';
+  pe.pickShown = !!show;                 // A / D change the car only while the cards are up
   hudSwap(slot, 'spr_root', show ? (mini ? 'stPickMini' : 'stPick') : null, 'pick');
   if (!show) return;
   const side = pe.csTeam === 2 ? 't' : pe.csTeam === 3 ? 'ct' : 'neutral';
@@ -287,4 +288,8 @@ function hudLobby(slot, info) {
 
 function hudHelp(slot, on) { hudSwap(slot, 'spr_root', on ? 'stHelp' : null, 'help'); }
 // player options on the outer panel: CRT scanlines off
-function hudOptions(slot, pe) { hudSwap(slot, 'spr_opts', pe.crt === false ? 'nocrt' : null, 'crt'); }
+// per-player switches, refreshed with every HUD update: scanlines (!crt), and the help panel while !help asked for it
+function hudOptions(slot, pe) {
+  hudSwap(slot, 'spr_opts', pe.crt === false ? 'nocrt' : null, 'crt');
+  hudHelp(slot, (pe.helpUntil || 0) > Instance.GetGameTime());
+}

@@ -13,6 +13,7 @@ class Car {
     this.cmd = { throttle: 0, steer: 0, boost: false, drift: false, spin: false };
     this.padTimer = 0; this.boosting = false; this.drifting = false; this.sliding = false; this.onCharge = false; this.slick = false;
     this.draft = null; this.spinTimer = 0; this.spinCd = 0; this.spinYaw = 0; this.hitCd = 0; this.ghost = 0;
+    this.stagger = 0; this.knockCd = 0;   // skidding after a spin hit; no second shove from the same spin
     this.seg = 0; this.t = 0; this.d = 0; this.s = 0; this.prevS = 0; this.rawLap = 0; this.lapsDone = 0; this.nextCp = 1; this.total = 0;
     this.lapStart = 0; this.bestLap = 0; this.lastLap = 0;
     this.finishPos = 0; this.finishTime = 0; this.wreckTotal = 0; this.wreckTime = 0; this.stateTime = 0;
@@ -63,6 +64,13 @@ class Car {
     }
     c.spin = false;
     if (this.spinTimer > 0) { this.spinTimer -= dt; this.spinYaw += dt * (4 * Math.PI / RULES.spinTime); if (this.spinTimer <= 0) this.spinYaw = 0; }
+    if (this.knockCd > 0) this.knockCd -= dt;
+    if (this.stagger > 0) {
+      // skidding after a spin hit: the tail swings from side to side, less and less
+      this.stagger -= dt;
+      const k = Math.max(0, this.stagger) / RULES.spinStagger;
+      if (this.spinTimer <= 0) this.spinYaw = this.stagger > 0 ? Math.sin((RULES.spinStagger - this.stagger) * 22) * 0.4 * k : 0;
+    }
     // heading
     let fx = Math.cos(this.yaw), fy = Math.sin(this.yaw);
     this.vf = this.vx * fx + this.vy * fy;
@@ -71,6 +79,7 @@ class Car {
     if (this.drifting) turnRate *= 1.45;
     if (this.slick) turnRate *= 0.8;
     if (this.spinTimer > 0) turnRate *= 0.3;
+    if (this.stagger > 0) turnRate *= RULES.staggerSteer;
     if (!air) turnRate *= 1 + Math.abs(this.bank) * RULES.bankTurn;   // banked bends turn tighter
     if (air) turnRate *= RULES.airControl;
     const yawRate = turnRate * steer * (this.vf < 0 ? -1 : 1);       // radians per second, + = turning left
@@ -102,6 +111,7 @@ class Car {
     let grip = this.drifting ? sp.driftGrip : sp.grip;
     if (this.slick) grip *= RULES.slickGrip;
     if (this.spinTimer > 0) grip *= 0.5;
+    if (this.stagger > 0) grip *= RULES.staggerGrip;
     if (!air) grip *= 1 + Math.abs(this.bank) * RULES.bankGrip;        // ... and hold the car better
     const g = air ? 1 : Math.exp(-grip * dt);
     this.sliding = Math.abs(vl) > 90 && absv > 300;
@@ -283,14 +293,38 @@ class Car {
 }
 
 // ---------------------------------------------------------------- pairs
-// bumps between two solid cars: separate them, swap momentum by mass, shield damage from the closing speed
+// a spin attack landing: the other car is shoved sideways, away from the attacker (harder by a heavier car, less
+// into a heavier one), loses a little speed and skids for a moment, so the shove carries it across the road - often
+// into the rail. Once per spin: a car just shoved can't be shoved again for 0.4 s.
+function spinHit(att, vic, nx, ny) {
+  if (vic.knockCd > 0) return false;
+  const lx = -Math.sin(vic.yaw), ly = Math.cos(vic.yaw);            // the victim's left
+  const side = nx * lx + ny * ly >= 0 ? 1 : -1;                      // the attacker is on the other side
+  const k = RULES.spinKnock * att.spec.mass / vic.spec.mass;
+  vic.vx = vic.vx * (1 - RULES.spinSlow) + lx * side * k;
+  vic.vy = vic.vy * (1 - RULES.spinSlow) + ly * side * k;
+  vic.stagger = RULES.spinStagger; vic.knockCd = 0.4;
+  return true;
+}
+
+// two solid cars. A spinning car hits anything within its reach (a car swinging round sweeps further than its body),
+// touching or not, moving closer or not. Bodies that touch are separated and swap momentum by mass, with shield
+// damage from the closing speed. Returns [attacker, victim] when a spin attack landed.
 function collideCars(a, b, tic) {
+  if (Math.abs(a.z - b.z) > 60) return null;
   const dx = b.x - a.x, dy = b.y - a.y;
   const dist2 = dx * dx + dy * dy;
   const R = CAR_R * 2;
-  if (dist2 >= R * R || Math.abs(a.z - b.z) > 60) return;
+  const aSpin = a.spinTimer > 0, bSpin = b.spinTimer > 0;
+  const reach = aSpin !== bSpin ? R + RULES.spinReach : R;
+  if (dist2 >= reach * reach) return null;
   const dist = Math.sqrt(dist2) || 0.01;
   const nx = dx / dist, ny = dy / dist;
+  let hit = null;
+  if (aSpin && !bSpin && b.noDamage <= 0 && spinHit(a, b, nx, ny)) { b.damage(RULES.spinDamage, a, tic); b.hitCd = 0.25; hit = [a, b]; }
+  else if (bSpin && !aSpin && a.noDamage <= 0 && spinHit(b, a, -nx, -ny)) { a.damage(RULES.spinDamage, b, tic); a.hitCd = 0.25; hit = [b, a]; }
+  if (hit) { a.fx |= 1; b.fx |= 1; }
+  if (dist >= R) return hit;
   const ma = a.spec.mass, mb = b.spec.mass, msum = ma + mb;
   const over = R - dist;
   a.x -= nx * over * (mb / msum); a.y -= ny * over * (mb / msum);
@@ -305,11 +339,12 @@ function collideCars(a, b, tic) {
     let da = base, db = base;
     if (a.spec.ram > 1) { db *= a.spec.ram; da /= a.spec.ram; }
     if (b.spec.ram > 1) { da *= b.spec.ram; db /= b.spec.ram; }
-    if (a.spinTimer > 0 && b.spinTimer <= 0 && b.noDamage <= 0) { db = Math.max(db, RULES.spinDamage); da = 0; b.vx += nx * RULES.spinKnock / mb; b.vy += ny * RULES.spinKnock / mb; }
-    else if (b.spinTimer > 0 && a.spinTimer <= 0 && a.noDamage <= 0) { da = Math.max(da, RULES.spinDamage); db = 0; a.vx -= nx * RULES.spinKnock / ma; a.vy -= ny * RULES.spinKnock / ma; }
-    else if (a.spinTimer > 0 && b.spinTimer > 0) { da = db = RULES.spinDamage; }
+    if (aSpin && !bSpin) da = 0;                 // the spinner takes no bump damage (its hit was dealt above)
+    else if (bSpin && !aSpin) db = 0;
+    else if (aSpin && bSpin && a.noDamage <= 0 && b.noDamage <= 0) { da = db = RULES.spinDamage; }   // two spins meet
     if (a.hitCd <= 0 && da > 0) { a.damage(da, b, tic); a.hitCd = 0.25; }
     if (b.hitCd <= 0 && db > 0) { b.damage(db, a, tic); b.hitCd = 0.25; }
     if (da > 0 || db > 0) { a.fx |= 1; b.fx |= 1; }
   }
+  return hit;
 }

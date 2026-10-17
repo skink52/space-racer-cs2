@@ -125,8 +125,10 @@ class Arena {
       for (let j = i + 1; j < cars.length; j++) {
         const b = cars[j];
         if (!b.solid) continue;
-        if (Math.abs(a.x - b.x) > CAR_R * 2 || Math.abs(a.y - b.y) > CAR_R * 2) continue;
-        collideCars(a, b, this.raceTic);
+        const near = CAR_R * 2 + (a.spinTimer > 0 || b.spinTimer > 0 ? RULES.spinReach : 0);
+        if (Math.abs(a.x - b.x) > near || Math.abs(a.y - b.y) > near) continue;
+        const hit = collideCars(a, b, this.raceTic);
+        if (hit) this.events.push({ type: 'spinHit', attacker: hit[0], car: hit[1] });
       }
     }
     // wrecks, finishes, departures

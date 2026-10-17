@@ -30,24 +30,41 @@ top 8.
 ## Cars
 
 Every player picks one of four cars; the choice is remembered between rounds and can be changed any time you are
-not racing (A / D keys, or `!car 1-4`). The cars differ in feel and in one signature perk. Nobody gets more total
-"stat"; they trade speed for armour and so on.
+not racing. The car picker comes up by itself only until you have chosen (A / D in the picker, or `!car 1-4`) or
+raced once - in the lobby and as small cards on the grid - so it never covers the results. After that `!car` (or
+`/car`, `!pick`) brings it back for 6 seconds (every A / D press keeps it up), and `!car 1-4` or a car's name picks
+straight away; A / D only change the car while the picker is on screen. The cars differ in feel and in one
+signature perk. Nobody gets more total "stat"; they trade speed for armour and so on.
 
 | | HORNET | METEOR | COMET | BASTION |
 |---|---|---|---|---|
 | Style | light, agile | heavy, rams | boost specialist | tank, team player |
-| Top speed | 1065 | 1090 | 1040 | 1035 |
-| Acceleration | 640 | 495 | 525 | 550 |
+| Top speed | 1065 | 1090 | 1040 | 1043 |
+| Acceleration | 640 | 515 | 525 | 550 |
 | Turning | sharpest | widest | medium | medium |
-| Shield | 90 | 110 | 100 | 130 |
+| Shield | 105 | 110 | 105 | 130 |
+| Mass (bumps, spin shoves) | 1.0 | 1.6 | 1.0 | 1.3 |
 | Charge capacity | 100 | 100 | 130 | 100 |
-| Boost strength | +30% | +28% | +40% | +33% |
+| Boost strength | +32% | +28% | +40% | +33% |
 | Spin attack cost | 18 | 30 | 30 | 30 |
 | Perk | **Drift charge**: drifting (hold Space) fills charge twice as fast; cheap spin attack | **Ram**: contact deals double damage to the other car and half to the Meteor; 1.6x mass, so it shoves | **Afterburn**: boost pads last 40% longer; charge platforms fill it 30% faster | **Slipstream**: drafting behind any car fills charge at double rate and repairs the shield; teammates drafting *it* get the convoy bonus |
 
-The numbers were tuned in `test/sim.cjs` (bot races on the big v0.3 tracks) so that every car wins some races and
-the average finishing positions are within a place of each other; the Hornet and Comet wreck most (light, and the
-Comet boosts into traffic), the Bastion almost never. Tune in `CARS` in `src/core/00_defs.js`.
+The numbers are tuned in `test/sim.cjs` (`node test/sim.cjs 64 100 even,seed=71`: bot races with the same number
+of each car) towards one shape: the light, fast cars win a little more often, the heavy ones wreck more rivals and
+finish in the top 8 more steadily. 17 Oct, 400 races of 32 at bot skill 0.5:
+
+| per 100 starts | HORNET | METEOR | COMET | BASTION |
+|---|---|---|---|---|
+| wins | 3.4 | 2.8 | 3.8 | 2.6 |
+| podiums | 10.5 | 8.9 | 8.6 | 9.5 |
+| top 8 | 24 | 26 | 21 | 29 |
+| average place (of 32) | 16.9 | 15.6 | 17.9 | 15.6 |
+| wrecked | 13 | 2.5 | 13 | 0.8 |
+| rivals wrecked (KO) | 4.6 | 11.6 | 4.2 | 8.4 |
+
+(An even share would be 3.1 wins per 100 starts.) About 2.3 wrecks a race, nearly all of them knock-outs. The same
+shape holds with skilled (0.85) and weak (0.25) bots, the fast cars' lead in wins a little smaller. Tune in `CARS`
+in `src/core/00_defs.js`.
 
 Speeds are CS2 units per second (a player sprinting is 250). A full-speed car crosses a 640-unit-wide track in
 under a second.
@@ -68,8 +85,13 @@ under a second.
   (a lot in a Hornet).
 - **Slipstream**: directly behind another car (within ~300 units, in a 20 degree cone) you get less drag and a
   trickle of charge. Teammates (same CS2 side) in each other's slipstream get the trickle doubled (**convoy**).
-- **Spin attack** (Mouse 2): costs 25 charge, 2 second cooldown. The car spins for half a second; anything it touches
-  takes 30 shield damage and is knocked sideways. The attacker is not immune to the rail.
+- **Spin attack** (Mouse 2): costs 30 charge (18 in a Hornet), 3 second cooldown. The car spins for half a second,
+  and any car within its reach - touching, or a little further, as the tail swings round - takes 20 shield and is
+  shoved sideways, away from the attacker: its speed changes by 480 x attacker mass / its own mass, it loses 12%
+  of its speed and it skids for 0.55 s (a quarter of its grip, half its steering), so the shove carries it across
+  the road, often into the rail. A Meteor shoves a Hornet about 220 units, a Hornet shoves a Meteor about 100
+  (`node test/spin_test.cjs` prints them all). Before 17 Oct a spin only hit a car it was closing on, and grip
+  killed the shove within a few frames (about 35 units). The attacker is not immune to the rail.
 - **Contact**: cars are solid. Bumps exchange momentum by mass and cost both cars shield in proportion to the
   closing speed (0 to about 20 per hit). Being hit never stops you outright, it pushes you.
 - **Wreck**: shield 0 means a wreck — explosion, car gone, placed behind everyone still racing. If another player
@@ -85,13 +107,17 @@ under a second.
   The car and the camera lean with the road.
 - **Tubes**: some sections run through octagonal tubes with neon strips that stream past; the camera drops and
   closes in inside them. Ringworld's lower pass runs through a tube under the bridge.
-- **Turbo start**: press W during the last half-second before GO for a launch (an instant kick and a pad-strength
-  boost for a second). Holding W down since long before GO stalls the engine for half a second. Bots get it
-  sometimes, more often the better they are.
+- **Turbo start** (a secret: nothing in the game or on the Workshop page tells players): press W on the third beep,
+  or any time after it, and hold it to GO for a launch (an instant kick and a pad-strength boost for a second). The
+  beeps come 3, 2 and 1 seconds before GO (the third one higher); the window opens 1.25 s before GO, so a press on
+  the beat counts even with ping and reaction time. Holding W since before the second beep stalls the engine for
+  half a second ("TOO EARLY - ENGINE STALLED"). Bots get it sometimes, more often the better they are.
+  `node test/turbo_test.cjs` checks the timing. (Before 17 Oct the window was the last 0.45 s, so a press on the
+  third beep did nothing.)
 - **Lap records**: the best lap on each track since the map loaded is shown in the lobby ("RECORD 0:24.31 NAME")
   and announced in chat at the end of the race that set it.
 - **Slick zones**: on some tracks, a strip where grip drops to 30% (purple and pink wavy bands).
-- **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (1.5/s), so a race is lost
+- **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (2.2/s), so a race is lost
   to sustained aggression, not to attrition. Bumps below a closing speed of 250 are free; the first 3 seconds after
   the lights are damage-free (the first corner is crowded).
 - **Laps**: per track (2 or 3; a race is about 75-120 seconds for bots, longer for people). Eight checkpoints per lap stop corner
@@ -103,16 +129,17 @@ under a second.
 ## Round flow (one CS2 round = one race)
 
 1. **Lobby / freeze time.** Players spawn in the lobby room. Their CS2 bodies are parked in a sealed booth for the
-   whole round and only used for input; everyone looks through a script camera. The HUD shows the car picker and
-   "race starts in N".
+   whole round and only used for input; everyone looks through a script camera. The HUD shows "race starts in N",
+   your car, and the car picker (by itself until you have picked or raced once; `!car` after that).
 2. **Grid.** When freeze time ends, everyone on T or CT who is not AFK is assigned to an arena and put on its grid
-   in a random order, 4 abreast. 10-second countdown; the car picker stays live until 3 seconds before the start,
-   so you can still swap cars on the grid (the line under the track name says your grid slot and the time to the
-   lights).
+   in a random order, 4 abreast. 10-second countdown; cars can be swapped until 3 seconds before the start (the
+   small cards show by themselves on your first grid, or after `!car`; the line under the track name says your
+   grid slot and the time to the lights).
 3. **Race.** Rounds are **locked**: nobody joins a race in progress. Someone connecting mid-round watches
-   (Mouse 1 / Mouse 2 change the car you follow, E changes arena) and is in the next round; A / D picks their car
-   for it (the cards show for a few seconds after each press, and again at the results).
-4. **Results.** Each arena shows its top 8 and your own placing for 6 seconds. The CS2 kills are applied in a
+   (Mouse 1 / Mouse 2 change the car you follow, E changes arena) and is in the next round; `!car` brings up the
+   cards to pick a car for it.
+4. **Results.** Each arena shows its top 8 and your own placing for 6 seconds, with nothing over it: a car picker
+   still open when the race ends closes (`!car` brings it back). The CS2 kills are applied in a
    cascade (one every few ticks, so the killfeed rolls). When every arena is done the script ends the CS2 round
    with the team result below. A race that somehow runs past 5 minutes is cut off and ranked by distance.
 
@@ -165,15 +192,16 @@ wreck, or watching as a late joiner, is not idling. Idle through 2 minutes of lo
 | Key | Action |
 |---|---|
 | W / S | accelerate / brake and reverse |
-| A / D | steer (and pick a car when not racing) |
+| A / D | steer (and change car while the car picker is up) |
 | Mouse 1 | boost (spends charge) |
 | Mouse 2 | spin attack |
 | Space | drift |
 | Mouse (look) | nothing — the camera follows the car |
 | Mouse 1 / Mouse 2 / E (spectating) | next car / previous car / next arena |
 
-Chat: `!car 1-4`, `!cam` (high / far / near view), `!tilt` (camera lean on/off), `!crt` (scanlines on/off),
-`!music`, `!spec`, `!afk`, `!back`, `!race` (controls on your own HUD).
+Chat (`!` or `/`): `!car` (the car picker, 6 seconds), `!car 1-4` or a name (pick straight away), `!cam` (high /
+far / near view), `!tilt` (camera lean on/off), `!crt` (scanlines on/off), `!music`, `!spec`, `!afk`, `!back`,
+`!help` or `!race` (controls on your own HUD).
 
 ## HUD
 
@@ -188,7 +216,7 @@ over the speed, centre messages (countdown, GO!, FINAL LAP, WRONG WAY blinking, 
 each new one pops in), a bottom line for short news and the answers to chat commands, the car picker (four framed
 cards, each with a pixel picture of the car in your side's colour, its perk and five stat bars; the chosen one gold
 and pulsing) in the lobby, and a row of four small cards bottom-right on the grid (so the flyover's view of the
-field stays clear), the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a
+field stays clear; both only until you have picked a car or raced once, then after `!car`), the SPACE RACER logo and three status lines in the lobby, a pulsing RESULTS banner over a
 results board at the end (top 8 with the winner's time and everyone else's gap, your own line swapped in if you
 placed lower), flickering pixel speed lines round the screen edges while boosting, and CRT scanlines plus a vignette
 over everything (`!crt` turns them off for you). `preview/hud_race.png`, `hud_grid.png`, `hud_lobby.png` show it.
@@ -252,6 +280,23 @@ show the map's single env_sky instead). Vis hints: Lowest over the whole map; Lo
 go) and in the lobby rooms. Nothing inside a box occludes (the track and scenery are props with visoccluder off), so
 coarse vis away from the road loses nothing, and the Low volume is about a quarter of what whole boxes were. Only
 one box is ever in view, so the scenery (25-35k triangles per track) costs little.
+
+## Loading screen
+
+CS2's loading screen shows `panorama/images/map_icons/screenshots/1080p/<map>.png`, `<map>_1.png` ... `<map>_9.png`
+as a slideshow (4 seconds each, starting on a random one) - and shows nothing at all when a map has only one
+picture, which is why the first version's loading screen never appeared. `tools/loading.py` draws four slides.
+Every slide has the same frame: the logo and a CONTROLS panel (the keys for driving and watching, and the chat
+commands) in the same place, so it can be read while the slides change. Below it is a panel that changes: the four
+cars and their perks, the eight tracks, how to win (kill shares, the T / CT result, drafting) and what is on
+the track (pads, ramps, slick bands, the Pulse), each over a different track's sky.
+
+CS2 draws its own column over the right of the screen (map name, icon, mode, the loading bar; 300 px wide, 20 px
+from the edge, the slide blurred behind it) and scales each slide to cover the screen. So everything that matters
+sits in x 252-1348, y 104-948: clear of the column at 16:9 and 16:10, and not cut off at 4:3 (which loses 240 px
+on each side) or by an ultrawide's crop of the top and bottom. `preview/loading_cs2.png` sketches the column and
+those edges over the first slide; `preview/loading_all.png` shows all four. The slides get compiled because the
+HUD's stylesheet points at them (never-shown `SprPre` rules), like the radar and the map icon.
 
 ## Architecture (same shape as FreeDM)
 

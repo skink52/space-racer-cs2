@@ -52,11 +52,15 @@ def paste(img, sprite, cx, cy):
         for xx in range(w):
             if sprite[yy, xx, 3] > 0: img[y, (x0 + xx) % W] = sprite[yy, xx, :3]
 
+LAST_PLANET = None      # (x, y, radius) of the big body in the last sky made (the loading screen frames it)
+
 def planet(img, rng, color, kind):
+    global LAST_PLANET
     cx, cy = rng.randint(60, W - 60), int(H * 0.26)
     if kind == 'sun':
         # a striped retro sun sitting low over the horizon
         R = 46; cy = int(H * 0.5) - 26
+        LAST_PLANET = (cx, cy, R)
         for y in range(cy - R, cy + R + 1):
             for x in range(cx - R, cx + R + 1):
                 d = math.hypot(x - cx, y - cy)
@@ -67,6 +71,7 @@ def planet(img, rng, color, kind):
                 img[y, x % W] = c
         return
     size = 84 if kind in ('ringed', 'banded') else 64
+    LAST_PLANET = (cx, cy, size // 2)
     sp = pixel_sphere(size, color, bands=6 if kind in ('banded', 'ringed') else 0, seed=rng.randint(99))
     if kind in ('moon', 'cratered'):
         for _ in range(9):

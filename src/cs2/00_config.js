@@ -84,7 +84,7 @@ const CONFIG = {
   // ---- input
   CHAT_COMMANDS: true,
   HELP_SECONDS: 10,
-  PICK_SHOW: 4,                  // seconds the car cards stay up for someone watching a race after they press A / D
+  PICK_SHOW: 6,                  // seconds the car picker stays up after !car (or /car) and after each A / D press
   SAY_GAP: 1.0,
 
   // ---- entity names in the map

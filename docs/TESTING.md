@@ -16,7 +16,8 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 1. Console on map load: `[spr] v0.3.1 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
-   (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too.
+   (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too. Once you have picked, the
+   cards go away; `!car` brings them back (see C6).
 3. About 2 s after the round starts (mp_freezetime 0): `RACE 1: <track> (1)` in chat, a 10-second countdown on the grid, your car on the grid
    seen from behind and above. Watch for the car model, its side colour (T orange / CT blue), the hover shadow.
 4. Drive: W accelerates, A / D steer, Mouse 1 boosts (charge bar drains, flame model), Space drifts, Mouse 2
@@ -75,8 +76,8 @@ Valve's type declarations. These are the things only the real game can show, in 
 - Scenery: towers, asteroids, crystals, rings, clouds, the synth-grid floor, billboards, the voxel-letter start
   gantry and sector numbers on the checkpoint gates. Watch `cl_showfps` on the busiest views (Solar Oval and
   Hairpin Harbour cities).
-- Turbo start: press W on the last beep (inside half a second of GO) - "TURBO START!" and a kick. Hold W from the
-  first beep - "TOO EARLY - ENGINE STALLED".
+- Turbo start: press W on the third beep (the higher one) and hold it - "TURBO START!" and a kick. Hold W from the
+  first beep - "TOO EARLY - ENGINE STALLED". (The window used to be the last 0.45 s; see C6.)
 - Camera shake on hits, rail strikes, landings and wrecks (`CAM_SHAKE` 0 turns it off).
 - Effects are pixel art now (explosion, warp-out, the Pulse, the hover shadow).
 - Lap records: after a race, the lobby's NEXT line shows a record for tracks that have one; chat announces new ones.
@@ -120,7 +121,8 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
   your side's colour, its perk and five stat bars; A / D moves the gold highlight. Grid (`preview/hud_grid.png`):
   the track name, "YOU START 3RD OF 10 - LIGHTS IN 6", and a row of four small cards bottom-right (the flyover's
   view of the field stays clear, and chat too); they go 3 seconds before the lights and the bars / speed /
-  standings come back in the same corner. Watching a race: the cards show for 4 seconds after you press A / D.
+  standings come back in the same corner. (Since then the cards only come up by themselves until you have picked a
+  car or raced once - see C6.)
 - **Countdown.** 3 / 2 / 1 in big red pixel digits in the middle of the screen, then GO!.
 - **Cars on the grid.** All cars visible on the grid from the moment the flyover reaches them (they were being
   teleported every tick, which CS2 doesn't draw).
@@ -137,6 +139,39 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
   Check: no flicker or rails across the road anywhere; the camera stays clear under the decks (try `!cam far`);
   bots get round the loop; the results camera rises over the loop as it circles the start. This one changes the
   map file (the track model and its vis hints), so compile the map in Hammer after copying.
+
+## C6. Loading screen and car picker (17 Oct, evening)
+
+- **Loading screen.** Four slides now (`preview/loading_all.png`); CS2 never shows a map's loading picture when it
+  has only one, which is why there was none before. While the map loads they change every 4 seconds, starting on a
+  random one. The logo and the CONTROLS panel (driving keys, watching keys, chat commands) stay put; the panel under
+  it changes (cars, tracks, how to win, what is on the track). CS2's own column on the right (map name, icon,
+  loading bar) should cover only sky, never text; on a 4:3 screen nothing of ours should be cut off at the sides.
+  The slides compile along with the HUD (the first load after copying compiles them, so they show from the second
+  load on): `game\csgo_addons\mg_space_racer\panorama\images\map_icons\screenshots\1080p\` should then hold
+  `mg_space_racer_png.vtex_c` and `mg_space_racer_1_png.vtex_c` to `_3_png.vtex_c`.
+- **Car picker.** First time in the lobby the cards are up; pick with A / D and they go 6 seconds after your last
+  press. From then on they stay away - in the lobby, on the grid and over the results. `!car` (or `/car`, `!pick`)
+  brings them back for 6 seconds (each A / D press keeps them up); `!car 2` picks the Meteor straight away and says
+  `YOUR CAR: METEOR - RAM` on the bottom line. On your first grid the small cards come up by themselves; after that
+  only with `!car`. `!car` while driving answers with the numbers (A / D steer). At the end of a race the results
+  board has nothing over it, even if the cards were open when the race ended. When the cards are hidden, A / D do
+  nothing to your car.
+- **A / D in the lobby** are read every tick now (before, the lobby read the keys 20 times a second and could miss
+  a quick tap).
+- **`!help`** goes away by itself after 10 seconds (it now comes off with the HUD refresh, not a timer).
+- **Spin attack.** Mouse 2 next to someone: they should be shoved well across the road (a Meteor or Bastion shoves
+  a Hornet or Comet into the rail from the middle) and fishtail for half a second, with a hard camera shake for
+  them. It now hits a car alongside even when you are not moving into it. If it is too much or too little:
+  `spinKnock` / `spinStagger` in `const RULES`.
+- **Turbo start** (secret now: the grid line no longer mentions it). Press W on the third beep - the higher one -
+  and hold it: "TURBO START!" and a kick. Pressing a little after the beep works too (up to GO); holding W from
+  before the second beep stalls. The window used to be the last 0.45 s before GO, so a press on the beep did
+  nothing - that was why it didn't seem to work.
+- **Balance** (sims, 400 races): the Hornet and Comet win a little more often (3.4 and 3.8 per 100 starts against
+  2.8 and 2.6), the Meteor and Bastion wreck two to three times as many rivals and make the top 8 more often; the
+  light cars get wrecked in about 1 race in 8. Changes: Hornet shield 90 -> 105 and boost +30% -> +32%, Comet
+  shield 100 -> 105, Meteor acceleration 495 -> 515, Bastion top speed 1035 -> 1043, shield repair 1.5 -> 2.2/s.
 
 ## D. Things to look at and tune
 

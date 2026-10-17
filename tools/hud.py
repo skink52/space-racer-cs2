@@ -492,7 +492,7 @@ lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 
     gtext('spr_lob3', 60, 'S', 'C', center=True, y=68)])
 HELP = [('SPACE RACER - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
         ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SPEC  !AFK  !BACK  !RACE', 'P')]
+        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR PICK A CAR  !CAM CAMERA', 'P'), ('!TILT !CRT !SPEC !AFK !BACK', 'P')]
 help_ = P('spr_help', box('Help', 'cyan', 640, 14 * 28 + 24, center=True, y=210),
           [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
 
@@ -505,15 +505,21 @@ centre = [
     gtext('spr_msg', 38, 'S', 'C', center=True, y=822),
 ]
 
-# never shown: these make CS2 compile the loading screen picture, the radar and the map icon along with the HUD
-for cls, src in (('SprPre1', 'map_icons/screenshots/1080p/%s.png' % MAP), ('SprPre2', 'overheadmaps/%s_radar.psd' % MAP),
-                 ('SprPre3', 'map_icons/map_icon_%s.svg' % MAP)):
+# never shown: these make CS2 compile the loading screen slides, the radar and the map icon along with the HUD.
+# CS2 shows no slide at all when a map has only one, so tools/loading.py draws LOADING_SLIDES of them
+# (<map>.png, <map>_1.png ...) and checks that each one is in this list.
+LOADING_SLIDES = 4
+PRELOAD = [('SprPre2', 'overheadmaps/%s_radar.psd' % MAP), ('SprPre3', 'map_icons/map_icon_%s.svg' % MAP)]
+PRELOAD += [('SprPre%d' % (1 if n == 0 else 3 + n), 'map_icons/screenshots/1080p/%s%s.png' % (MAP, '_%d' % n if n else ''))
+            for n in range(LOADING_SLIDES)]
+PRELOAD.sort()
+for cls, src in PRELOAD:
     rule('.' + cls, width='1px', height='1px', opacity='0', visibility='collapse', background_image='url("file://{images}/%s")' % src)
 rule('.SprPreload', width='1px', height='1px', visibility='collapse')
 
 # ---------------------------------------------------------------- xml
 screen = P(None, 'Screen', [
-    P(None, 'SprPreload', [P(None, 'SprPre1'), P(None, 'SprPre2'), P(None, 'SprPre3')]),
+    P(None, 'SprPreload', [P(None, cls) for cls, _ in PRELOAD]),
     P('spr_flash', 'Flash Full'),
     P(None, 'SpeedFx Full', [P(None, 'Speed0 Full'), P(None, 'Speed1 Full')]),
     logo, res, minimap, top, clock,

@@ -16,7 +16,7 @@ Workshop: *(link to the Steam Workshop page)*
 Everything here is original work: the name, cars, tracks, art, sounds and rules. The genre conventions it uses
 (anti-grav racers, boost pads, drafting, laps) belong to nobody; see `docs/WORKSHOP_COMPLIANCE.md`.
 
-![loading screen](preview/loading.png)
+![the loading screen: four slides, the controls on every one](preview/loading_all.png)
 
 ![the racer's view on all eight tracks](preview/chase_all.png)
 
@@ -40,7 +40,7 @@ Everything here is original work: the name, cars, tracks, art, sounds and rules.
 | `src/cs2/` | The CS2 side: pawn parking and the chase camera, input, prop-pool rendering, HUD, sounds, CS2 kills, round control, chat commands. |
 | `tools/` | Generators: `trackdefs.py` (the eight track designs and colour themes), `tracks.py` (tracks → data, road / tube / scenery models, minimaps), `retro.py` (the palette and dithering), `pixfont.py` (the pixel font and logo), `skies.py` (pixel-art skies), `cars.py` (voxel cars, pixel effects, renders), `loading.py` (loading screen, radar, map icon), `hud.py` (Panorama layout/css and glyph pictures), `sounds.py` (chiptune sounds, music and sound events), `vmap.py` (writes the whole map into the Hammer template), `build.mjs` (assembles the script), `build_all.sh`. |
 | `test/` | `sim.cjs` runs bot races on the pure game; `mock_cs2.mjs` runs the real script on a stand-in cs_script API; `tsconfig.json` + `point_script.d.ts` type-check it against Valve's API. |
-| `preview/` | Pictures of the tracks, skies, cars (`car_angles.png`), loading screen, HUD (`hud_render.py` lays the real HUD out like Panorama would, draws it at 16:9, ultrawide and 4:3, and fails the build if a panel breaks the layout rules or sits under CS2's own chat, kill feed, team counter or money / health row; `hud_cs2.png` marks those places), and `chase_view.py`: a software render of the racer's view from the chase camera (sky, banking and all). |
+| `preview/` | Pictures of the tracks, skies, cars (`car_angles.png`), loading screen (`loading_all.png`; `loading_cs2.png` sketches where CS2's own column and the 4:3 and 21:9 edges fall), HUD (`hud_render.py` lays the real HUD out like Panorama would, draws it at 16:9, ultrawide and 4:3, and fails the build if a panel breaks the layout rules or sits under CS2's own chat, kill feed, team counter or money / health row; `hud_cs2.png` marks those places), and `chase_view.py`: a software render of the racer's view from the chase camera (sky, banking and all). |
 | `docs/` | `DESIGN.md` (the game), `TESTING.md` (first run in CS2), `WORKSHOP_COMPLIANCE.md`, the notes that ship with the addon. |
 | `workshop/` | The Steam Workshop page: preview icon, eight screenshots and the description in Steam's BBCode (`workshop/README.md`). |
 | `ref/` | The Hammer map template the build writes into, and the stock sound-events file. |
@@ -62,6 +62,9 @@ Tests:
 
 ```
 node test/sim.cjs 64 10            # ten rounds of 64 bots: durations, wrecks, car balance, team points
+node test/sim.cjs 64 100 even,seed=71    # car balance: the same number of each car, 200 races
+node test/turbo_test.cjs           # the (secret) turbo start's timing
+node test/spin_test.cjs            # how far a spin attack shoves each car
 node test/mock_cs2.mjs 20 44 500 churn   # the real script on the mock engine with people joining and leaving
 cd test && tsc -p tsconfig.json    # type check against point_script.d.ts
 ```

@@ -319,7 +319,7 @@ def race_state(grid=False, results=False):
 def lobby_state():
     reset()
     add('spr_root', 'stLobby', 'stPick')
-    text('spr_lob1', 'THE RACE STARTS IN 7', 'white'); text('spr_lob2', 'YOUR CAR: METEOR - RAM  (A/D OR !CAR 1-4)', 'gold')
+    text('spr_lob1', 'THE RACE STARTS IN 7', 'white'); text('spr_lob2', 'YOUR CAR: METEOR - RAM  (A / D TO CHANGE)', 'gold')
     text('spr_lob3', 'NEXT: SOLAR OVAL - 3 LAPS  RECORD 0:41.2 SKINK52', 'cyan')
     add('spr_card1', 'sel')
     for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): swap('spr_cimg%d' % i, r'^pic_', 'pic_%s_t' % k)

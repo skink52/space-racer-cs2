@@ -219,6 +219,13 @@ function handleArenaEvents(a, now) {
       case 'beep': { const p = T.point(0); if (view) playSound(view, e.n === 1 ? 'beep2' : 'beep', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, String(e.n), 1.1, 'red'); break; }
       case 'launch': { const pe = e.car.person; if (pe && !pe.bot) { bottom(pe.slot, 'TURBO START!', 2); hudFlash(pe.slot, 'pulse', 0.3); shake(pe.slot, 0.3, 8); } if (view) sfxCar(view, 'boost', e.car, 0.8); break; }
       case 'stall': { const pe = e.car.person; if (pe && !pe.bot) bottom(pe.slot, 'TOO EARLY - ENGINE STALLED', 2); break; }
+      case 'spinHit': {
+        // a spin attack landed: a hard shake for the car shoved across the road, a little one for the attacker
+        const vp = e.car.person, ap = e.attacker.person;
+        if (vp && !vp.bot) { shake(vp.slot, 0.45, 16); hudFlash(vp.slot, 'hit', 0.35); }
+        if (ap && !ap.bot) shake(ap.slot, 0.2, 6);
+        break;
+      }
       case 'go': { const p = T.point(0); if (view) playSound(view, 'go', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, 'GO!', 1.2, 'green'); break; }
       case 'wreck': {
         if (view) { view.wreckEffect(e.car, now); sfxCar(view, 'wreck', e.car); }
@@ -293,6 +300,8 @@ function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: Instance.Ge
 
 function onArenaEnd(a, result, now) {
   if (a.newRecord) { const r = records.get(a.track.id); if (r) sayAll(`LAP RECORD on ${a.track.title}: ${r.who} ${fmtTime(r.time)}`); a.newRecord = false; }
+  // the results come up clear: a car picker still open from before the end closes (!car brings it back)
+  for (const pe of rm.people.values()) if (pe.arena === a || (pe.spec && pe.spec.arena === a.index)) pe.pickUntil = 0;
   const r = result.ranking;
   const top = r.slice(0, 3).map((c, i) => `${i + 1}. ${c.name}`).join('  ');
   sayAll(`${a.track.title}: ${top}`);
@@ -358,8 +367,9 @@ function raceInfo(pe, car, a, now, spectating) {
   else if (car.offLine && car.state === 'racing') { info.center = 'MISSED CHECKPOINT'; info.centerCls = 'red'; }
   const sm = timed(subMsgs, pe.slot, now);
   if (sm) info.sub = sm.text;
-  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  A/D CAR';
-  else if (a.state === 'grid') info.sub = a.countdown > 3 * TICRATE ? 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : 'PRESS W ON THE LAST BEEP FOR A TURBO START';
+  else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  !CAR';
+  // (the turbo start - gas on the third beep - is a secret: nothing on screen gives it away)
+  else if (a.state === 'grid') info.sub = 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + (a.countdown > 3 * TICRATE ? '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : '');
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
   const bm = timed(botMsgs, pe.slot, now);
   info.msg = bm ? bm.text : '';
@@ -372,7 +382,7 @@ let lobbyCycle = 0;
 function lobbyInfo(pe, now) {
   const info = { line1: '', line2: '', line3: '' };
   const car = CARS[pe.carChoice] || CARS.hornet;
-  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + '  (A/D OR !CAR 1-4)';
+  info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + (pe.pickShown ? '  (A / D TO CHANGE)' : '  (!CAR TO CHANGE)');
   const nextT = rm.upcoming[0];
   if (phase === 'running') {
     const rem = guard('remaining', () => Instance.GetRoundRemainingTime());
@@ -421,16 +431,16 @@ function engineHum(now) {
 
 // ---------------------------------------------------------------- per tick
 function lobbyFrame(now, dt) {
-  if (now < lobbyNext) return;
-  lobbyNext = now + 0.05;
-  lobbyCycle = Math.floor(now / 3);
+  // keys and the camera every tick (a tap of A / D lasts a tick or two), the HUD 20 times a second
+  const hudNow = now >= lobbyNext;
+  if (hudNow) { lobbyNext = now + 0.05; lobbyCycle = Math.floor(now / 3); }
   const a0 = rm.arenas[0];
   for (const pe of rm.people.values()) {
     if (pe.bot) { if (!parked.has(pe.slot)) park(pe.slot); continue; }   // bots stand frozen in the booth too
     const pk = park(pe.slot);
-    if (!pk) { guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); }); continue; }
+    if (!pk) { if (hudNow) guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); }); continue; }
     if (pickerInput(pe, pk)) rm.markActive(pe.slot);
-    guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); });
+    if (hudNow) guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, pickerAuto(pe) || pickerOpen(pe, now)); });
     // nothing to look at yet: a slow look around the first track from above
     if (!a0) guard('lobbycam', () => {
       if (!live(pk.cam)) return;
@@ -492,9 +502,10 @@ function frame(dt) {
     if (!pk) continue;
     if (pe.status === 'racing' && pe.car && pe.arena) {
       if (pe.car.state === 'grid') { if (pe.arena.countdown > 3 * TICRATE ? pickerInput(pe, pk) : sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
-      else if (pe.car.racing) { if (sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
+      else if (pe.car.racing) { pe.raced = true; if (sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
       else {
-        // wrecked / finished / withdrawn: watch the others after a moment
+        // wrecked / finished / withdrawn: watch the others after a moment (!car works from here on)
+        pickerInput(pe, pk);
         if (pe.car.stateTime > RULES.wreckShow || pe.car.state === 'gone' || pe.car.state === 'withdrawn') {
           pe.status = 'spectating'; pe.spec = { arena: pe.arena.index, target: null }; rm.fixSpectate(pe, 0);
         }
@@ -541,17 +552,19 @@ function frame(dt) {
         else placeCamera(pk, pe.car, v, dt, pe.cam, pe.tilt);
         if (!hudTurn(pe.slot)) return;
         hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false));
-        hudPicker(pe.slot, pe, a.state === 'grid' && a.countdown > 3 * TICRATE ? 'mini' : false);
+        // the small cards on the grid (first race, or after !car); the big ones only after !car once the car is done
+        if (a.state === 'grid') hudPicker(pe.slot, pe, a.countdown > 3 * TICRATE && (pickerAuto(pe) || pickerOpen(pe, now)) ? 'mini' : false);
+        else hudPicker(pe.slot, pe, !pe.car.racing && pickerOpen(pe, now));
       } else {
         // spectators and people waiting for the next race
         if (!pe.spec) rm.spectate(pe);
         const a = rm.arenas[pe.spec ? pe.spec.arena : 0], v = a && views.get(a);
         const t = a && pe.spec && pe.spec.target !== null ? a.cars.get(pe.spec.target) : null;
-        if (!a || !v) { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, true); return; }
+        if (!a || !v) { hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, pickerAuto(pe) || pickerOpen(pe, now)); return; }
         if (t && t.visible && a.state !== 'over') { placeCamera(pk, t, v, dt, pe.cam, pe.tilt); if (hudTurn(pe.slot)) hudRace(pe.slot, t, a, raceInfo(pe, t, a, now, true)); }
         else { placeOverviewCamera(pk, a, v); if (pe.car && pe.arena === a) hudRace(pe.slot, pe.car, a, raceInfo(pe, pe.car, a, now, false)); else { hudLobby(pe.slot, lobbyInfo(pe, now)); } rm.fixSpectate(pe, 0); }
-        // watchers get the cards while the results are up, or for a moment after pressing A / D
-        hudPicker(pe.slot, pe, pe.status !== 'racing' && (!pe.car || a.state === 'over') && (a.state === 'over' || (pe.pickUntil || 0) > now));
+        // watchers (results included) see the cards only after asking for them with !car
+        hudPicker(pe.slot, pe, pe.status !== 'racing' && pickerOpen(pe, now));
       }
     });
   }
@@ -636,12 +649,24 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
   if (!player.IsBot()) sayHold();
   if (!t.startsWith('!') || !pe) return;
   log(`chat command "${t}" from slot ${slot}`);
-  if (t === '!car' || t.startsWith('!car ')) {
-    const arg = t.slice(4).trim();
+  const word = t.split(/\s+/)[0];
+  if (word === '!car' || word === '!cars' || word === '!pick') {
+    // !car 1-4 (or a name) picks straight away; !car on its own brings the picker up for a few seconds
+    const arg = t.slice(word.length).trim();
     const n = parseInt(arg, 10);
-    const key = CAR_KEYS[n - 1] || CAR_KEYS.find((k) => k === arg || CARS[k].name.toLowerCase() === arg);
-    if (key) { if (!rm.setCar(pe, key)) bottom(slot, 'TOO LATE TO SWAP - NEXT ROUND', 3); }
-    else bottom(slot, '1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
+    const key = arg ? CAR_KEYS[n - 1] || CAR_KEYS.find((k) => k === arg || CARS[k].name.toLowerCase() === arg) : undefined;
+    const driving = pe.car && pe.arena && (pe.car.racing || (pe.car.state === 'grid' && pe.arena.countdown <= 3 * TICRATE));
+    if (key) {
+      pe.picked = true; pe.pickUntil = 0;
+      const car = CARS[key];
+      if (!rm.setCar(pe, key)) bottom(slot, 'TOO LATE TO SWAP - ' + car.name + ' NEXT RACE', 3);
+      else bottom(slot, (driving ? 'NEXT RACE: ' : 'YOUR CAR: ') + car.name + ' - ' + car.perk, 3);
+    } else if (arg || driving) {
+      // a name we don't know, or the hands are on the wheel (A / D steer): the numbers instead
+      bottom(slot, '1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
+    } else {
+      pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;
+    }
   } else if (t === '!cam' || t.startsWith('!cam ')) {
     const names = Object.keys(CONFIG.CAMERAS);
     const want = t.slice(4).trim();
@@ -664,8 +689,7 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
   } else if (t === '!back') {
     pe.afk = false; rm.markActive(slot);
   } else if (t === '!race' || t === '!help' || t === '!spr') {
-    pe.helpUntil = Instance.GetGameTime() + CONFIG.HELP_SECONDS;
+    pe.helpUntil = Instance.GetGameTime() + CONFIG.HELP_SECONDS;      // hudOptions takes it down again
     hudHelp(slot, true);
-    guard('helpoff', () => { Instance.Delay(CONFIG.HELP_SECONDS).then(() => hudHelp(slot, false)); });
   }
 }));

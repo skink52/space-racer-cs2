@@ -13,7 +13,7 @@ python3 -I tools/cars.py out/addon preview/car_angles.png
 python3 -I tools/hud.py out/addon "$NAME" "$MAP"
 # lay the HUD out like Panorama would and stop the build if it breaks the layout rules (see tools/hud.py)
 python3 -I preview/hud_render.py out/addon preview/chase_nullgap.png build/hud_check
-python3 -I tools/loading.py out/addon "$MAP"
+python3 -I tools/loading.py out/addon "$MAP" preview
 python3 -I tools/sounds.py out/addon "${SPR_SOUNDEVENTS:-ref/soundevents_addon_template.vsndevts}"
 SPR_NAME="$NAME" node tools/build.mjs
 SRC=${SPR_CURRENT_VMAP:-ref/hammer_template.vmap}
@@ -23,5 +23,4 @@ cp docs/TESTING.md out/addon/TESTING_SPACE_RACER.md 2>/dev/null || true
 cp docs/CREDITS.md out/addon/CREDITS.md 2>/dev/null || true
 cp test/types/point_script.d.ts out/addon/maps/scripts/ 2>/dev/null || true
 rm -rf out/addon/_gen/*.json.tmp
-cp out/addon/panorama/images/map_icons/screenshots/1080p/$MAP.png preview/loading.png
 echo "built out/addon (map maps/$MAP.vmap, script maps/scripts/$NAME.js)"

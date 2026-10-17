@@ -102,7 +102,7 @@ def shot_pack():
     bg = background('pack', 'oval', f, SKIN='ct', PACK=pack_env(pack))
     race_hud(T, s0, pack, 2, '8', 'TH', 'white', 'LAP 1/3', 'gold', '0:04', '0:04.1', '-', '1312', 20, 14,
              [('BLITZ', 'T'), ('ACE', 'T'), ('RAYNE', 'CT'), ('SOLSTICE', 'CT'), ('DRIFTER', 'T'), ('NOVA', 'CT'), ('PIXL', 'T'), ('YOU', 'CT')], 7,
-             tally=('T 4', '4 CT'), msg='TURBO START!', boost=True, pad=True)
+             tally=('T 4', '4 CT'), msg='+40 CHARGE FROM THE PULSE', boost=True, pad=True)
     return bg
 
 
@@ -174,7 +174,7 @@ def shot_lobby():
     HR.reset()
     HR.add('spr_root', 'stLobby', 'stPick')
     HR.text('spr_lob1', 'THE RACE STARTS IN 7', 'white')
-    HR.text('spr_lob2', 'YOUR CAR: COMET - AFTERBURN  (A/D OR !CAR 1-4)', 'gold')
+    HR.text('spr_lob2', 'YOUR CAR: COMET - AFTERBURN  (A / D TO CHANGE)', 'gold')
     HR.text('spr_lob3', 'NEXT: SWITCHBACK SPIRE - 2 LAPS  RECORD 0:38.0 KESTREL', 'cyan')
     HR.add('spr_card2', 'sel')
     for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): HR.swap('spr_cimg%d' % i, r'^pic_', 'pic_%s_ct' % k)
@@ -215,8 +215,9 @@ def shot_tracks():
 
 
 def shot_info():
-    """the map's own loading screen: the logo, the four cars, the eight tracks and the controls"""
-    return os.path.join(OUT, 'panorama/images/map_icons/screenshots/1080p', [f for f in os.listdir(os.path.join(OUT, 'panorama/images/map_icons/screenshots/1080p')) if f.endswith('.png')][0])
+    """the map's own loading screen: its first slide (the logo, the controls and the four cars)"""
+    d = os.path.join(OUT, 'panorama/images/map_icons/screenshots/1080p')
+    return os.path.join(d, sorted(f for f in os.listdir(d) if f.endswith('.png'))[0])     # <map>.png before <map>_1.png
 
 
 def save_small(im, out):

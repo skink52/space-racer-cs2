@@ -66,14 +66,24 @@ function sampleInput(slot, car, pk) {
   return active;
 }
 
-// the car picker (lobby, spectating, on the grid): A / D cycle; returns true on any input
+// The car picker. It comes up by itself only for someone who has not chosen a car yet and has not raced (in the
+// lobby and on the grid). After that it stays away - so it never covers the results - until !car (or /car) brings
+// it back for a few seconds. A / D change the car only while the cards are on screen (hudPicker notes that in
+// pe.pickShown).
+function pickerAuto(pe) { return !pe.picked && !pe.raced; }
+function pickerOpen(pe, now) { return (pe.pickUntil || 0) > now; }
+
+// A / D while the picker is up; returns true on any input (AFK tracking)
 function pickerInput(pe, pk) {
   const pawn = pk.pawn;
   if (!live(pawn)) return false;
-  let any = false;
-  if (pawn.WasInputJustPressed(CSInputs.LEFT)) { rm.cycleCar(pe, -1); any = true; }
-  if (pawn.WasInputJustPressed(CSInputs.RIGHT)) { rm.cycleCar(pe, 1); any = true; }
-  if (any) pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;     // watchers see the cards for a moment
+  const l = pawn.WasInputJustPressed(CSInputs.LEFT), r = pawn.WasInputJustPressed(CSInputs.RIGHT);
+  let any = l || r;
+  if (any && pe.pickShown) {
+    rm.cycleCar(pe, l ? -1 : 1);
+    pe.picked = true;
+    pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;      // the cards stay up while they keep choosing
+  }
   if (pawn.IsInputPressed(CSInputs.FORWARD | CSInputs.BACK | CSInputs.ATTACK | CSInputs.JUMP | CSInputs.USE)) any = true;
   const ang = pawn.GetEyeAngles();
   if (Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2) any = true;

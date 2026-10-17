@@ -61,8 +61,16 @@ class PointTemplate extends Entity { ForceSpawn(pos) { stats.spawned++; const e 
 const hudIds = new Set(JSON.parse(fs.readFileSync(path.join(root, 'out/addon/_gen/hud_ids.json'), 'utf8')));
 const hudCss = fs.readFileSync(path.join(root, `out/addon/panorama/styles/custom_game/${NAME}.css`), 'utf8');
 const classesUsed = new Map();
+const rootCls = new Map();      // slot -> the state classes on spr_root right now (stRes = results board, stPick = car picker)
+const resStart = new Map();     // slot -> when their results board last came up
 class CustomHudLayout extends Entity {
-  SetHasClassForPlayer(slot, panel, cls, on) { stats.hudCalls++; const pk = panel.replace(/_\d+$/, '').replace(/\d+$/, ''); (stats.hudBy ||= {})[pk] = (stats.hudBy[pk] || 0) + 1; if (OPTS.includes('hudtrace') && slot === 0 && (pk === 'spr_lap' || pk === 'spr_sub') && on && time > 60 && time < 64) console.log('t', time.toFixed(2), panel, cls); if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); classesUsed.set(cls, (classesUsed.get(cls) || 0) + 1); }
+  SetHasClassForPlayer(slot, panel, cls, on) {
+    if (panel === 'spr_root') {
+      let s = rootCls.get(slot); if (!s) rootCls.set(slot, s = new Set());
+      if (on) s.add(cls); else s.delete(cls);
+      if (on && cls === 'stRes') resStart.set(slot, time);
+    }
+    stats.hudCalls++; const pk = panel.replace(/_\d+$/, '').replace(/\d+$/, ''); (stats.hudBy ||= {})[pk] = (stats.hudBy[pk] || 0) + 1; if (OPTS.includes('hudtrace') && slot === 0 && (pk === 'spr_lap' || pk === 'spr_sub') && on && time > 60 && time < 64) console.log('t', time.toFixed(2), panel, cls); if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); classesUsed.set(cls, (classesUsed.get(cls) || 0) + 1); }
   SetDialogVariableStringForPlayer(slot, panel, name, value) { stats.hudVars++; if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); if (typeof value !== 'string') throw new Error('non-string dialog var'); }
   ResetForPlayer() {}
 }
@@ -183,11 +191,23 @@ let rounds = 0;
 const t0 = Date.now();
 let thinkMs = 0, maxThink = 0;
 const CHATS = { 12: '!car 3', 16: '!car', 18: '!cam', 20: '!cam near', 22: '!tilt', 23: '!tilt', 25: '!race', 28: '!crt', 29: '!crt', 32: '!music',
-  40: '!car meteor', 70: '!spec', 90: '!back', 130: '!afk', 150: '!back' };
+  40: '!car meteor', 70: '!spec', 90: '!back', 100: '/car', 130: '!afk', 150: '!back', 170: '!pick', 175: '!car 2', 230: '/pick', 290: '!car' };
 const phases = {};
+// the car picker must never sit over the results board unless that player asked for it (!car / /car / !pick) since
+// the board came up
+const asked = new Map(), picker = { overResults: 0, askedOverResults: 0, ticks: new Map() };
 while (time < SECONDS) {
   time += TICK;
-  for (const [at, text] of Object.entries(CHATS)) if (Math.abs(time - +at) < TICK / 2 && players[0] && hooks.OnPlayerChat) hooks.OnPlayerChat({ player: players[0], text, team: 0 });
+  for (const [at, text] of Object.entries(CHATS)) if (Math.abs(time - +at) < TICK / 2 && players[0] && hooks.OnPlayerChat) {
+    if (/^[!/](car|pick)$/.test(text)) asked.set(0, time);
+    hooks.OnPlayerChat({ player: players[0], text, team: 0 });
+  }
+  for (const c of players) {
+    const s = !c.bot && c.connected && rootCls.get(c.slot);
+    if (!s || !s.has('stPick')) continue;
+    picker.ticks.set(c.slot, (picker.ticks.get(c.slot) || 0) + 1);
+    if (s.has('stRes')) { if ((asked.get(c.slot) ?? -99) >= (resStart.get(c.slot) ?? 0)) picker.askedOverResults++; else picker.overResults++; }
+  }
   // fake human input: drive forward, wobble the steering, boost and spin now and then, pick cars in the lobby
   for (const c of players) {
     const p = c.pawn;
@@ -278,6 +298,8 @@ console.log('HUD classes not in the css:', unknownCls.join(' ') || 'none');
 const loneCls = [...classesUsed.keys()].filter((c) => c && new RegExp('(^|\\n)\\.' + c + ' \\{').test(hudCss));
 console.log('switched HUD classes with a rule of their own:', loneCls.join(' ') || 'none');
 if (loneCls.length) stats.errors.push('HUD state classes collide with panel classes: ' + loneCls.join(' '));
+console.log(`car picker: up ${((picker.ticks.get(0) || 0) / 64).toFixed(1)} s for the player typing !car, ${([...picker.ticks].filter(([k]) => k !== 0).reduce((n, [, v]) => n + v, 0) / 64 / Math.max(1, HUMANS - 1)).toFixed(1)} s on average for the others; over the results ${(picker.askedOverResults / 64).toFixed(1)} s when asked, ${(picker.overResults / 64).toFixed(1)} s unasked`);
+if (picker.overResults) stats.errors.push('the car picker covered the results board without !car: ' + (picker.overResults / 64).toFixed(1) + ' s');
 console.log('props teleported 3+ ticks in a row:', stats.tpRuns || 0);
 if (stats.tpRuns) stats.errors.push('props teleported every tick (CS2 hides them): ' + stats.tpRuns);
 if (stats.errors.length) { console.log('ERRORS/WARNINGS:'); for (const e of [...new Set(stats.errors)].slice(0, 20)) console.log('  ' + e); }

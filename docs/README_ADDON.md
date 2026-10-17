@@ -32,28 +32,33 @@ moondome shells (each showing its track's own pixel-art sky), vis hints (Low alo
 `spr_cache_*` props that make every car and effect model available to the script, and the lobby with 32 T and
 32 CT spawns about 12,000 units below the tracks.
 
-Loading screen, radar and map icon are in `panorama/images/` and compile with the HUD. The radar's position file
+Loading screen (four slides: `mg_space_racer.png`, `_1`, `_2`, `_3` - CS2 shows nothing when a map has only one),
+radar and map icon are in `panorama/images/` and compile with the HUD. The radar's position file
 `resource/overviews/mg_space_racer.txt` has to be copied into the **game** addon folder
 (`game\csgo_addons\mg_space_racer\resource\overviews\`); content-folder text files are not compiled across.
 
 ## 3. How it plays
 
-- Everyone spawns in the lobby; the view slowly circles the track of the next race, and the HUD shows the car
-  picker, the countdown and NEXT TRACK. Bodies are parked in the booth
+- Everyone spawns in the lobby; the view slowly circles the track of the next race, and the HUD shows the
+  countdown, your car and NEXT TRACK (and the car picker until you have picked a car or raced once). Bodies are
+  parked in the booth
   for the whole round; the view is a chase camera behind your car.
 - About 2 seconds into each CS2 round (freeze time is set to 0), everyone on T or CT who is not AFK goes to a grid: 1-32 players race together, 33-64 are
   split evenly into two arenas (or, with `ARENA_LAYOUT '4x16'`, up to four arenas of 16) (each with the same share of Ts and CTs), on different tracks. 10-second countdown;
-  you can still swap cars (A / D) until 3 seconds before the lights.
+  you can still swap cars until 3 seconds before the lights (`!car`, then A / D).
 - Rounds are locked: nobody joins a race in progress. Latecomers watch (Mouse 1 / 2 change car, E change arena)
   and race next round.
-- Cars: HORNET (light, drift charge), METEOR (heavy, ram), COMET (afterburn), BASTION (tank, slipstream). Pick with
-  A / D or `!car 1-4`; the choice is remembered.
+- Cars: HORNET (light, drift charge), METEOR (heavy, ram), COMET (afterburn), BASTION (tank, slipstream). The
+  picker comes up by itself until you have chosen (A / D) or raced once; after that it stays away - it never covers
+  the results - until `!car` (or `/car`, `!pick`) brings it back for 6 seconds. `!car 1-4` or a car's name picks
+  straight away. The choice is remembered.
 - Shield = health, Charge = boost. Boost pads give free speed; charge platforms (on the slower lines) refill charge
   and shield; drafting behind a car trickles charge; drifting fills it a little. Mouse 1 boosts, Mouse 2 is a spin
-  attack (costs charge), Space drifts. Shield 0 = wrecked and out. Falling off a rail-less section costs 15 shield
+  attack (costs charge; it shoves anyone alongside across the road, harder from a heavier car), Space drifts. Shield 0 = wrecked and out. Falling off a rail-less section costs 15 shield
   and a reset. Jump ramps (Skyway) throw you over an open gap: hit them fast or drop in. Bends are banked (they
   grip harder). Once a lap the Pulse (a wave from the back of the field) tops up everyone it passes by 40.
-- Turbo start: press W on the last beep before GO for a launch; holding W from long before stalls you briefly.
+- Turbo start (a secret - nothing in the game says so): press W on the third beep, or after it, and hold it for a
+  launch; holding W from before the second beep stalls you briefly.
 - Lap records per track are kept while the map runs and shown in the lobby.
 - The race ends when everyone is in, 30 seconds after the winner, or at 5 minutes (ranked by distance).
 - Results: the top 3 survive. Everyone else takes one CS2 death, credited as kills 50% to 1st, 30% to 2nd, 20% to
@@ -69,16 +74,16 @@ Loading screen, radar and map icon are in `panorama/images/` and compile with th
 | Key | Action |
 |---|---|
 | W / S | accelerate / brake and reverse |
-| A / D | steer; pick a car when not racing |
+| A / D | steer; change car while the car picker is up |
 | Mouse 1 | boost (uses charge) |
 | Mouse 2 | spin attack |
 | Space | drift |
 | Mouse | nothing while racing - the camera follows the car and turns a little into the bend ahead |
 | Mouse 1 / 2, E (watching) | next car / previous car / next arena |
 
-Chat (`!` or `/`): `!car 1-4` (or a name), `!cam` (camera: high = default, far, near), `!tilt` (camera lean in
-corners on / off for you), `!crt` (CRT scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!race`
-(controls on your own screen).
+Chat (`!` or `/`): `!car` (the car picker for 6 seconds; also `!pick`), `!car 1-4` or a name (pick straight away),
+`!cam` (camera: high = default, far, near), `!tilt` (camera lean in corners on / off for you), `!crt` (CRT
+scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!help` or `!race` (controls on your own screen).
 
 ## Settings
 
@@ -103,5 +108,5 @@ Same risks as FreeDM. On this map, turn off or exempt:
 - **Weapon / loadout / knife plugins**: parked bodies are stripped of weapons every round; a plugin re-giving them
   shows a viewmodel over the race.
 - **Anti-stuck / noblock / third-person plugins** that move or unfreeze bodies or change the camera.
-- **Chat commands** `!car !cam !tilt !crt !music !spec !afk !back !race` may clash with plugin commands.
+- **Chat commands** `!car !pick !cam !tilt !crt !music !spec !afk !back !help !race` may clash with plugin commands.
 - **Team balancers**: balance at round start only; a mid-race team change takes the player out of the race.
