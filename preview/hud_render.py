@@ -297,8 +297,9 @@ def race_state(grid=False, results=False):
             if i < 3: add('spr_rb%d' % i, 'p%d' % (i + 1))
         add('spr_rb7', 'me')
         text('spr_msg', 'WRECKED - 12TH OF 32 - BEST LAP 0:29.8', 'cyan')     # the longest bottom line there is
+    text('spr_abtxt', 'E PHASE DASH', 'cY'); add('spr_abfill', 'w20'); add('spr_abil', 'ready')
     if grid:
-        text('spr_ctr', 'NULL GAP', 'gold'); text('spr_sub', 'YOU START 3RD OF 32  -  LIGHTS IN 6', 'white')
+        text('spr_ctr', 'NULL GAP', 'gold'); text('spr_sub', 'YOU START 32ND OF 32  -  NO ATTACKS FOR 6 SECONDS', 'white'); text('spr_abtxt', 'ATTACKS IN 6', 'cW')
         add('spr_mcard2', 'sel')
         for i, k in enumerate(['hornet', 'meteor', 'comet', 'bastion']): swap('spr_mimg%d' % i, r'^pic_', 'pic_%s_ct' % k)
     elif not results:
@@ -306,7 +307,6 @@ def race_state(grid=False, results=False):
         add('spr_turn', 'l2')
     text('spr_spd', '1286', 'gold')
     add('spr_shfill', 'w14'); add('spr_chfill', 'w9'); add('spr_spfill', 'w17'); add('spr_speed', 'pad')
-    text('spr_abtxt', 'E PHASE DASH', 'cY'); add('spr_abfill', 'w20'); add('spr_abil', 'ready')
     names = ['SKINK52', 'BOT14', 'YOU', 'BOT3', 'MARLOW', 'BOT28', 'VEXIS', 'BOT9']
     for i, nm in enumerate(names):
         BYID['spr_stn%d' % i].text = '%d  %s' % (i + 1, nm)

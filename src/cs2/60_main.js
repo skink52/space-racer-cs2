@@ -400,7 +400,7 @@ function raceInfo(pe, car, a, now, spectating) {
   if (sm) info.sub = sm.text;
   else if (spectating) info.sub = 'WATCHING ' + car.name.slice(0, 12).toUpperCase() + '  M1/M2 NEXT  E ARENA  R CAR';
   // (the turbo start - gas on the third beep - is a secret: nothing on screen gives it away)
-  else if (a.state === 'grid') info.sub = 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + (a.countdown > 3 * TICRATE ? '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : '');
+  else if (a.state === 'grid') info.sub = 'YOU START ' + ordinal((car.gridPos || 0) + 1) + ' OF ' + a.order.length + (a.countdown > 3 * TICRATE ? '  -  LIGHTS IN ' + Math.ceil(a.countdown / TICRATE - 3) : '  -  NO ATTACKS FOR ' + Math.round(RULES.attackLock) + ' SECONDS');
   else if (pe.afk) info.sub = 'AFK - TYPE !BACK TO RACE NEXT ROUND';
   const bm = timed(botMsgs, pe.slot, now);
   info.msg = bm ? bm.text : '';
