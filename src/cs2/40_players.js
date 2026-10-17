@@ -61,6 +61,8 @@ function sampleInput(slot, car, pk) {
   c.drift = pressed('JUMP') || pressed('DUCK');
   if (pawn.WasInputJustPressed(CSInputs.ATTACK2)) c.spin = true;
   if (pawn.WasInputJustPressed(CSInputs.USE)) c.ability = true;          // the car's E ability
+  // the clean start: say why a spin (or a Meteor's Shockwave) does nothing yet
+  if (car.lock > 0 && car.racing && (c.spin || (c.ability && car.spec.ability === 'quake'))) bottom(slot, 'ATTACKS UNLOCK IN ' + Math.ceil(car.lock), 1);
   const ang = pawn.GetEyeAngles();
   const active = fwd || back || left || right || c.boost || c.drift || c.spin || c.ability || Math.abs(angleDiff(pk.lastYaw, ang.yaw)) > 2 || Math.abs(ang.pitch - pk.lastPitch) > 2;
   pk.lastYaw = ang.yaw; pk.lastPitch = ang.pitch;

@@ -205,7 +205,8 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 
 - For the first 6 seconds after GO: no damage, no spin attacks and no Shockwave. In a Meteor the ability bar reads
   "ATTACKS IN 6 ... 1" and fills; then everyone's bottom line says "ATTACKS ON: SPINS ARE LIVE". Mashing Mouse 2
-  off the line should do nothing. Phase Dash, Nova Burn and Aegis still work from GO (they can't hurt anyone yet).
+  off the line does nothing except show "ATTACKS UNLOCK IN n". Phase Dash, Nova Burn and Aegis still work from GO
+  (they can't hurt anyone yet).
 - A car that's just been spun can't be spun again for 1.5 seconds (so two or three cars can't spin-lock someone).
 - Meteor bots don't all Shockwave the moment the lock ends; the calmer ones wait up to 3 seconds more.
 - If the start still feels too wild or too tame: `attackLock` / `startProtect` / `spinImmune` in `const RULES`.
