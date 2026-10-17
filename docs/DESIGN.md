@@ -145,13 +145,16 @@ Balance with the abilities in: see the table under the cars (18 Oct). Bots use t
 - **Slick zones**: on some tracks, a strip where grip drops to 30% (purple and pink wavy bands).
 - **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (2.2/s), so a race is lost
   to sustained aggression, not to attrition. Bumps below a closing speed of 250 are free.
-- **Clean start**: for the first 6 seconds after the lights nothing can be damaged and nobody can spin or use E
-  (the ability bar counts down "ATTACKS IN 6"; then "ATTACKS ON"), so the start is a drag race, not a brawl in a
-  32-car pack. Bots then use their abilities over the next few seconds, not all at once. A car hit by a spin can't
+- **Clean start**: for the first 6 seconds after the lights nothing can be damaged, nobody can spin and the Meteor
+  can't Shockwave (its ability bar counts down "ATTACKS IN 6"; then everyone gets "ATTACKS ON"), so the start is a
+  drag race, not a brawl in a 32-car pack. Phase Dash, Nova Burn and Aegis work from GO (they can't hurt anyone
+  while nothing takes damage, and locking them too cost the Comet its launch: wins 3.8 -> 3.0 per 100). Meteor bots
+  then Shockwave over the next few seconds, not all at once. A car hit by a spin can't
   be spun again for 1.5 s, so a pack can't chain-spin someone to a wreck. Measured (scratchpad start.cjs, 24 races):
   bots alone, no wreck in the first 16 s (first wreck typically at ~50 s); with a quarter of the field mashing
   Mouse 2 and E from the lights, no wreck in the first 12 s and the first one at ~18 s (before: ~11 s, 9 wrecks a
-  race; now 7).
+  race; now 7). Balance with it (720 races): wins/100 H 3.1 M 3.2 C 3.4 B 2.8, podiums 9.3 / 8.9 / 9.0 / 10.4,
+  KOs H 3.6 M 12.5 C 5.7 B 7.3, about 2.4 wrecks a race (fewer chain wrecks), light cars wrecked ~15%.
 - **Laps**: per track (2 or 3; a race is about 75-120 seconds for bots, longer for people). Eight checkpoints per lap stop corner
   cutting; driving the wrong way shows a warning and does not count, and a missed checkpoint shows
   "MISSED CHECKPOINT" until you go back for it.

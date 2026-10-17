@@ -43,7 +43,7 @@ Each track has its own pixel-art sky, scenery, start gantry, sector gates and bi
 [*][b]Boost pads[/b] give free speed. [b]Charge platforms[/b], on the slower lines, refill charge and shield.
 [*][b]Drafting[/b] behind another car trickles in charge (twice as fast behind a teammate, so convoys pay off), and [b]drifting[/b] (Space) fills it a little.
 [*][b]Spin attack[/b] (Mouse 2) hits anyone alongside and shoves them across the road, often into the rail. A heavier car shoves harder. It costs charge.
-[*][b]Clean start:[/b] for the first 6 seconds after GO there's no damage, no spins and no abilities, so the start is a race, not a pile-up.
+[*][b]Clean start:[/b] for the first 6 seconds after GO there's no damage, no spins and no Shockwaves, so the start is a race, not a pile-up.
 [*][b]The Pulse[/b] is a wave that sweeps from the back of the field to the front once a lap and tops up everyone it passes.
 [*][b]Banked bends[/b] grip harder. [b]Jump ramps[/b] throw you over open gaps. [b]Rail-less sections[/b] let you fall off: that costs shield and a reset.
 [*]The race ends when everyone is home, 30 seconds after the winner, or at 5 minutes (ranked by distance).

@@ -66,7 +66,9 @@ class Car {
     const wantBoost = !finished && !air && c.boost && this.charge > 0;
     this.drifting = !finished && !air && c.drift && this.speed > 250;
     // spin attack
-    if (this.lock > 0) { this.lock -= dt; c.spin = false; c.ability = false; }
+    // the start: no spins, and no Shockwave (the only E that hits others); the rest can't hurt anyone while nothing
+    // takes damage, so a Phase Dash, Nova Burn or Aegis off the line is fine
+    if (this.lock > 0) { this.lock -= dt; c.spin = false; if (sp.ability === 'quake') c.ability = false; }
     if (!finished && c.spin && this.spinCd <= 0 && this.charge >= sp.spinCost && this.spinTimer <= 0) {
       this.charge -= sp.spinCost; this.spinTimer = RULES.spinTime; this.spinCd = RULES.spinCooldown; this.fx |= 32;
     }

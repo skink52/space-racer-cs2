@@ -252,7 +252,7 @@ function handleArenaEvents(a, now) {
         if (ap && !ap.bot) shake(ap.slot, 0.2, 6);
         break;
       }
-      case 'armed': { for (const c of a.order) if (c.racing && c.person && !c.person.bot) { bottom(c.person.slot, 'ATTACKS ON: SPIN AND E ARE LIVE', 2); hudFlash(c.person.slot, 'pulse', 0.3); } break; }
+      case 'armed': { for (const c of a.order) if (c.racing && c.person && !c.person.bot) { bottom(c.person.slot, 'ATTACKS ON: SPINS ARE LIVE', 2); hudFlash(c.person.slot, 'pulse', 0.3); } break; }
       case 'go': { const p = T.point(0); if (view) playSound(view, 'go', null, p.x, p.y, p.z + 60); for (const c of a.order) if (c.person && !c.person.bot) center(c.person.slot, 'GO!', 1.2, 'green'); break; }
       case 'wreck': {
         if (view) { view.wreckEffect(e.car, now); sfxCar(view, 'wreck', e.car); }

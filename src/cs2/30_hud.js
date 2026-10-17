@@ -253,7 +253,7 @@ function hudRace(slot, car, arena, info) {
   // the E ability: name, and a bar that refills over the cooldown; gold when ready, red when short of charge
   const sp = car.spec, ready = car.abilCd <= 0;
   const short = ready && car.charge < sp.abilityCost;
-  if (car.lock > 0) {   // the first seconds of a race: no spins or abilities yet, count down to them
+  if (car.lock > 0 && sp.ability === 'quake') {   // the first seconds of a race: no Shockwave yet, count down to it
     hudText(slot, 'spr_abtxt', 'ATTACKS IN ' + Math.ceil(car.lock), 'cW', null);
     hudSwap(slot, 'spr_abfill', pct(RULES.attackLock - car.lock, RULES.attackLock));
     hudSwap(slot, 'spr_abil', null, 'st');
