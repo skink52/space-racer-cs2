@@ -13,7 +13,7 @@ class Car {
     this.cmd = { throttle: 0, steer: 0, boost: false, drift: false, spin: false, ability: false, abilityDir: 0 };
     this.padTimer = 0; this.boosting = false; this.drifting = false; this.sliding = false; this.onCharge = false; this.slick = false;
     this.draft = null; this.spinTimer = 0; this.spinCd = 0; this.spinYaw = 0; this.hitCd = 0; this.ghost = 0;
-    this.stagger = 0; this.knockCd = 0;   // skidding after a spin hit; no second shove from the same spin
+    this.stagger = 0; this.knockCd = 0; this.lock = 0;   // lock: seconds left before spin / E work (the start)   // skidding after a spin hit; no second shove from the same spin
     // the E ability: cooldown; what fired this step (the arena does the part that touches other cars); timers
     this.abilCd = 0; this.fired = null; this.dashTime = 0; this.novaTimer = 0; this.novaLeft = 0; this.fireT = 0; this.aegis = 0; this.scorch = 0; this.burnCd = 0;
     this.driftDir = 0; this.driftStreak = 0;   // drift charge needs a held slide one way
@@ -66,6 +66,7 @@ class Car {
     const wantBoost = !finished && !air && c.boost && this.charge > 0;
     this.drifting = !finished && !air && c.drift && this.speed > 250;
     // spin attack
+    if (this.lock > 0) { this.lock -= dt; c.spin = false; c.ability = false; }
     if (!finished && c.spin && this.spinCd <= 0 && this.charge >= sp.spinCost && this.spinTimer <= 0) {
       this.charge -= sp.spinCost; this.spinTimer = RULES.spinTime; this.spinCd = RULES.spinCooldown; this.fx |= 32;
     }
@@ -347,9 +348,11 @@ class Car {
 // ---------------------------------------------------------------- pairs
 // a spin attack landing: the other car is shoved sideways, away from the attacker (harder by a heavier car, less
 // into a heavier one), loses a little speed and skids for a moment, so the shove carries it across the road - often
-// into the rail. Once per spin: a car just shoved can't be shoved again for 0.4 s.
+// into the rail. A car just spun can't be spun again for a moment (RULES.spinImmune).
 function spinHit(att, vic, nx, ny) {
-  return shove(att, vic, nx, ny, RULES.spinKnock, RULES.spinStagger);
+  if (!shove(att, vic, nx, ny, RULES.spinKnock, RULES.spinStagger)) return false;
+  vic.knockCd = RULES.spinImmune;
+  return true;
 }
 // a sideways shove away from `att` (the Shockwave uses it too); an Aegis shell can't be shoved
 function shove(att, vic, nx, ny, knock, stagger) {

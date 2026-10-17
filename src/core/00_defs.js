@@ -47,7 +47,9 @@ const RULES = {
   contactSoft: 250,         // closing speed below which a bump is free
   contactDamage: 0.024,     // shield per unit of closing speed above that
   regenDelay: 4, regenRate: 2.2,   // shield repairs slowly once nothing has hit you for this long
-  startProtect: 3.0,        // seconds after the lights with no damage (the first corner is crowded)
+  startProtect: 6.0,        // seconds after the lights with no damage (the first corner is crowded)
+  attackLock: 6.0,          // ... and with no spin attacks or E abilities, so the start is a race, not a brawl
+  spinImmune: 1.5,          // a car just hit by a spin can't be spun again for this long (no chain wrecks)
   railRestitution: 0.3,     // bounce off the rails
   contactRestitution: 0.45,
   wreckShow: 1.5,           // seconds a wreck stays visible

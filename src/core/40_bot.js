@@ -114,6 +114,7 @@ function botThink(arena, car) {
   }
   // the E ability
   b.abilThink = (b.abilThink || 0) - dt;
+  if (car.lock > 0) b.abilThink = car.lock + (1 - b.aggression) * 3;   // at the start, the calmer bots wait a little longer
   if (!ramp && b.abilThink <= 0 && car.abilCd <= 0 && car.charge >= car.spec.abilityCost) { b.abilThink = 0.25; botAbility(arena, car, b, c, straight); }
 }
 

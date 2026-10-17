@@ -135,7 +135,7 @@ class Arena {
       if (this.countdown <= 0) {
         this.state = 'racing'; this.raceTic = 0;
         for (const car of this.order) if (car.state === 'grid') {
-          car.state = 'racing'; car.stateTime = 0; car.lapStart = 0; car.noDamage = RULES.startProtect;
+          car.state = 'racing'; car.stateTime = 0; car.lapStart = 0; car.noDamage = RULES.startProtect; car.lock = RULES.attackLock;
           // gas pressed in the last moment before the lights: a turbo start; held down since long before: a stall
           const g = car.isBot ? (rnd() < car.bot.skill * RULES.botLaunch ? 1 : null) : car.gasAt;
           if (g !== null && g <= RULES.launchWindow * TICRATE) {
@@ -154,6 +154,7 @@ class Arena {
     }
     if (this.state !== 'racing') { this.finishedAt++; return; }
     this.raceTic++;
+    if (this.raceTic === Math.round(RULES.attackLock * TICRATE)) this.events.push({ type: 'armed' });   // spins and E unlock
     const dt = DT;
     const cars = this.order;
     // slipstreams: who is directly behind whom

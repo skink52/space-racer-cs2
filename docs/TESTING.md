@@ -201,6 +201,15 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
   105 -> 110, boost +40% -> +38%, pads 1.4x -> 1.38x; Meteor ram 2x -> 1.8x, acceleration 530 -> 535; Bastion
   shield 130 -> 115, drafting repair 3 -> 1.5/s.
 
+## C8. Clean start (18 Oct)
+
+- For the first 6 seconds after GO: no damage, no spin attacks, no E abilities. The ability bar reads
+  "ATTACKS IN 6 ... 1" and fills; then the bottom line says "ATTACKS ON: SPIN AND E ARE LIVE". Mashing Mouse 2 / E
+  off the line should do nothing.
+- A car that's just been spun can't be spun again for 1.5 seconds (so two or three cars can't spin-lock someone).
+- Bots don't all fire their abilities the moment the lock ends; the calmer ones wait up to 3 seconds more.
+- If the start still feels too wild or too tame: `attackLock` / `startProtect` / `spinImmune` in `const RULES`.
+
 ## D. Things to look at and tune
 
 - Speed feel: `CARS[*].maxSpeed`, `RULES.padSpeed`, the camera presets in `CONFIG.CAMERAS`.
