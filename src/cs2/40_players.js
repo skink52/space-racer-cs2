@@ -166,13 +166,36 @@ function placeFlyover(pk, arena, view, now) {
   pk.camYaw = null;
 }
 
-// results / nothing to follow: a slow circle round the start gantry, high enough to see the field warp out
+// results / nothing to follow: a slow circle round the start gantry, high enough to see the field warp out, rising
+// over any road the circle passes (Crosswire's loop is close to its start). Heights per track, worked out once.
+const OV_R = 1500, OV_N = 64;
+const ovHeights = new Map();
+function overviewHeights(T) {
+  let hs = ovHeights.get(T.id);
+  if (hs) return hs;
+  const p = T.point(0);
+  hs = [];
+  for (let k = 0; k < OV_N; k++) {
+    const a = 2 * Math.PI * k / OV_N, cx = p.x + Math.cos(a) * OV_R, cy = p.y + Math.sin(a) * OV_R;
+    let h = 650;
+    for (let i = 0; i < T.n; i++) if (Math.hypot(T.x[i] - cx, T.y[i] - cy) - T.hw[i] < 500) h = Math.max(h, T.z[i] - p.z + 380);
+    hs.push(h);
+  }
+  // widen the rises a little, then smooth them so the camera eases up and down
+  hs = hs.map((_, k) => Math.max(hs[(k + OV_N - 2) % OV_N], hs[(k + OV_N - 1) % OV_N], hs[k], hs[(k + 1) % OV_N], hs[(k + 2) % OV_N]));
+  for (let pass = 0; pass < 4; pass++) hs = hs.map((v, k) => (hs[(k + OV_N - 1) % OV_N] + 2 * v + hs[(k + 1) % OV_N]) / 4);
+  ovHeights.set(T.id, hs);
+  return hs;
+}
 function placeOverviewCamera(pk, arena, view) {
   if (!live(pk.cam)) return;
   const T = arena.track;
   const p = T.point(0);
   const ang = Instance.GetGameTime() * 0.12;
-  const r = 1500, h = 650;
+  const hs = overviewHeights(T);
+  const f = (((ang / (2 * Math.PI)) % 1) + 1) % 1 * OV_N, k0 = Math.floor(f) % OV_N, w = f - Math.floor(f);
+  const h = hs[k0] + (hs[(k0 + 1) % OV_N] - hs[k0]) * w;
+  const r = OV_R;
   const pos = view.world(p.x + Math.cos(ang) * r, p.y + Math.sin(ang) * r, p.z + h);
   if (pk.camMode !== CustomCameraMode.CONTROLLED) { pk.cam.SetMode(CustomCameraMode.CONTROLLED); pk.camMode = CustomCameraMode.CONTROLLED; }
   pk.cam.Move({ position: pos, angles: { pitch: deg(Math.atan2(h - 250, r)), yaw: deg(ang + Math.PI), roll: 0 } });

@@ -229,7 +229,7 @@ screen, centre text stacked, the bars squashed, no car cards):
 |---|---|---|---|---|
 | Solar Oval | 30.9k | 3 | pixel city at sunset | a huge speedway; the east bend climbs onto an elevated back straight with a chicane that ends in a tube, the west bend dives home |
 | Hairpin Harbour | 37.4k | 2 | teal city | four long straights joined by banked hairpins, climbing a terrace each time, then down through the harbour tube |
-| Crosswire | 33.3k | 3 | neon city | a giant figure-8 with a flat crossing; each lobe climbs to a high banked end |
+| Crosswire | 36.7k | 3 | neon city | a giant figure-8: the first pass dives low through the middle; the second climbs into a full banked spiral loop round the crossing (the first pass threads through it, twice underneath), comes out over the top of itself and dives round the east lobe to the grid |
 | Null Gap | 28.1k | 3 | asteroid belt | two long narrow rail-less sections over the void that roll up and down like a coaster |
 | Switchback Spire | 39.2k | 2 | crystal spikes | four switchbacks up to 1200 units, a long banked sweep, then a dive through a tube |
 | Ringworld | 29.5k | 3 | giant rings, asteroids | a figure-8; one pass is a bridge 920 up, the other runs under it through a tube |

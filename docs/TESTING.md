@@ -131,6 +131,12 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 - **The Pulse** (the wave that sweeps from the back of the field to the front each time the leader starts a new
   lap, topping up everyone's charge): now a low pixel laser fence
   with chevrons on the road under it, instead of a tall see-through sheet that washed out the screen.
+- **Crosswire's crossing** (the pink figure-8; `preview/chase_crosswire.png`). No level crossing any more (the two
+  decks z-fought and each road's rails ran across the other): the second pass climbs into a full banked spiral loop
+  round the middle, and the first pass dives under it twice, threading through the loop just after the start.
+  Check: no flicker or rails across the road anywhere; the camera stays clear under the decks (try `!cam far`);
+  bots get round the loop; the results camera rises over the loop as it circles the start. This one changes the
+  map file (the track model and its vis hints), so compile the map in Hammer after copying.
 
 ## D. Things to look at and tune
 

@@ -95,23 +95,58 @@ TRACKS.append(dict(id='hairpin', title='HAIRPIN HARBOUR', laps=2, theme='hairpin
     gaps=[], tunnels=[(0.775, 0.865)],
     slogans=['HAIRPIN HARBOUR', 'BRAKE LATE', 'DRIFT = CHARGE']))
 
-# 3. Crosswire: a giant figure-8 with a flat crossing in the middle; each lobe climbs to a high banked end.
-cw = []
-a = 5600
-for k in range(48):
-    t = 2 * math.pi * k / 48 + math.pi / 4
+def hermite_heights(cum, keys):
+    """height at each distance in cum from keyframes (distance, height, slope): smooth cubic pieces between them"""
+    out = []
+    for s in cum:
+        z = keys[-1][1]
+        for (s0, z0, m0), (s1, z1, m1) in zip(keys, keys[1:]):
+            if s0 <= s <= s1:
+                h = s1 - s0; t = (s - s0) / h
+                z = ((2 * t ** 3 - 3 * t ** 2 + 1) * z0 + (t ** 3 - 2 * t ** 2 + t) * h * m0 + (-2 * t ** 3 + 3 * t ** 2) * z1
+                     + (t ** 3 - t ** 2) * h * m1)
+                break
+        out.append(z)
+    return out
+
+# 3. Crosswire: a giant figure-8. The first pass through the middle dives low; the second climbs into a full spiral
+# loop round the crossing (the first pass threads through it, twice under it), comes out over the top of itself
+# and dives round the east lobe back to the grid.
+def lem(t, a):
     den = 1 + math.sin(t) ** 2
-    x = a * math.cos(t) / den; y = a * math.sin(t) * math.cos(t) / den * 1.35
-    z = 620 * smoothstep(1200, 4600, abs(x))
-    cw.append((x, y, z, 300))
+    return a * math.cos(t) / den, a * math.sin(t) * math.cos(t) / den * 1.35
+CW_A, CW_R = 5000, 1100          # figure-8 size; loop radius
+CW_H1, CW_HL = 650, 720          # loop height where it starts (over the crossing); how much it climbs in the circle
+CW_ZA, CW_ZS = -100, 250         # the first pass at the crossing; the grid
+(bx0, by0), (bx1, by1) = lem(1.5 * math.pi - 1e-4, CW_A), lem(1.5 * math.pi + 1e-4, CW_A)
+hd = math.atan2(by1 - by0, bx1 - bx0)               # the second pass's heading through the middle (south-east)
+lft = (math.cos(hd + math.pi / 2), math.sin(hd + math.pi / 2))
+O = (CW_R * lft[0], CW_R * lft[1])                  # loop centre: on the second pass's left, so the loop touches the middle
+ph0 = math.atan2(-lft[1], -lft[0])
+cxy = []; mark = {}
+for k in range(48):
+    if k == 6: mark['c1'] = len(cxy)                # first pass through the middle
+    if k == 30:                                     # second pass: the middle, a full left-hand circle round O, the middle
+        mark['c2'] = len(cxy); cxy.append((0.0, 0.0))
+        cxy += [(O[0] + CW_R * math.cos(ph0 + 2 * math.pi * j / 16), O[1] + CW_R * math.sin(ph0 + 2 * math.pi * j / 16)) for j in range(1, 16)]
+        mark['c3'] = len(cxy); cxy.append((0.0, 0.0))
+        continue
+    cxy.append(lem(2 * math.pi * k / 48 + math.pi / 4, CW_A))
+ccum = [0.0]
+for (x0, y0), (x1, y1) in zip(cxy, cxy[1:] + cxy[:1]): ccum.append(ccum[-1] + math.hypot(x1 - x0, y1 - y0))
+CL = ccum.pop()
+s1, s2, s3 = ccum[mark['c1']], ccum[mark['c2']], ccum[mark['c3']]
+m = CW_HL / (s3 - s2)                               # the loop's climb rate; the road climbs into it and out of it as fast,
+cz = hermite_heights(ccum, [                        # so the decks stacked over the middle stay 600+ apart
+    (0, CW_ZS, 0), (400, CW_ZS, 0), (s1 - 350, CW_ZA, 0), (s1 + 350, CW_ZA, 0), (s2, CW_H1, m), (s3, CW_H1 + CW_HL, m),
+    (s3 + 1300, CW_H1 + CW_HL + m * 650, 0), (CL - 1700, CW_ZS, 0), (CL, CW_ZS, 0)])
 TRACKS.append(dict(id='crosswire', title='CROSSWIRE', laps=3, theme='crosswire', bank=20, scenery='city',
-    pts=cw,
-    feats=[('boost', 0.055, 0.075, -0.6, 0.6), ('boost', 0.555, 0.575, -0.6, 0.6),
-           ('charge', 0.30, 0.37, 0.4, 1.0), ('charge', 0.80, 0.87, -1.0, -0.4),
-           ('boost', 0.44, 0.46, -0.5, 0.5), ('boost', 0.94, 0.96, -0.5, 0.5),
-           ('slick', 0.19, 0.21, -1.0, 1.0), ('slick', 0.69, 0.71, -1.0, 1.0)],
-    gaps=[], tunnels=[], crossing=True,
-    slogans=['CROSSWIRE', 'LOOK BOTH WAYS', 'NO BRAKES']))
+    pts=[(x, y, z, 300) for (x, y), z in zip(cxy, cz)],
+    feats=[('boost', 0.03, 0.05, -0.6, 0.6), ('slick', 0.15, 0.17, -1.0, 1.0), ('charge', 0.25, 0.31, 0.4, 1.0),
+           ('boost', 0.42, 0.44, -0.5, 0.5), ('charge', 0.56, 0.62, -1.0, -0.4), ('slick', 0.76, 0.78, -1.0, 1.0),
+           ('charge', 0.83, 0.88, -1.0, -0.4), ('boost', 0.935, 0.955, -0.6, 0.6)],
+    gaps=[], tunnels=[],
+    slogans=['CROSSWIRE', 'THREAD THE LOOP', 'NO BRAKES']))
 
 # 4. Null Gap: a kidney-shaped loop over the void; two long rail-less sections on narrow roads that roll up and
 # down like a roller coaster.

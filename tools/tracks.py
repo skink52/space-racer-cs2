@@ -113,7 +113,9 @@ def validate(track, S):
         for j in np.where(near2d & (np.abs(dz) < 150))[0]:
             if j < i: continue
             cosang = abs(float((tan[i] * tan[j]).sum()))
-            if cosang < 0.5 and track.get('crossing'): crossings.append((i, j))
+            # a level crossing can't be drawn: the two decks z-fight and each road's rails run across the other
+            # (Crosswire's first test). Put one road over the other, 600+ apart.
+            if cosang < 0.5: problems.append('level crossing between samples %d and %d: one road must go over the other' % (i, j))
             else: problems.append('overlap between samples %d and %d (angle cos %.2f)' % (i, j, cosang))
         if (near2d & (dz > 400)).any(): unders.append(i)
         tight = near2d & (np.abs(dz) >= 150) & (np.abs(dz) < 600)

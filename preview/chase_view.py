@@ -74,6 +74,12 @@ if PRESET == 'fly':
     look = math.atan2(qy - py, qx - px); pt = math.atan2(h - 40, 900)
     fwd = np.array([math.cos(look) * math.cos(pt), math.sin(look) * math.cos(pt), -math.sin(pt)])
     right = np.cross(fwd, [0, 0, 1]); right /= np.linalg.norm(right); upv = np.cross(right, fwd)
+if os.environ.get('EYE'):
+    # a free camera for overview shots: EYE=x,y,z AT=x,y,z (track space)
+    cam = np.array([float(v) for v in os.environ['EYE'].split(',')])
+    at = np.array([float(v) for v in os.environ.get('AT', '0,0,0').split(',')])
+    fwd = (at - cam) / np.linalg.norm(at - cam)
+    right = np.cross(fwd, [0, 0, 1]); right /= np.linalg.norm(right); upv = np.cross(right, fwd)
 f = (W / 2) / math.tan(math.radians(FOV / 2))
 
 vmdl = os.path.join(OUT, 'models/spr/track/%s.vmdl' % TID)

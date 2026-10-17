@@ -1,7 +1,7 @@
 // Runs the real out/addon/maps/scripts/space_racer.js against a stand-in for CS2's cs_script API.
 // Simulates players (humans with random input + CS2 bots), the round timer, freeze time, scripted kills and
 // respawns, people joining and leaving, and checks the script keeps working.
-// usage: node test/mock_cs2.mjs [humans=10] [bots=22] [seconds=400] [opts: v,churn,afk,prof,silent,norespawn,warmup,hudstats]
+// usage: node test/mock_cs2.mjs [humans=10] [bots=22] [seconds=400] [opts: v,churn,afk,prof,silent,norespawn,warmup,hudstats,4x16,alt,track=<id>]
 //   silent: churn without disconnect events (slots change hands unannounced); norespawn: CS2 never respawns killed
 //   players; warmup: the whole run is warmup (FireWinCondition ends nothing)
 import fs from 'node:fs';
@@ -166,6 +166,12 @@ let src = fs.readFileSync(path.join(root, `out/addon/maps/scripts/${NAME}.js`), 
 src = src.replace(/^import \{[^}]+\} from "cs_script\/point_script";/m, 'const { Instance, CSInputs, CSPlayerPawn, CSPlayerController, BaseModelEntity, PointTemplate, CustomHudLayout, CSDamageFlags, CSDamageTypes, CustomCameraMode, CSMoveType, CSRoundEndReason, Entity } = __api;');
 if (OPTS.includes('4x16')) src = src.replace("ARENA_LAYOUT: '2x32'", "ARENA_LAYOUT: '4x16'");
 if (OPTS.includes('alt')) src = src.replace("ARENA_LAYOUT: '2x32'", "ARENA_LAYOUT: 'alternate'");
+// track=<id>: race only that track (every other one blacklisted)
+const onlyTrack = (OPTS.match(/track=(\w+)/) || [])[1];
+if (onlyTrack) {
+  const ids = JSON.parse(fs.readFileSync(path.join(root, 'out/addon/_gen/tracks.json'), 'utf8')).map((t) => t.id).filter((id) => id !== onlyTrack);
+  src = src.replace('TRACK_BLACKLIST: [],', 'TRACK_BLACKLIST: ' + JSON.stringify(ids) + ',');
+}
 src += '\nglobalThis.__dbg = () => ({ rm, views, parked, phase });\n';
 const ctx = vm.createContext({ __api: api, console, Math, Date, JSON, Map, Set, Array, Object, String, Number, Error, Infinity, NaN, Promise, performance });
 vm.runInContext(src, ctx, { filename: NAME + '.js' });
