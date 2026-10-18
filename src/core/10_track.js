@@ -65,15 +65,24 @@ class Track {
     return p;
   }
 
-  // locate a point with a hint segment: checks a window around it; falls back to a full scan when nothing fits
+  // locate a point with a hint segment: checks a window around it; falls back to a full scan when nothing fits.
+  // (every car, every tic: the window is the same sum as closest() for each segment, written out so it makes no
+  // garbage; only the winner becomes an object)
   locate(x, y, z, hint) {
-    let best = null;
     if (hint !== undefined && hint !== null) {
+      const n = this.n, X = this.x, Y = this.y, TX = this.tx, TY = this.ty, NX = this.nx, NY = this.ny, step = this.step;
+      let bi = -1, bt = 0, bd = 0, bs = 0;
       for (let k = -4; k <= 8; k++) {
-        const p = this.closest(hint + k, x, y, z);
-        if (!best || p.score < best.score) best = p;
+        const i = (((hint + k) % n) + n) % n;
+        const dx = x - X[i], dy = y - Y[i];
+        const tc = clamp((dx * TX[i] + dy * TY[i]) / step, 0, 1);
+        const d = dx * NX[i] + dy * NY[i];
+        const px = X[i] + TX[i] * tc * step, py = Y[i] + TY[i] * tc * step;
+        const dz = (z - this.zAt(i, tc) + d * this.bankAt(i, tc)) * 2;
+        const score = Math.sqrt((x - px) * (x - px) + (y - py) * (y - py) + dz * dz);
+        if (bi < 0 || score < bs) { bi = i; bt = tc; bd = d; bs = score; }
       }
-      if (best && best.score < this.hw[best.i] + 160) return this.finish(best);
+      if (bi >= 0 && bs < this.hw[bi] + 160) return this.finish({ i: bi, t: bt, d: bd, score: bs });
     }
     return this.locateAll(x, y, z);
   }
@@ -108,6 +117,14 @@ class Track {
 
   zAt(i, t) { const j = (i + 1) % this.n; return this.z[i] + (this.z[j] - this.z[i]) * t; }
   bankAt(i, t) { const j = (i + 1) % this.n; return this.bk[i] + (this.bk[j] - this.bk[i]) * t; }
+
+  // the centreline height at progress s (the same as point(s).z, without making an object)
+  zAtS(s) {
+    s = ((s % this.len) + this.len) % this.len;
+    const f = s / this.step;
+    const i = Math.floor(f) % this.n, j = (i + 1) % this.n, t = f - Math.floor(f);
+    return this.z[i] + (this.z[j] - this.z[i]) * t;
+  }
 
   // a point on the centreline at progress s (any real; wraps)
   point(s) {

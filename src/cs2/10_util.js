@@ -1,4 +1,8 @@
 // ---------------------------------------------------------------- small helpers
+// the game time of the current server tick: read once per think (it doesn't change within a tick)
+let tickTime = 0, inThink = false;
+function gameTime() { return inThink ? tickTime : Instance.GetGameTime(); }
+
 function log(msg) { Instance.Msg('[spr] ' + msg); }
 function dlog(msg) { if (CONFIG.DEBUG) log(msg); }
 const warned = new Set();
@@ -42,9 +46,9 @@ function angleDiff(a, b) { return normAngle(b - a); }
 const sayQueue = [];
 let sayNext = 0;
 function sayAll(text) { sayQueue.push('say ' + String(text).replace(/[;"]/g, '')); }
-function sayHold() { sayNext = Math.max(sayNext, Instance.GetGameTime() + CONFIG.SAY_GAP); }
+function sayHold() { sayNext = Math.max(sayNext, gameTime() + CONFIG.SAY_GAP); }
 function flushSays() {
-  const now = Instance.GetGameTime();
+  const now = gameTime();
   if (!sayQueue.length || now < sayNext) return;
   Instance.ServerCommand(sayQueue.shift());
   sayNext = now + CONFIG.SAY_GAP;

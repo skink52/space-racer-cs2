@@ -21,7 +21,8 @@ function trial(attKey, vicKey, speed = 900, gap = 70) {
   const yaw = Math.atan2(ty, tx);
   for (const [car, off] of [[att, -gap / 2], [vic, gap / 2]]) {
     car.placeAt(track.x[i] + lx * off, track.y[i] + ly * off, track.z[i], yaw, track);
-    car.state = 'racing'; car.noDamage = 0; car.vx = tx * speed; car.vy = ty * speed; car.charge = 100;
+    car.state = 'racing'; car.noDamage = 0; car.lock = 0; car.vx = tx * speed;   // (lock: the start's no-attack seconds)
+    car.vy = ty * speed; car.charge = 100;
     car.cmd.throttle = 1; car.cmd.steer = 0;
   }
   const d0 = vic.d, v0 = speed, s0 = vic.shield;

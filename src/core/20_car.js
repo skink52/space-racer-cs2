@@ -28,6 +28,11 @@ class Car {
     this.bank = 0;                 // tan of the road's lean under the car (banked bends)
     this.yawRate = 0;              // how fast the car is turning (radians per second, smoothed; + = left)
     this.gasAt = null; this.stall = 0;   // turbo start: when the gas went down on the grid; seconds of stalled engine
+    this.gridPos = 0; this.pos = 0;      // grid slot; place in the race (set by the arena)
+    this.koBy = null; this.koApplied = false;   // who wrecked it, and whether that kill was sent at once (CS2 side)
+    // used by the CS2 side (sound edges, the HUD's turn arrow). Every field a car will ever have is made here: a field
+    // added later gives some cars a different shape and makes the physics noticeably slower.
+    this.wasBoost = false; this.wasCharge = false; this.turnTick = -1; this.turnCls = null;
   }
 
   placeAt(x, y, z, yaw, track) {

@@ -37,13 +37,13 @@ function init() {
   scanPeople(true);
   cvars(CONFIG.CVARS_ALWAYS);
   ready = true;
-  lastTime = Instance.GetGameTime();
+  lastTime = gameTime();
   startAt = lastTime + 1;
   log(`v${VERSION} ready: ${rm.tracks.length} tracks, HUD ${hud() ? 'on' : 'MISSING'}, prop template ${findPropTemplate() ? 'on' : 'MISSING'}`);
 }
 
 function scanPeople(force) {
-  const now = Instance.GetGameTime();
+  const now = gameTime();
   if (!force && now - lastPeopleScan < 1) return;
   lastPeopleScan = now;
   const seen = new Set();
@@ -65,7 +65,7 @@ function scanPeople(force) {
 
 function dropPerson(slot) {
   rm.removePerson(slot);
-  parked.delete(slot);
+  parked.delete(slot); noPawnUntil.delete(slot);
   hudReset(slot);
   centerMsgs.delete(slot); subMsgs.delete(slot); botMsgs.delete(slot);
   awaitRespawn.delete(slot);
@@ -77,15 +77,15 @@ function dropPerson(slot) {
 }
 
 // ---------------------------------------------------------------- messages
-function center(slot, text, secs, cls) { centerMsgs.set(slot, { text, until: Instance.GetGameTime() + secs, cls: cls || null }); }
-function sub(slot, text, secs) { subMsgs.set(slot, { text, until: Instance.GetGameTime() + secs }); }
-function bottom(slot, text, secs) { botMsgs.set(slot, { text, until: Instance.GetGameTime() + secs }); }
+function center(slot, text, secs, cls) { centerMsgs.set(slot, { text, until: gameTime() + secs, cls: cls || null }); }
+function sub(slot, text, secs) { subMsgs.set(slot, { text, until: gameTime() + secs }); }
+function bottom(slot, text, secs) { botMsgs.set(slot, { text, until: gameTime() + secs }); }
 function timed(map, slot, now) { const m = map.get(slot); return m && now < m.until ? m : null; }
 
 // ---------------------------------------------------------------- round flow
 function startRace() {
   scanPeople(true);
-  if (!rm.startRound()) { startAt = Instance.GetGameTime() + 5; return; }
+  if (!rm.startRound()) { startAt = gameTime() + 5; return; }
   phase = 'running';
   cvars(['mp_ignore_round_win_conditions 1', 'mp_teammates_are_enemies 1']);
   guard('roundtime', () => Instance.SetRoundRemainingTime(CONFIG.COUNTDOWN + CONFIG.RACE_CAP + CONFIG.RESULTS_HOLD + CONFIG.ROUND_SLACK));
@@ -100,7 +100,7 @@ function onArenaBuilt(a) {
   for (const car of a.order) {
     const pe = car.person;
     if (!pe || (pe.bot && !CONFIG.CS2_BOTS_PLAY)) continue;
-    const pk = park(pe.slot);
+    const pk = park(pe.slot, true);
     if (pk) pk.camYaw = null;
     if (!pe.bot) center(pe.slot, a.track.title, 4, 'gold');
   }
@@ -109,7 +109,7 @@ function onArenaBuilt(a) {
 let endedAt = 0, roundEndSeen = false;
 function endRace() {
   if (phase !== 'running') return;
-  phase = 'ending'; endedAt = Instance.GetGameTime(); roundEndSeen = false;
+  phase = 'ending'; endedAt = gameTime(); roundEndSeen = false;
   const pts = rm.teamPoints();
   const lines = pts.detail.map((d) => `${d.track}: T ${d.t} - CT ${d.ct}`);
   const who = pts.winner === 2 ? 'T WIN' : pts.winner === 3 ? 'CT WIN' : 'DRAW';
@@ -167,7 +167,7 @@ function queueKill(victimSlot, killerSlot, delay) {
     return;
   }
   const kp = killerSlot === null || killerSlot === undefined ? null : rm.person(killerSlot);
-  pendingKills.push({ at: Instance.GetGameTime() + delay, victim: victimSlot, killer: killerSlot, vpe: rm.person(victimSlot), kpe: kp });
+  pendingKills.push({ at: gameTime() + delay, victim: victimSlot, killer: killerSlot, vpe: rm.person(victimSlot), kpe: kp });
 }
 
 function processKills(now) {
@@ -202,7 +202,7 @@ let respawnFailures = 0, koDeferred = false;
 
 // ---------------------------------------------------------------- events from the race
 function sfxCar(view, sfx, car, gap) {
-  const key = car.slot + sfx, now = Instance.GetGameTime();
+  const key = car.slot + sfx, now = gameTime();
   if (gap && (soundCd.get(key) || 0) > now) return;
   soundCd.set(key, now + (gap || 0));
   playSound(view, sfx, car);
@@ -300,8 +300,9 @@ function handleArenaEvents(a, now) {
     }
   }
   a.events.length = 0;
-  // per-car effect bits
-  if (!view) return;
+  // per-car effect bits - once per race step: when an arena stops stepping (results), its cars keep their last bits
+  if (!view || (a.state === 'over' && view.fxDone)) return;
+  if (a.state === 'over') view.fxDone = true;
   for (const car of a.order) {
     const f = car.fx;
     if (!f && !car.boosting && !car.onCharge) { car.wasBoost = false; car.wasCharge = false; continue; }
@@ -327,7 +328,7 @@ function handleArenaEvents(a, now) {
 const FIRE_FRAMES = Array.from({ length: Math.round(RULES.fireTime * 8) }, (_, k) => (k % 2 ? CAR_MODELS.fx.fire1 : CAR_MODELS.fx.fire0));
 
 const flashes = new Map();   // slot -> { cls, until }
-function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: Instance.GetGameTime() + secs }); }
+function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: gameTime() + secs }); }
 
 function onArenaEnd(a, result, now) {
   if (a.newRecord) { const r = records.get(a.track.id); if (r) sayAll(`LAP RECORD on ${a.track.title}: ${r.who} ${fmtTime(r.time)}`); a.newRecord = false; }
@@ -387,10 +388,8 @@ function liveTally(now) {
 }
 
 function raceInfo(pe, car, a, now, spectating) {
-  const info = { rows: [], spectating, tally: liveTally(now) };
-  const rows = standingsFor(a, now);
-  info.rows = rows.map((r) => ({ text: r.text, team: r.team, me: r.slot === car.slot }));
-  info.clock = a.state === 'grid' ? 'GRID' : a.state === 'over' ? 'RESULTS' : fmtTime(a.raceTic / TICRATE).slice(0, -3);
+  // (rows = the arena's shared standings list; the HUD marks the row whose slot is info.me)
+  const info = { rows: standingsFor(a, now), me: car.slot, spectating, tally: liveTally(now), clock: arenaHud(a).clock };
   const cm = timed(centerMsgs, pe.slot, now);
   if (cm) { info.center = cm.text; info.centerCls = cm.cls; }
   else if (a.state === 'grid' && a.countdown > 3 * TICRATE) info.center = '';
@@ -410,13 +409,19 @@ function raceInfo(pe, car, a, now, spectating) {
 }
 
 let lobbyCycle = 0;
+// the CS2 round clock, read once per tick however many lobby screens show it
+let remTick = -1, remValue;
+function roundRemaining() {
+  if (remTick !== tickNo || !inThink) { remValue = guard('remaining', () => Instance.GetRoundRemainingTime()); remTick = inThink ? tickNo : -1; }
+  return remValue;
+}
 function lobbyInfo(pe, now) {
   const info = { line1: '', line2: '', line3: '' };
   const car = CARS[pe.carChoice] || CARS.hornet;
   info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + (pe.pickShown ? '  (A / D, E TO CONFIRM)' : '  (R TO CHANGE)');
   const nextT = rm.upcoming[0];
   if (phase === 'running') {
-    const rem = guard('remaining', () => Instance.GetRoundRemainingTime());
+    const rem = roundRemaining();
     const left = rem === undefined ? 0 : Math.max(0, Math.ceil(rem - CONFIG.ROUND_SLACK));
     info.line1 = `RACE ON - YOU ARE IN THE NEXT ONE  (${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} AT MOST)`;
     const a = rm.arenas[lobbyCycle % Math.max(1, rm.arenas.length)];
@@ -467,14 +472,14 @@ function lobbyFrame(now, dt) {
   if (hudNow) { lobbyNext = now + 0.05; lobbyCycle = Math.floor(now / 3); }
   const a0 = rm.arenas[0];
   for (const pe of rm.people.values()) {
-    if (pe.bot) { if (!parked.has(pe.slot)) park(pe.slot); continue; }   // bots stand frozen in the booth too
-    const pk = park(pe.slot);
+    if (pe.bot) { if (!parked.has(pe.slot) && verifyTurn(pe.slot)) park(pe.slot); continue; }   // bots stand frozen in the booth too
+    const pk = park(pe.slot, verifyTurn(pe.slot));
     if (!pk) { if (hudNow) guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); }); continue; }
-    if (pickerInput(pe, pk)) rm.markActive(pe.slot);
+    if (!playerCall('lobbyinput', pe.slot, () => { if (pickerInput(pe, pk)) rm.markActive(pe.slot); })) continue;   // pawn gone
     if (hudNow) guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, pickerAuto(pe) || pickerOpen(pe, now)); });
     // nothing to look at yet: a slow look around the first track from above
-    if (!a0) guard('lobbycam', () => {
-      if (!live(pk.cam)) return;
+    if (!a0) playerCall('lobbycam', pe.slot, () => {
+      if (!pk.cam) return;
       // the track of the next race, the whole of it in view: a slow circle high above its edge, looking in
       const T = rm.upcoming[0] || rm.tracks[0];
       const off = T.off || [0, 0, 0];
@@ -508,7 +513,7 @@ function musicStart(name) { const e = soundEnt(name); if (e) Instance.EntFireAtT
 function musicStop(name) { const e = soundEnt(name); if (e) Instance.EntFireAtTarget({ target: e, input: 'StopSound' }); }
 
 function frame(dt) {
-  const now = Instance.GetGameTime();
+  const now = gameTime();
   guard('music', () => musicFrame(now));
   soundsThisTick = 0;
   spawnBudget = CONFIG.SPAWN_BUDGET;
@@ -528,22 +533,10 @@ function frame(dt) {
   if (phase !== 'running' && phase !== 'ending') return;
   // input
   for (const pe of rm.people.values()) {
-    if (pe.bot) { if (!parked.has(pe.slot)) park(pe.slot); continue; }
-    const pk = park(pe.slot);
+    if (pe.bot) { if (!parked.has(pe.slot) && verifyTurn(pe.slot)) park(pe.slot); continue; }
+    const pk = park(pe.slot, verifyTurn(pe.slot));
     if (!pk) continue;
-    if (pe.status === 'racing' && pe.car && pe.arena) {
-      if (pe.car.state === 'grid') { if (pe.arena.countdown > 3 * TICRATE ? pickerInput(pe, pk) : sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
-      else if (pe.car.racing) { pe.raced = true; if (sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
-      else {
-        // wrecked / finished / withdrawn: watch the others after a moment (!car works from here on)
-        pickerInput(pe, pk);
-        if (pe.car.stateTime > RULES.wreckShow || pe.car.state === 'gone' || pe.car.state === 'withdrawn') {
-          pe.status = 'spectating'; pe.spec = { arena: pe.arena.index, target: null }; rm.fixSpectate(pe, 0);
-        }
-      }
-    } else if (pe.status === 'spectating' || pe.status === 'none') {
-      if (spectatorInput(pe, pk)) rm.markActive(pe.slot);
-    }
+    playerCall('input', pe.slot, () => playerInput(pe, pk));
   }
   // the race, one step per server tick
   acc += dt;
@@ -574,7 +567,7 @@ function frame(dt) {
       continue;
     }
     hudOptions(pe.slot, pe);
-    guard('view', () => {
+    playerCall('view', pe.slot, () => {
       if (pe.status === 'racing' && pe.car && pe.arena) {
         const a = pe.arena, v = views.get(a);
         if (!v) return;
@@ -601,32 +594,82 @@ function frame(dt) {
   }
 }
 
+// one player's keys for this tick (racing, on the grid, watching)
+function playerInput(pe, pk) {
+  if (pe.status === 'racing' && pe.car && pe.arena) {
+    if (pe.car.state === 'grid') { if (pe.arena.countdown > 3 * TICRATE ? pickerInput(pe, pk) : sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
+    else if (pe.car.racing) { pe.raced = true; if (sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
+    else {
+      // wrecked / finished / withdrawn: watch the others after a moment (!car works from here on)
+      pickerInput(pe, pk);
+      if (pe.car.stateTime > RULES.wreckShow || pe.car.state === 'gone' || pe.car.state === 'withdrawn') {
+        pe.status = 'spectating'; pe.spec = { arena: pe.arena.index, target: null }; rm.fixSpectate(pe, 0);
+      }
+    }
+  } else if (pe.status === 'spectating' || pe.status === 'none') {
+    if (spectatorInput(pe, pk)) rm.markActive(pe.slot);
+  }
+}
+
+// something failed for one player: if their pawn or camera went away between checks, forget the parked entry so the
+// next tick looks the pawn up again (returns false: skip the rest of this player's tick); any other error is said
+// once per kind and the player carries on
+function playerCall(what, slot, fn) {
+  try { fn(); return true; } catch (err) {
+    const pk = parked.get(slot);
+    if (pk && (!live(pk.pawn) || (pk.cam && !live(pk.cam)))) { parked.delete(slot); return false; }   // expected: no message
+    const k = what + ':' + String(err);
+    if (!warned.has(k)) { warned.add(k); log('error in ' + what + ' (slot ' + slot + '): ' + err + (err && err.stack ? '\n' + err.stack : '')); }
+    return true;
+  }
+}
+
 // HUDs refresh at half the tick rate, half the players on even ticks and half on odd (cameras still move every tick)
 let tickNo = 0;
 function hudTurn(slot) { return ((slot + tickNo) & 1) === 0; }
 
 function think() {
+  const t0 = perfOn ? clockMs() : 0;
   tickNo++;
   hudBudget = CONFIG.HUD_BUDGET;
-  flushSays();
   const now = Instance.GetGameTime();
+  tickTime = now; inThink = true;
+  flushSays();
   let dt = now - lastTime;
   lastTime = now;
   if (!(dt > 0) || dt > 0.25) dt = DT;
   if (ready) guard('frame', () => frame(dt));
+  inThink = false;
+  if (perfOn) perfTick(clockMs() - t0, now);
   Instance.SetNextThink(now);
+}
+
+// script time per server tick, said in the console once a minute while a race runs (to judge a server's load)
+const perfClock = typeof performance !== 'undefined' && performance && typeof performance.now === 'function' ? performance : null;
+const perfOn = CONFIG.PERF_LOG && (!!perfClock || typeof Date !== 'undefined');
+function clockMs() { return perfClock ? perfClock.now() : Date.now(); }
+let perfSum = 0, perfMax = 0, perfN = 0, perfAt = 0;
+function perfTick(ms, now) {
+  if (phase !== 'running') { perfN = 0; perfSum = 0; perfMax = 0; perfAt = now + 60; return; }
+  perfSum += ms; perfN++; if (ms > perfMax) perfMax = ms;
+  if (now < perfAt) return;
+  let humans = 0, cars = 0;
+  for (const pe of rm.people.values()) if (!pe.bot) humans++;
+  for (const a of rm.arenas) cars += a.order.length;
+  log(`script time: avg ${(perfSum / Math.max(1, perfN)).toFixed(2)} ms, max ${perfMax.toFixed(1)} ms per server tick (${humans} players, ${cars} cars, ${rm.arenas.length} arenas)${perfClock ? '' : ' (1 ms clock)'}`);
+  perfN = 0; perfSum = 0; perfMax = 0; perfAt = now + 60;
 }
 
 // ---------------------------------------------------------------- CS2 hooks
 Instance.SetThink(think);
-Instance.OnActivate(() => { guard('init', init); Instance.SetNextThink(Instance.GetGameTime()); });
+Instance.OnActivate(() => { guard('init', init); Instance.SetNextThink(gameTime()); });
 Instance.OnScriptReload({
   before: () => { guard('reload', () => cleanupRound(false)); return null; },
-  after: () => { guard('init', init); Instance.SetNextThink(Instance.GetGameTime()); },
+  after: () => { guard('init', init); Instance.SetNextThink(gameTime()); },
 });
 Instance.OnRoundStart(() => guard('roundstart', () => {
   if (phase !== 'lobby') cleanupRound(true);
-  startAt = Instance.GetGameTime() + CONFIG.START_DELAY;
+  startAt = gameTime() + CONFIG.START_DELAY;
   cvars(['mp_ignore_round_win_conditions 1']);
 }));
 Instance.OnRoundEnd((ev) => guard('roundend', () => {
@@ -653,8 +696,8 @@ Instance.OnPlayerReset(({ player }) => guard('reset', () => {
   const pe = rm.person(slot);
   if (!pe) return;
   // a fresh pawn (spawn, or the respawn after a scripted kill): park it again and keep the camera
-  parked.delete(slot);
-  park(slot);
+  parked.delete(slot); noPawnUntil.delete(slot);
+  park(slot, true);
   if (phase === 'running' && pe.status === 'none') rm.lateJoin(pe);
 }));
 Instance.OnPlayerKill(({ player }) => guard('cskilled', () => {
@@ -696,7 +739,7 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
       // a name we don't know, or the hands are on the wheel (A / D steer): the numbers instead
       bottom(slot, '1 HORNET  2 METEOR  3 COMET  4 BASTION', 5);
     } else {
-      pe.pickUntil = Instance.GetGameTime() + CONFIG.PICK_SHOW;
+      pe.pickUntil = gameTime() + CONFIG.PICK_SHOW;
     }
   } else if (t === '!cam' || t.startsWith('!cam ')) {
     const names = Object.keys(CONFIG.CAMERAS);
@@ -720,7 +763,7 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
   } else if (t === '!back') {
     pe.afk = false; rm.markActive(slot);
   } else if (t === '!race' || t === '!help' || t === '!spr') {
-    pe.helpUntil = Instance.GetGameTime() + CONFIG.HELP_SECONDS;      // hudOptions takes it down again
+    pe.helpUntil = gameTime() + CONFIG.HELP_SECONDS;      // hudOptions takes it down again
     hudHelp(slot, true);
   }
 }));

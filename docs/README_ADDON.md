@@ -92,7 +92,9 @@ scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!help` or `!ra
 `maps/scripts/space_racer.js`, search for `const CONFIG`: `ARENA_LAYOUT` ('2x32', '4x16', 'alternate'), laps, countdown, finish window, race cap,
 podium size and kill shares, `KO_CREDIT_TO_ATTACKER`, tie-break, AFK times, bot skill, camera distance, and the
 cvars the map applies, the camera presets (`CAMERAS`, `CAM_LOOKAHEAD`, `CAM_BANK`, `CAM_SHAKE`), `ENGINE_HUM`,
-`MUSIC` (chiptune music for everyone; volume: `MUSIC_VOL` in `tools/sounds.py`). The four cars and the physics rules are in `const CARS` / `const RULES` just below.
+`MUSIC` (chiptune music for everyone; volume: `MUSIC_VOL` in `tools/sounds.py`), `MINIMAP_DOT_HZ` (how often the
+other cars' minimap dots move; 4 instead of 8 halves the biggest share of HUD traffic), `PERF_LOG` (the once-a-minute
+`script time` line in the console). The four cars and the physics rules are in `const CARS` / `const RULES` just below.
 
 When `APPLY_CVARS` is on the map sets: `mp_respawn_on_death_t/ct 1`, `mp_respawn_immunitytime 0`,
 `mp_teammates_are_enemies 1` (no teamkill penalties for same-side kills), `mp_ignore_round_win_conditions 1`

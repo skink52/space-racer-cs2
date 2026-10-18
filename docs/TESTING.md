@@ -14,7 +14,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 ## B. First run (listen server, `bot_quota 0`)
 
-1. Console on map load: `[spr] v0.3.1 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
+1. Console on map load: `[spr] v0.3.2 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too. Once you have picked, the
    cards go away; `!car` brings them back (see C6).
@@ -37,6 +37,7 @@ Valve's type declarations. These are the things only the real game can show, in 
    Then: does CS2 respawn the killed pawns within a couple of seconds (they must, or the camera is lost for a
    moment - console warns if kills are blocked)?
 3. Watch "point_script ... thinking for" in the console; a 32-car arena should cost well under 5 ms per tick.
+   Once a minute during a race the map says `[spr] script time: avg X ms, max Y ms per server tick (...)` (see C9).
 4. With 33+ players (bots) two arenas run on two tracks; `RACE OVER - <track>: T n - CT m | ...` names the winner.
 
 ## C2. Added in session 2 (check these too)
@@ -233,3 +234,26 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 - The translucent effects (wreck, warp, the Pulse wave, hover shadow) and the alpha-blended materials.
 - Sound spatialisation relative to the custom camera, and whether the music events stay un-positioned.
 - Whether `csgo_moondome` accepts the equirectangular sky pictures as its `TextureCubeMap`.
+
+## C9. Performance pass (18 Oct, v0.3.2)
+
+The script was made cheaper without changing what anyone sees. On the stand-in engine (900 s, players holding keys
+like people do, after warm-up), per server tick:
+
+| Server | Script time before | after | CS2 calls before | after |
+|---|---|---|---|---|
+| 64 (20 humans + 44 bots) | 0.36 ms | 0.14 ms | 608 | 215 |
+| 32 humans | 0.41 ms | 0.11 ms | 723 | 255 |
+| 32 (4 humans + 28 bots) | 0.14 ms | 0.06 ms | 163 | 69 |
+| 8 (2 humans + 6 bots) | 0.055 ms | 0.026 ms | 63 | 25 |
+
+What to check in CS2:
+- Console, the first time someone taps a key while watching or on the car picker: `[spr] CS2 input masks mean "any
+  of these keys" - idle players now cost one input call a tick`. If it says `something else`, the map reads keys
+  one at a time as before (still fine, just more calls) - tell Claude.
+- `[spr] script time: ...` once a minute during races: with a full server it should stay well under 1 ms avg.
+- Everything else should look and play exactly as before: the HUD, cars on the grid, the camera, picking a car with
+  A / D / E, spectating with Mouse 1 / 2 / E / Space, kill credit and respawns.
+- `MINIMAP_DOT_HZ` in CONFIG (default 8, as before): the other cars' minimap dots are about half of all HUD traffic;
+  4 halves that for a slightly choppier minimap.
+

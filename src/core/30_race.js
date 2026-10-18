@@ -29,6 +29,9 @@ class Arena {
     this.finishedAt = 0;
     this.lastBeep = -1;
     this.fires = [];                // Nova Burn fire on the road: { x, y, z, until, owner }
+    this.pairs = null;              // flat copies of positions for the pair loops in step()
+    this.lanes = null;              // the bots' lane picture for this tic (laneCars)
+    this.hudCache = null; this.newRecord = false;   // used by the CS2 side
   }
 
   addCar(slot, name, clsKey, team) {
@@ -156,37 +159,53 @@ class Arena {
     this.raceTic++;
     if (this.raceTic === Math.round(RULES.attackLock * TICRATE)) this.events.push({ type: 'armed' });   // spins and E unlock
     const dt = DT;
-    const cars = this.order;
+    const cars = this.order, n = cars.length;
+    // the pair loops below (every car against every other, 64 times a second) read positions from flat arrays that
+    // mirror the cars: the same numbers, much faster to scan than the car objects
+    let A = this.pairs;
+    if (!A || A.n !== n) A = this.pairs = { n, x: new Float64Array(n), y: new Float64Array(n), z: new Float64Array(n), v: new Float64Array(n), solid: new Uint8Array(n), spin: new Uint8Array(n) };
+    const X = A.x, Y = A.y, Z = A.z, V = A.v, SOL = A.solid, SPIN = A.spin;
+    for (let i = 0; i < n; i++) {
+      const c = cars[i];
+      c.draft = null;
+      X[i] = c.x; Y[i] = c.y; Z[i] = c.z; V[i] = c.speed; SOL[i] = c.state === 'racing' && c.ghost <= 0 ? 1 : 0;
+    }
     // slipstreams: who is directly behind whom
-    for (const c of cars) c.draft = null;
-    for (const c of cars) {
-      if (!c.solid || c.speed < 300) continue;
-      const fx = Math.cos(c.yaw), fy = Math.sin(c.yaw);
-      let best = null, bestAlong = 1e9;
-      for (const o of cars) {
-        if (o === c || !o.solid || o.speed < 350) continue;
-        const rx = o.x - c.x, ry = o.y - c.y;
+    for (let i = 0; i < n; i++) {
+      if (!SOL[i] || V[i] < 300) continue;
+      const c = cars[i];
+      const fx = Math.cos(c.yaw), fy = Math.sin(c.yaw), cx = X[i], cy = Y[i], cz = Z[i];
+      let best = -1, bestAlong = 1e9;
+      for (let j = 0; j < n; j++) {
+        if (j === i || !SOL[j] || V[j] < 350) continue;
+        const rx = X[j] - cx, ry = Y[j] - cy;
         const along = rx * fx + ry * fy;
         if (along < 60 || along > 360) continue;
         const side = Math.abs(-rx * fy + ry * fx);
-        if (side > 70 || Math.abs(o.z - c.z) > 60) continue;
-        if (along < bestAlong) { best = o; bestAlong = along; }
+        if (side > 70 || Math.abs(Z[j] - cz) > 60) continue;
+        if (along < bestAlong) { best = j; bestAlong = along; }
       }
-      c.draft = best;
+      c.draft = best >= 0 ? cars[best] : null;
     }
     // drive
     for (const c of cars) c.step(this.track, dt, this.raceTic);
     this.abilities(cars, dt);
     // bumps
-    for (let i = 0; i < cars.length; i++) {
+    for (let i = 0; i < n; i++) {
+      const c = cars[i];
+      X[i] = c.x; Y[i] = c.y; SOL[i] = c.state === 'racing' && c.ghost <= 0 ? 1 : 0; SPIN[i] = c.spinTimer > 0 ? 1 : 0;
+    }
+    const R2 = CAR_R * 2;
+    for (let i = 0; i < n; i++) {
+      if (!SOL[i]) continue;
       const a = cars[i];
-      if (!a.solid) continue;
-      for (let j = i + 1; j < cars.length; j++) {
+      for (let j = i + 1; j < n; j++) {
+        if (!SOL[j]) continue;
+        const near = R2 + (SPIN[i] || SPIN[j] ? RULES.spinReach : 0);
+        if (Math.abs(X[i] - X[j]) > near || Math.abs(Y[i] - Y[j]) > near) continue;
         const b = cars[j];
-        if (!b.solid) continue;
-        const near = CAR_R * 2 + (a.spinTimer > 0 || b.spinTimer > 0 ? RULES.spinReach : 0);
-        if (Math.abs(a.x - b.x) > near || Math.abs(a.y - b.y) > near) continue;
         const hit = collideCars(a, b, this.raceTic);
+        X[i] = a.x; Y[i] = a.y; X[j] = b.x; Y[j] = b.y;      // a bump pushes the two apart
         if (hit) this.events.push({ type: 'spinHit', attacker: hit[0], car: hit[1] });
       }
     }
@@ -209,18 +228,18 @@ class Arena {
     if (RULES.pulseEnabled) this.pulseStep(dt);
     if ((this.raceTic & 7) === 0) this.rank();
     // end of the race
-    const active = cars.filter((c) => c.racing);
+    let active = false;
+    for (const c of cars) if (c.state === 'racing' || c.state === 'falling') { active = true; break; }
     const cap = this.raceTic >= this.cfg.raceCap * TICRATE;
     const window = this.firstFinishTic && this.raceTic - this.firstFinishTic >= this.cfg.finishWindow * TICRATE;
-    if (!active.length || cap || window) this.end(cap ? 'time' : window ? 'window' : 'all');
+    if (!active || cap || window) this.end(cap ? 'time' : window ? 'window' : 'all');
   }
 
   pulseStep(dt) {
     const p = this.pulse;
-    const racing = this.order.filter((c) => c.state === 'racing');
-    if (!racing.length) { p.active = false; return; }
-    let leader = -Infinity, back = Infinity;
-    for (const c of racing) { if (c.total > leader) leader = c.total; if (c.total < back) back = c.total; }
+    let leader = -Infinity, back = Infinity, any = false;
+    for (const c of this.order) if (c.state === 'racing') { any = true; if (c.total > leader) leader = c.total; if (c.total < back) back = c.total; }
+    if (!any) { p.active = false; return; }
     const leaderLaps = Math.floor(leader / this.track.len);
     if (!p.active && leaderLaps > p.lapsSeen && leaderLaps < this.laps) {
       p.lapsSeen = leaderLaps; p.active = true; p.total = back - 400; p.prev = p.total;
@@ -228,7 +247,8 @@ class Arena {
     }
     if (!p.active) return;
     p.prev = p.total; p.total += RULES.pulseSpeed * dt;
-    for (const c of racing) {
+    for (const c of this.order) {
+      if (c.state !== 'racing') continue;
       if (c.total > p.prev && c.total <= p.total) { c.charge = Math.min(c.spec.charge, c.charge + RULES.pulseCharge); c.fx |= 4; c.pulsed = 0.6; this.events.push({ type: 'pulsed', car: c }); }
     }
     if (p.total > leader + 300) { p.active = false; this.events.push({ type: 'pulse', start: false }); }

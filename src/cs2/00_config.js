@@ -80,6 +80,8 @@ const CONFIG = {
   SPAWN_BUDGET: 24,              // new props per server tick at most
   HUD_BUDGET: 900,               // HUD changes per server tick at most (pixel text sends one per changed letter)
   STANDINGS_PERIOD: 0.5,         // seconds between standings refreshes
+  MINIMAP_DOT_HZ: 8,             // refreshes per second of the other cars' minimap dots (about half of all HUD traffic;
+                                 // 4 halves that for a slightly choppier minimap)
 
   // ---- input
   CHAT_COMMANDS: true,
@@ -94,7 +96,8 @@ const CONFIG = {
   SOUND_PREFIX: 'spr_snd_',
   MAP_PARAMS: 'spr_map_params',
 
+  PERF_LOG: true,                // once a minute while a race runs: "[spr] script time: avg X ms, max Y ms per server tick"
   DEBUG: false,
 };
 
-const VERSION = '0.3.1';
+const VERSION = '0.3.2';

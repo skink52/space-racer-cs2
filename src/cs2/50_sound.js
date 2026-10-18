@@ -5,8 +5,12 @@
 const soundEnts = new Map();
 let soundsThisTick = 0;
 
+const soundChecked = new Map();   // sfx -> tick its entity was last checked
 function soundEnt(sfx) {
-  let e = live(soundEnts.get(sfx));
+  let e = soundEnts.get(sfx);
+  if (e && soundChecked.get(sfx) === tickNo) return e;
+  e = live(e);
+  soundChecked.set(sfx, tickNo);
   if (!e) {
     e = live(Instance.FindEntityByName(CONFIG.SOUND_PREFIX + sfx));
     if (!e) { warnOnce('snd' + sfx, 'no point_soundevent named ' + CONFIG.SOUND_PREFIX + sfx); return undefined; }
@@ -41,7 +45,7 @@ function playSound(view, sfx, car, x, y, z) {
   let srcName = null;
   if (car) {
     const p = view.props.get(car.slot);
-    if (p && live(p.ent) && !p.hidden) srcName = p.name;
+    if (p && !p.hidden) srcName = p.name;      // (the renderer keeps its props checked)
     else { x = car.x; y = car.y; z = car.z; }
   }
   if (!srcName) {

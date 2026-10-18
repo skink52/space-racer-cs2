@@ -27,7 +27,7 @@ function newProp() {
   const ent = ents[0];
   const name = 'spr_p' + (++propSerial);
   try { ent.SetEntityName(name); } catch (err) { /* ignore */ }
-  return { ent, name, model: '', skin: -1, hidden: true, lastPos: null, alpha: -1 };
+  return { ent, name, model: '', skin: -1, hidden: true, lastPos: null, lastAng: null, alpha: -1, resetTic: -1 };
 }
 
 function takeProp() {
@@ -69,6 +69,7 @@ class ArenaView {
     this.pulseProp = null;
     this.shells = new Map();     // car slot -> prop: the Aegis shell round a Bastion
     this.anchors = null;
+    this.fxDone = false;         // the per-car sound / shake bits of the last race step have been handled (results)
   }
 
   world(x, y, z) { return { x: this.off[0] + x, y: this.off[1] + y, z: this.off[2] + z }; }
@@ -79,17 +80,39 @@ class ArenaView {
     return car.padTimer > 0 ? m.pad : car.boosting || car.novaTimer > 0 ? m.boost : m.base;
   }
 
+  // (CS2 calls are the expensive part here: a prop's entity is checked every 16th tick, not every tick - an engine
+  // call that fails on a prop that went away drops it, and a car whose pose hasn't changed isn't moved at all)
   update(now) {
-    const a = this.arena, T = a.track;
-    // cars
+    const a = this.arena;
     for (const car of a.order) {
-      let p = this.props.get(car.slot);
-      if (!car.visible) {
-        if (p) { this.props.delete(car.slot); releaseProp(p); }
-        continue;
+      const p = this.props.get(car.slot);
+      try { this.drawCar(car, p, now); } catch (err) {
+        // the prop's entity went away: forget it (a new one is taken next tick); a prop that is still there is kept
+        const q = this.props.get(car.slot);
+        if (q && !live(q.ent)) this.props.delete(car.slot);
+        else warnOnce('carprop:' + String(err), 'drawing a car failed: ' + err);
       }
-      if (!p) { p = takeProp(); if (!p) continue; this.props.set(car.slot, p); p.hidden = false; p.lastPos = null; p.model = ''; p.skin = -1; p.alpha = -1; }
-      if (!live(p.ent)) { this.props.delete(car.slot); continue; }
+    }
+    for (const [slot, sh] of this.shells) if (!a.cars.get(slot) || !a.cars.get(slot).visible) { releaseProp(sh); this.shells.delete(slot); }
+    this.drawPulse();
+    // effects
+    for (let k = this.fx.length - 1; k >= 0; k--) {
+      const e = this.fx[k];
+      if (now >= e.until || ((tickNo + k) & 15) === 0 && !live(e.prop.ent)) { releaseProp(e.prop); this.fx.splice(k, 1); continue; }
+      const frame = Math.min(e.frames.length - 1, Math.floor((now - e.start) / (e.until - e.start) * e.frames.length));
+      try { propModel(e.prop, e.frames[frame]); } catch (err) { this.fx.splice(k, 1); }
+    }
+  }
+
+  drawCar(car, p, now) {
+    const T = this.arena.track;
+    if (!car.visible) {
+      if (p) { this.props.delete(car.slot); releaseProp(p); }
+      return;
+    }
+    if (!p) { p = takeProp(); if (!p) return; this.props.set(car.slot, p); p.hidden = false; p.lastPos = null; p.lastAng = null; p.model = ''; p.skin = -1; p.alpha = -1; }
+    else if (((tickNo + car.slot) & 15) === 0 && !live(p.ent)) { this.props.delete(car.slot); return; }
+    {
       propModel(p, car.state === 'wrecked' ? CAR_MODELS.cars[car.cls].base : this.carModel(car));
       propSkin(p, car.team === 0 ? SKIN_INDEX.t : car.team === 1 ? SKIN_INDEX.ct : SKIN_INDEX.neutral);
       propAlpha(p, car.state === 'wrecked' ? 90 : car.ghost > 0 && car.state === 'racing' ? 140 : car.state === 'finished' ? 160 : 255);
@@ -103,8 +126,8 @@ class ArenaView {
       if (car.state === 'falling') pitch = Math.min(60, car.stateTime * 50);
       else if (car.air) pitch = clamp(-deg(Math.atan2(car.vz, Math.max(200, car.speed))) * 0.7, -25, 25);
       else {
-        const half = CAR_LEN * 0.45, zMid = T.point(car.s).z;
-        const zf = T.point(car.s + half).z, zr = T.point(car.s - half).z;
+        const half = CAR_LEN * 0.45, zMid = T.zAtS(car.s);
+        const zf = T.zAtS(car.s + half), zr = T.zAtS(car.s - half);
         pitch = -deg(Math.atan2(zf - zr, 2 * half)) + rampTilt;
         if (!rf) lift = Math.max(0, (zf + zr) / 2 - zMid);
       }
@@ -116,30 +139,39 @@ class ArenaView {
       const yaw = deg(car.yaw + car.spinYaw);
       const pos = this.world(car.x, car.y, car.z + lift);
       if (car.state === 'wrecked') pos.z -= Math.min(8, car.stateTime * 6);
-      const ang = { pitch, yaw, roll };
-      // Teleport only for the first placement and real jumps (respawns); everything else Moves, the grid included
-      const lp = p.lastPos;
-      if (!lp || (car.fx & 128) || Math.abs(pos.x - lp.x) + Math.abs(pos.y - lp.y) + Math.abs(pos.z - lp.z) > CONFIG.TELEPORT_DIST) p.ent.Teleport({ position: pos, angles: ang });
-      else p.ent.Move({ position: pos, angles: ang });
+      // Teleport only for the first placement and real jumps (respawns); everything else Moves, the grid included -
+      // unless the car is exactly where it was (waiting on the grid, a wreck that has settled)
+      // (a reset after a fall teleports once: an arena that has stopped stepping keeps the car's last fx bits)
+      const lp = p.lastPos, la = p.lastAng, reset = (car.fx & 128) !== 0 && p.resetTic !== this.arena.raceTic;
+      if (reset) p.resetTic = this.arena.raceTic;
+      if (!lp || reset || Math.abs(pos.x - lp.x) + Math.abs(pos.y - lp.y) + Math.abs(pos.z - lp.z) > CONFIG.TELEPORT_DIST) p.ent.Teleport({ position: pos, angles: { pitch, yaw, roll } });
+      else if (pos.x !== lp.x || pos.y !== lp.y || pos.z !== lp.z || pitch !== la.pitch || yaw !== la.yaw || roll !== la.roll) p.ent.Move({ position: pos, angles: { pitch, yaw, roll } });
       p.lastPos = pos;
+      if (!la) p.lastAng = { pitch, yaw, roll }; else { la.pitch = pitch; la.yaw = yaw; la.roll = roll; }
       // the Aegis shell follows the car while it is up
       let sh = this.shells.get(car.slot);
       if (car.aegis > 0 && car.state === 'racing') {
         if (!sh) { sh = takeProp(); if (sh) { this.shells.set(car.slot, sh); sh.hidden = false; sh.lastPos = null; sh.model = ''; sh.alpha = -1; } }
-        if (sh && live(sh.ent)) {
-          propModel(sh, CAR_MODELS.fx.aegis);
-          const sa = { pitch: 0, yaw: (now * 90) % 360, roll: 0 };
-          if (!sh.lastPos) sh.ent.Teleport({ position: pos, angles: sa }); else sh.ent.Move({ position: pos, angles: sa });
-          sh.lastPos = pos;
+        else if (((tickNo + car.slot) & 15) === 0 && !live(sh.ent)) { this.shells.delete(car.slot); sh = null; }
+        if (sh) {
+          try {
+            propModel(sh, CAR_MODELS.fx.aegis);
+            const sa = { pitch: 0, yaw: (now * 90) % 360, roll: 0 };
+            if (!sh.lastPos) sh.ent.Teleport({ position: pos, angles: sa }); else sh.ent.Move({ position: pos, angles: sa });
+            sh.lastPos = pos;
+          } catch (err) { if (!live(sh.ent)) this.shells.delete(car.slot); }
         }
       } else if (sh) { releaseProp(sh); this.shells.delete(car.slot); }
     }
-    for (const [slot, sh] of this.shells) if (!a.cars.get(slot) || !a.cars.get(slot).visible) { releaseProp(sh); this.shells.delete(slot); }
-    // the Pulse wave
+  }
+
+  // the Pulse wave
+  drawPulse() {
+    const a = this.arena, T = a.track;
     if (a.pulse.active && RULES.pulseEnabled) {
       if (!this.pulseProp) { this.pulseProp = takeProp(); if (this.pulseProp) { this.pulseProp.hidden = false; this.pulseProp.lastPos = null; this.pulseProp.model = ''; this.pulseProp.alpha = -1; } }
       const pp = this.pulseProp;
-      if (pp && live(pp.ent)) {
+      if (pp && ((tickNo & 15) !== 0 || live(pp.ent))) {
         propModel(pp, CAR_MODELS.fx.pulse);
         const pt = T.point(a.pulse.total);
         const pos = this.world(pt.x, pt.y, pt.z + 2);
@@ -150,13 +182,6 @@ class ArenaView {
         pp.lastPos = pos;
       }
     } else if (this.pulseProp) { releaseProp(this.pulseProp); this.pulseProp = null; }
-    // effects
-    for (let k = this.fx.length - 1; k >= 0; k--) {
-      const e = this.fx[k];
-      if (now >= e.until || !live(e.prop.ent)) { releaseProp(e.prop); this.fx.splice(k, 1); continue; }
-      const frame = Math.min(e.frames.length - 1, Math.floor((now - e.start) / (e.until - e.start) * e.frames.length));
-      propModel(e.prop, e.frames[frame]);
-    }
   }
 
   // an effect at a track position: frames = list of models, shown over `seconds`

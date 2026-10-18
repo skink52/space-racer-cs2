@@ -351,7 +351,18 @@ test/       sim.cjs (bot races on the pure game), mock_cs2.mjs (the real script 
 preview/    PNG renders of tracks, cars and the HUD for checking without CS2 (hud_render.py: the HUD layout check)
 ```
 
-- The sim runs at 64 Hz, one step per CS2 server tick (64 cars cost about 0.05 ms per tick in Node), so props are moved with `Move` every tick and the client
+- Script cost (18 Oct pass): a full 64-player server costs about 0.14 ms of script time and ~215 CS2 calls per tick on
+  the stand-in engine. What keeps it there: the HUD remembers what each part was drawn from and skips parts whose
+  inputs haven't changed (the class cache is only consulted when something did); per-arena and per-car values the
+  HUD needs (clock, field size, turn arrow) are worked out once per tick; pawns, cameras, props and the HUD entity
+  are checked with IsValid every 8th / 16th tick instead of every tick (CS2's events drop stale entries, and a failed
+  call drops the entry too); cars that haven't moved aren't moved; idle players' keys are read with one masked call
+  once the script has seen that masks mean "any"; every field a car or arena will ever have is set in its
+  constructor (V8 slows down when objects change shape); the pair loops (slipstreams, bumps) scan flat arrays.
+  The race itself is bit-for-bit the same as before (test: a hash of every car's state every tic).
+  test/mock_cs2.mjs runs the script like CS2 does (as a module, not in a vm context, which made timings ~2.5x too
+  slow) and has `held`, `seed=`, `trace=` (compare two builds by what ends up on screen), `calls` and `maskall`.
+- The sim runs at 64 Hz, one step per CS2 server tick (64 cars cost about 0.04 ms per tick in Node), so props are moved with `Move` every tick and the client
   interpolates; no sub-tick interpolation needed. `Teleport` only for a prop's first placement and real jumps
   (respawns): CS2 stops drawing a prop that is teleported every tick (the first test's invisible grid).
 - Cars are pooled `prop_dynamic` entities spawned from one `point_template` (model = car class + state:

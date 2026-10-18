@@ -14,19 +14,35 @@ function makeBot(skill) {
   };
 }
 
+// the solid cars of an arena with their progress and lateral position, gathered once per tic for all its bots
+// (bots only decide; nothing moves until the arena steps after them)
+function laneCars(arena) {
+  let L = arena.lanes;
+  if (L && L.tic === arena.tic) return L;
+  if (!L) L = arena.lanes = { tic: -1, n: 0, cars: [], total: [], ol: [] };
+  const T = arena.track;
+  let n = 0;
+  for (const o of arena.order) {
+    if (o.state !== 'racing' || o.ghost > 0) continue;
+    L.cars[n] = o; L.total[n] = o.total; L.ol[n] = -o.d / Math.max(1, T.hw[o.seg]); n++;
+  }
+  L.n = n; L.tic = arena.tic;
+  return L;
+}
+
 // the nearest car just ahead of `car` near a lateral position (-1 left edge .. 1 right edge)
 function laneTraffic(arena, car, lane, ahead) {
-  const T = arena.track;
-  let worst = null;
-  for (const o of arena.order) {
-    if (o === car || !o.solid) continue;
-    const ds = o.total - car.total;
-    if (ds < (ahead < 0 ? ahead : -60) || ds > Math.abs(ahead)) continue;
-    const ol = -o.d / Math.max(1, T.hw[o.seg]);
-    if (Math.abs(ol - lane) > 0.3) continue;
-    if (!worst || ds < worst.ds) worst = { car: o, ds };
+  const L = laneCars(arena), cars = L.cars, total = L.total, ol = L.ol;
+  const lo = ahead < 0 ? ahead : -60, hi = Math.abs(ahead), me = car.total;
+  let w = -1, wds = 0;
+  for (let k = 0; k < L.n; k++) {
+    if (cars[k] === car) continue;
+    const ds = total[k] - me;
+    if (ds < lo || ds > hi) continue;
+    if (Math.abs(ol[k] - lane) > 0.3) continue;
+    if (w < 0 || ds < wds) { w = k; wds = ds; }
   }
-  return worst;
+  return w < 0 ? null : { car: cars[w], ds: wds };
 }
 
 function botThink(arena, car) {
