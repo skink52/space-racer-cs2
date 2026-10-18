@@ -14,7 +14,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 ## B. First run (listen server, `bot_quota 0`)
 
-1. Console on map load: `[spr] v0.4.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
+1. Console on map load: `[spr] v0.4.1 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too. Once you have picked, the
    cards go away; `!car` brings them back (see C6).
@@ -273,4 +273,14 @@ Needs the models and materials compiled (new skins on every car): a Hammer build
   doesn't show, shows through walls in a distracting way, or is too strong (`WINNER_GLOW false` turns it off).
 - Fixed with this build: with two arenas, the humans placed in the second arena were turned into spectators while
   it was being set up (one tick after the first), so that arena raced with bots only. Both arenas now fill.
+
+## C11. Joining, money, minimap (18 Oct, v0.4.1)
+
+- Join the server (or load the map) without picking a team: CS2's team menu should not appear, and about a second
+  later the console says `<name> put on T (auto team)` (or CT) and you spawn into the lobby / next race.
+- No money: the kill feed and round end pay nothing, and the money counter stays at $0.
+- Minimap (top-left): every car's dot moves round the track, the leader's in gold and yours blinking white. Before,
+  the dots were cut away by their own panel (8 px tall) as soon as they moved down - now each dot runs in a column
+  as tall as the map. If they still don't move, tell me what you see (dots stuck in the top-left corner, or none).
+- The car picker no longer reopens by itself at the results when someone was tapping A / D as the race ended.
 

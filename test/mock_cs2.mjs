@@ -159,11 +159,22 @@ class Controller {
   constructor(slot, name, team, bot, noPawn) { this.slot = slot; this.name = name; this.team = team; this.bot = bot; this.connected = true; this.pawn = noPawn ? null : new Pawn(this); this.score = 0; this.kills = 0; this.deaths = 0; this.brain = { steer: 0, t: 0 }; }
   GetPlayerSlot() { return this.slot; } GetPlayerName() { return this.name; } GetPlayerPawn() { return this.pawn && this.pawn.valid ? this.pawn : undefined; }
   IsBot() { return this.bot; } IsConnected() { return this.connected; } GetTeamNumber() { return this.team; }
-  AddScore(n) { this.score += n; } GetScore() { return this.score || 0; } JoinTeam(t) { this.team = t; } IsValid() { return this.connected; }
+  AddScore(n) { this.score += n; } GetScore() { return this.score || 0; } JoinTeam(t) {
+    // like CS2: the team changes, the team-change event fires, and the player spawns a moment later
+    if (this.team === t) return;
+    this.team = t; stats.autoTeams = (stats.autoTeams || 0) + 1;
+    if (this.pawn) { this.pawn.alive = false; this.pawn.valid = false; }
+    hooks.OnPlayerTeamChanged && hooks.OnPlayerTeamChanged({ player: this, newTeam: t });
+    later(1, () => this.respawn());
+  } IsValid() { return this.connected; }
   respawn() { if (!this.connected) return; this.pawn = new Pawn(this); hooks.OnPlayerReset && hooks.OnPlayerReset({ player: this.pawn }); }
 }
 const players = [];
-for (let i = 0; i < HUMANS + BOTS; i++) players.push(new Controller(i, (i < HUMANS ? 'human' : 'bot') + i, i % 2 ? 3 : 2, i >= HUMANS));
+// unassigned: every other human starts on no team, with no pawn (CS2's team menu at map load)
+for (let i = 0; i < HUMANS + BOTS; i++) {
+  const un = OPTS.includes('unassigned') && i < HUMANS && i % 2 === 1;
+  players.push(new Controller(i, (i < HUMANS ? 'human' : 'bot') + i, un ? 0 : i % 2 ? 3 : 2, i >= HUMANS, un));
+}
 
 // ---------------------------------------------------------------- Instance
 const hooks = {};
@@ -346,7 +357,7 @@ function churn() {
       c.team = Math.random() < 0.5 ? 2 : 3; c.pawn = new Pawn(c); c.joinedAt = time;
     } else {
       hooks.OnPlayerActivate && hooks.OnPlayerActivate({ player: c });
-      later(2, () => { if (!c.connected) return; c.team = Math.random() < 0.5 ? 2 : 3; hooks.OnPlayerTeamChanged && hooks.OnPlayerTeamChanged({ player: c, newTeam: c.team }); later(1, () => c.respawn()); });
+      later(2, () => { if (!c.connected || c.team !== 0) return; c.team = Math.random() < 0.5 ? 2 : 3; hooks.OnPlayerTeamChanged && hooks.OnPlayerTeamChanged({ player: c, newTeam: c.team }); later(1, () => c.respawn()); });
     }
   } else if (r < 0.75) {
     const humans = live.filter((c) => !c.bot && c.slot !== 0);
@@ -388,6 +399,7 @@ console.log('switched HUD classes with a rule of their own:', loneCls.join(' ') 
 if (loneCls.length) stats.errors.push('HUD state classes collide with panel classes: ' + loneCls.join(' '));
 console.log(`car picker: up ${((picker.ticks.get(0) || 0) / 64).toFixed(1)} s for the player typing !car, ${([...picker.ticks].filter(([k]) => k !== 0).reduce((n, [, v]) => n + v, 0) / 64 / Math.max(1, HUMANS - 1)).toFixed(1)} s on average for the others; over the results ${(picker.askedOverResults / 64).toFixed(1)} s when asked, ${(picker.overResults / 64).toFixed(1)} s unasked`);
 if (picker.overResults) stats.errors.push('the car picker covered the results board without !car: ' + (picker.overResults / 64).toFixed(1) + ' s');
+console.log(`auto team joins: ${stats.autoTeams || 0}`);
 console.log(`votes: ${(stats.says.join(' | ').match(/VOTED/g) || []).length} voted arenas announced; glow calls ${stats.glows || 0}`);
 console.log('props teleported 3+ ticks in a row:', stats.tpRuns || 0, '; calls on entities that had gone away:', stats.invalidCalls || 0);
 if (stats.tpRuns) stats.errors.push('props teleported every tick (CS2 hides them): ' + stats.tpRuns);

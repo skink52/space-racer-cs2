@@ -47,7 +47,14 @@ const CONFIG = {
   CVARS_ALWAYS: [
     'mp_respawn_immunitytime 0', 'mp_death_drop_gun 0', 'mp_buy_anywhere 0', 'mp_buytime 0', 'sv_disable_radar 1',
     'mp_respawn_on_death_t 1', 'mp_respawn_on_death_ct 1', 'mp_teammates_are_enemies 1', 'mp_freezetime 0',
+    // no money at all: no kill / round rewards, nothing to start with (the race credit is kills, not cash)
+    'mp_playercashawards 0', 'mp_teamcashawards 0', 'mp_startmoney 0', 'mp_maxmoney 0', 'mp_afterroundmoney 0',
   ],
+  // put everyone joining on a team straight away (the smaller side), so CS2's team menu never sits behind the race HUD.
+  // Sets mp_force_assign_teams 1 + sv_disable_teamselect_menu 1, and the script itself moves anyone still unassigned
+  // after AUTO_TEAM_DELAY seconds. Players can still watch with !spec; the M-key team menu is off while this is on.
+  AUTO_TEAM: true,
+  AUTO_TEAM_DELAY: 1,
   START_DELAY: 2,                // seconds after a CS2 round starts (no freeze time) before the race is set up
   ROUND_END_WAIT: 20,            // seconds after a race: if CS2 hasn't ended the round by then (warmup), the next race starts anyway
   ROUND_SLACK: 15,               // the CS2 round clock runs this much longer than the race can, so the script ends it
@@ -108,4 +115,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';

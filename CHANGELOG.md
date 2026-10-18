@@ -1,5 +1,17 @@
 # Space Racer changelog
 
+## v0.4.1 (18 Oct 2026)
+
+### Changed
+- **No team menu.** Players who join without a team are put on the side with fewer players after a second, so CS2's
+  team menu never sits behind the race HUD. The M-key team menu is turned off (`AUTO_TEAM` in CONFIG turns this
+  off); `!spec` still lets you watch.
+- **No money.** Kills and rounds pay nothing, and nobody starts with money.
+
+### Fixed
+- The minimap dots didn't move: each dot was clipped by its own panel as soon as it moved down the map.
+- The car picker could reopen over the results if you were tapping A / D as the race ended.
+
 ## v0.4.0 (18 Oct 2026)
 
 ### New

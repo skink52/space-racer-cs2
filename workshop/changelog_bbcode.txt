@@ -1,3 +1,11 @@
+[h2]v0.4.1[/h2]
+[list]
+[*]No team menu: players joining are put on a team automatically, so CS2's team menu no longer hides behind the race screen.
+[*]No money: kills and rounds no longer pay out.
+[*]Fixed the minimap: the cars' dots move again.
+[*]Fixed the car picker reopening over the results.
+[/list]
+
 [h2]v0.4.0[/h2]
 [b]New[/b]
 [list]

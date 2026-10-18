@@ -109,9 +109,16 @@ other cars' minimap dots move; 4 instead of 8 halves the biggest share of HUD tr
 `VOTE_CHOICES` / `BOTS_VOTE` (the track vote), `WINNER_GLOW` / `GLOW_PLACES` (the winners' glow), `PERF_LOG` (the once-a-minute
 `script time` line in the console). The four cars and the physics rules are in `const CARS` / `const RULES` just below.
 
+Joining: with `AUTO_TEAM` on (the default) nobody sees CS2's team menu: anyone on no team after a second is put on
+the side with fewer players (the map also sets `mp_force_assign_teams 1` and `sv_disable_teamselect_menu 1`, so the
+M menu is off; `!spec` still watches). No money is ever paid: kill and round rewards, start money and the money cap
+are all 0.
+
 When `APPLY_CVARS` is on the map sets: `mp_respawn_on_death_t/ct 1`, `mp_respawn_immunitytime 0`,
 `mp_teammates_are_enemies 1` (no teamkill penalties for same-side kills), `mp_ignore_round_win_conditions 1`
-while a race runs, `mp_death_drop_gun 0`, `mp_buy_anywhere 0`, `mp_buytime 0`, `sv_disable_radar 1`.
+while a race runs, `mp_death_drop_gun 0`, `mp_buy_anywhere 0`, `mp_buytime 0`, `sv_disable_radar 1`,
+`mp_playercashawards 0`, `mp_teamcashawards 0`, `mp_startmoney 0`, `mp_maxmoney 0`, `mp_afterroundmoney 0`, and with
+`AUTO_TEAM` `mp_force_assign_teams 1` and `sv_disable_teamselect_menu 1`.
 
 ## Servers with plugins (CounterStrikeSharp etc.)
 

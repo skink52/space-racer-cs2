@@ -38,6 +38,7 @@ function init() {
   hud();
   scanPeople(true);
   cvars(CONFIG.CVARS_ALWAYS);
+  if (CONFIG.AUTO_TEAM) cvars(['mp_force_assign_teams 1', 'sv_disable_teamselect_menu 1']);
   ready = true;
   lastTime = gameTime();
   startAt = lastTime + 1;
@@ -49,11 +50,13 @@ function scanPeople(force) {
   if (!force && now - lastPeopleScan < 1) return;
   lastPeopleScan = now;
   const seen = new Set();
+  const unassigned = [];
   for (const c of Instance.GetAllPlayerControllers()) {
     if (!c || !c.IsConnected()) continue;
     const slot = c.GetPlayerSlot();
     seen.add(slot);
     const bot = c.IsBot();
+    if (CONFIG.AUTO_TEAM && !bot && c.GetTeamNumber() === 0) unassigned.push(c);
     if (bot && !CONFIG.CS2_BOTS_PLAY) continue;
     const name = c.GetPlayerName();
     // the slot now holds someone else (a bot kicked for a joining player, a quick leave + join): start them fresh,
@@ -63,6 +66,28 @@ function scanPeople(force) {
     rm.addPerson(slot, name, c.GetTeamNumber(), bot);
   }
   for (const slot of Array.from(rm.people.keys())) if (!seen.has(slot)) dropPerson(slot);
+  autoTeam(unassigned, now);
+}
+
+// players still on no team (CS2's team menu) after AUTO_TEAM_DELAY seconds go to the side with fewer players (then
+// fewer humans; then the one with the worse score this map). Spectators (team 1) are left alone.
+const unassignedSince = new Map();   // slot -> game time first seen without a team
+function autoTeam(list, now) {
+  for (const slot of Array.from(unassignedSince.keys())) if (!list.some((c) => c.GetPlayerSlot() === slot)) unassignedSince.delete(slot);
+  if (!list.length) return;
+  for (const c of list) {
+    const slot = c.GetPlayerSlot();
+    if (!unassignedSince.has(slot)) { unassignedSince.set(slot, now); if (CONFIG.AUTO_TEAM_DELAY > 0) continue; }
+    if (now - unassignedSince.get(slot) < CONFIG.AUTO_TEAM_DELAY) continue;
+    const n = { 2: 0, 3: 0 }, h = { 2: 0, 3: 0 };
+    for (const pe of rm.people.values()) if (pe.csTeam === 2 || pe.csTeam === 3) { n[pe.csTeam]++; if (!pe.bot) h[pe.csTeam]++; }
+    const team = n[2] !== n[3] ? (n[2] < n[3] ? 2 : 3) : h[2] !== h[3] ? (h[2] < h[3] ? 2 : 3) : (Math.random() < 0.5 ? 2 : 3);
+    guard('autoteam', () => c.JoinTeam(team));
+    unassignedSince.delete(slot);
+    const pe = rm.person(slot);
+    if (pe) pe.csTeam = team;
+    log(`${c.GetPlayerName()} put on ${team === 2 ? 'T' : 'CT'} (auto team)`);
+  }
 }
 
 function dropPerson(slot) {
@@ -335,7 +360,8 @@ function hudFlash(slot, cls, secs) { flashes.set(slot, { cls, until: gameTime() 
 function onArenaEnd(a, result, now) {
   if (a.newRecord) { const r = records.get(a.track.id); if (r) sayAll(`LAP RECORD on ${a.track.title}: ${r.who} ${fmtTime(r.time)}`); a.newRecord = false; }
   // the results come up clear: a car picker still open from before the end closes (!car brings it back)
-  for (const pe of rm.people.values()) if (pe.arena === a || (pe.spec && pe.spec.arena === a.index)) pe.pickUntil = 0;
+  // (pickShown too: an A / D tap before the next HUD update would otherwise count as browsing and reopen it)
+  for (const pe of rm.people.values()) if (pe.arena === a || (pe.spec && pe.spec.arena === a.index)) { pe.pickUntil = 0; pe.pickShown = false; }
   const r = result.ranking;
   const top = r.slice(0, 3).map((c, i) => `${i + 1}. ${c.name}`).join('  ');
   sayAll(`${a.track.title}: ${top}`);

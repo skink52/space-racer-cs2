@@ -300,11 +300,14 @@ MMCELLS = 48                 # dots snap to the picture's own pixels
 MAXDOTS = 32
 for tid in [t['id'] for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))]:
     rule('.MapImg.mm_%s' % tid, background_image='url("%smm_%s.png")' % (IMG, tid))
-rule('.MapImg', background_size='100% 100%', background_repeat='no-repeat')
-# dots are moved with transforms: x on the outer panel, y on the inner square (both start at the map's corner)
+rule('.MapImg', background_size='100% 100%', background_repeat='no-repeat', overflow='noclip')
+# dots are moved with transforms: x on the outer panel, y on the inner square (both start at the map's corner).
+# The outer panel is a column as tall as the map, so the square moved down by its y class stays inside it: Panorama
+# clips a child to its parent, and with an 8 px tall outer panel every square moved more than a few pixels down was
+# cut away (the minimap showed no moving dots in CS2). overflow noclip as well, to be sure.
 DOT, DOTL = 8, 12
-rule('.Dot', width=px(DOT), height=px(DOT), opacity='0')
-rule('.DotL', width=px(DOTL), height=px(DOTL), opacity='0')
+rule('.Dot', width=px(DOT), height=px(MM), opacity='0', overflow='noclip')
+rule('.DotL', width=px(DOTL), height=px(MM), opacity='0', overflow='noclip')
 rule('.Dot.On', opacity='1'); rule('.DotL.On', opacity='1')
 rule('.DotSq', width=px(DOT - 2), height=px(DOT - 2), border='1px solid #000000', background_color=hexc(LILAC))
 rule('.DotSqL', width=px(DOTL - 4), height=px(DOTL - 4), border='2px solid #000000', background_color='#ffffff')
