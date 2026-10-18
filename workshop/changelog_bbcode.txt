@@ -1,0 +1,18 @@
+[h2]v0.4.0[/h2]
+[b]New[/b]
+[list]
+[*][b]Track vote:[/b] when a race ends, its top 3 vote on the next track (W / S, or [i]!vote 1-4[/i]). 1st place's vote counts 3, 2nd's 2, 3rd's 1.
+[*]Votes work per arena: each arena races the track its own players voted for.
+[*][b]Colour shades:[/b] [i]!shade[/i] picks one of six reds (T) or six blues (CT).
+[*][b]Winners' glow:[/b] last round's top 3 drive with a neon outline in their colour.
+[/list]
+[b]Fixed[/b]
+[list]
+[*]With two or more arenas, players in the second arena were turned into spectators. Every arena now fills properly.
+[/list]
+
+[h2]v0.3.2[/h2]
+[list]
+[*]The map uses much less server time: about a third of the script time and a third of the CS2 calls per tick. Nothing looks or plays differently.
+[*]Fixed a car that could vanish during the results, and car sounds that kept replaying after a race.
+[/list]
