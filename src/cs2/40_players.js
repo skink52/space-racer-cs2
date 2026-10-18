@@ -151,6 +151,17 @@ function spectatorInput(pe, pk) {
   return pickerInput(pe, pk, m) || any;
 }
 
+// W / S move a voter's pick on their ballot (the top places of a finished race); true on a press
+const VOTE_KEYS = [CSInputs.FORWARD, CSInputs.BACK];
+const VOTE_MASK = CSInputs.FORWARD | CSInputs.BACK;
+function voteInput(pe, pk) {
+  if (!rm.ballotOf(pe)) return false;
+  const m = justPressed(pk.pawn, VOTE_KEYS, VOTE_MASK);
+  if (m & CSInputs.FORWARD) rm.vote(pe, -1);
+  if (m & CSInputs.BACK) rm.vote(pe, 1);
+  return m !== 0;
+}
+
 // camera shake (hits, landings, wrecks): a few units of jitter that dies away
 function shake(slot, secs, amp) {
   const pk = parked.get(slot);

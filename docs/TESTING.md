@@ -14,7 +14,7 @@ Valve's type declarations. These are the things only the real game can show, in 
 
 ## B. First run (listen server, `bot_quota 0`)
 
-1. Console on map load: `[spr] v0.3.2 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
+1. Console on map load: `[spr] v0.4.0 ready: 8 tracks, HUD on, prop template on`. Any `WARNING` lines matter.
 2. Lobby: you should be frozen in the booth looking at a slow turn around the next track from above, with the car picker
    (four cards) and the lobby lines. A / D should move the highlight. `!car 3` should too. Once you have picked, the
    cards go away; `!car` brings them back (see C6).
@@ -256,4 +256,21 @@ What to check in CS2:
   A / D / E, spectating with Mouse 1 / 2 / E / Space, kill credit and respawns.
 - `MINIMAP_DOT_HZ` in CONFIG (default 8, as before): the other cars' minimap dots are about half of all HUD traffic;
   4 halves that for a slightly choppier minimap.
+
+## C10. Track vote, shades, winners' glow (18 Oct, v0.4.0)
+
+Needs the models and materials compiled (new skins on every car): a Hammer build, or `run_build.bat` with
+`assets mg_space_racer` in build_queue.txt.
+- Finish in the top 3 (easy with `bot_quota 5` and a good line, or with friends): when the race ends the line under
+  the centre says `VOTE THE NEXT TRACK: W / S (YOUR VOTE COUNTS X3)` and a gold-framed TRACK VOTE box shows on the
+  left under the clock, with four tracks and their votes. W / S moves your pick (gold, pulsing); the footer says
+  `YOUR VOTE X3  W/S`. `!vote 2` / `!vote helix` work too. Others in that race see the box with `TOP 3 ARE VOTING`.
+- The lobby line says `VOTED: <track>` / `VOTES SO FAR: <track>`, and the next race's chat line ends `(n, VOTED)`; that
+  arena races the voted track. With 33+ players (two arenas) each arena gets the pick of the voters who landed in it.
+- `!shade` cycles your colour (bottom line: `SHADE: CRIMSON (3/6)`); the car changes at once - does the colour look
+  right in game (preview/car_angles_shades.png shows all twelve)?
+- Next round, last round's top 3 glow: a neon outline in their colour. CS2's glow is untested here: tell me if it
+  doesn't show, shows through walls in a distracting way, or is too strong (`WINNER_GLOW false` turns it off).
+- Fixed with this build: with two arenas, the humans placed in the second arena were turned into spectators while
+  it was being set up (one tick after the first), so that arena raced with bots only. Both arenas now fill.
 

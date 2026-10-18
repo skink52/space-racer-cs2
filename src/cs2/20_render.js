@@ -4,7 +4,24 @@
 
 const NULL_MODEL = 'models/spr/null.vmdl';
 const HIDE_POS = { x: 0, y: 0, z: -15000 };
-const SKIN_INDEX = { neutral: 0, t: 1, ct: 2, gold: 3 };
+// skin numbers by name, in the order tools/cars.py gave the car models their skins (neutral, t, ct, gold, then the shades)
+const SKIN_INDEX = {};
+(CAR_MODELS.skins || ['neutral', 't', 'ct', 'gold']).forEach((k, i) => { SKIN_INDEX[k] = i; });
+// a car's skin: its driver's shade of the side colour (index into SHADES.t / SHADES.ct)
+function carSkin(car) {
+  const list = car.team === 0 ? SHADES.t : car.team === 1 ? SHADES.ct : null;
+  if (!list) return SKIN_INDEX.neutral || 0;
+  const sh = list[car.shade] || list[0];
+  const i = SKIN_INDEX[sh.skin];
+  return i === undefined ? SKIN_INDEX[car.team === 0 ? 't' : 'ct'] : i;
+}
+// the winners' neon glow: their shade's colour, brightened
+function glowColor(car) {
+  const list = car.team === 0 ? SHADES.t : car.team === 1 ? SHADES.ct : null;
+  const c = list ? (list[car.shade] || list[0]).rgb : [255, 215, 60];
+  const k = 255 / Math.max(1, c[0], c[1], c[2]);
+  return { r: Math.round(c[0] * k), g: Math.round(c[1] * k), b: Math.round(c[2] * k) };
+}
 
 let propTemplate;
 let propSerial = 0;
@@ -27,7 +44,7 @@ function newProp() {
   const ent = ents[0];
   const name = 'spr_p' + (++propSerial);
   try { ent.SetEntityName(name); } catch (err) { /* ignore */ }
-  return { ent, name, model: '', skin: -1, hidden: true, lastPos: null, lastAng: null, alpha: -1, resetTic: -1 };
+  return { ent, name, model: '', skin: -1, hidden: true, lastPos: null, lastAng: null, alpha: -1, resetTic: -1, glow: '' };
 }
 
 function takeProp() {
@@ -40,6 +57,7 @@ function takeProp() {
 
 function releaseProp(p) {
   if (!p || !live(p.ent)) return;
+  if (p.glow) { try { p.ent.Unglow(); } catch (err) { /* ignore */ } p.glow = ''; }
   if (!p.hidden) {
     try { p.ent.SetModel(NULL_MODEL); p.ent.Teleport({ position: HIDE_POS }); } catch (err) { /* ignore */ }
     p.model = NULL_MODEL; p.hidden = true;
@@ -54,6 +72,13 @@ function propModel(p, model) {
 function propSkin(p, skin) {
   if (p.skin === skin || !live(p.ent)) return;
   Instance.EntFireAtTarget({ target: p.ent, input: 'Skin', value: skin }); p.skin = skin;
+}
+// the outline glow: '' = none, else 'r,g,b'
+function propGlow(p, col) {
+  const key = col ? col.r + ',' + col.g + ',' + col.b : '';
+  if (p.glow === key) return;
+  if (col) p.ent.Glow(col); else p.ent.Unglow();
+  p.glow = key;
 }
 function propAlpha(p, a) {
   if (p.alpha === a || !live(p.ent)) return;
@@ -114,7 +139,9 @@ class ArenaView {
     else if (((tickNo + car.slot) & 15) === 0 && !live(p.ent)) { this.props.delete(car.slot); return; }
     {
       propModel(p, car.state === 'wrecked' ? CAR_MODELS.cars[car.cls].base : this.carModel(car));
-      propSkin(p, car.team === 0 ? SKIN_INDEX.t : car.team === 1 ? SKIN_INDEX.ct : SKIN_INDEX.neutral);
+      propSkin(p, carSkin(car));
+      // last round's top places glow (not while wrecked or warping out)
+      propGlow(p, CONFIG.WINNER_GLOW && car.glow > 0 && car.glow <= CONFIG.GLOW_PLACES && car.state !== 'wrecked' && car.state !== 'gone' ? glowColor(car) : null);
       propAlpha(p, car.state === 'wrecked' ? 90 : car.ghost > 0 && car.state === 'racing' ? 140 : car.state === 'finished' ? 160 : 255);
       // angles: yaw from the heading (+ spin), pitch from the slope, roll from the bank and the slide
       const i = car.seg;

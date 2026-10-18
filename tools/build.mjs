@@ -7,7 +7,7 @@ const cat = (dir) => fs.readdirSync(dir).filter((f) => f.endsWith('.js')).sort()
 const core = cat(path.join(root, 'src/core'));
 const tracks = fs.readFileSync(path.join(root, 'out/addon/_gen/tracks.json'), 'utf8');
 fs.mkdirSync(path.join(root, 'build'), { recursive: true });
-const testMod = core + `\nconst TRACKS = ${tracks};\nmodule.exports = { TRACKS, Track, Car, Arena, RoundManager, DEFAULT_CFG, CARS, CAR_KEYS, RULES, TICRATE, DT, arenaSizes, splitShares, layoutFor, LAYOUTS, makeBot, botThink, seedRandom, rnd, collideCars };\n`;
+const testMod = core + `\nconst TRACKS = ${tracks};\nmodule.exports = { TRACKS, Track, Car, Arena, RoundManager, ballotRandom, DEFAULT_CFG, CARS, CAR_KEYS, RULES, TICRATE, DT, arenaSizes, splitShares, layoutFor, LAYOUTS, makeBot, botThink, seedRandom, rnd, collideCars };\n`;
 fs.writeFileSync(path.join(root, 'build/core_test.cjs'), testMod);
 console.log('test module', (testMod.length / 1024).toFixed(0), 'KB');
 const adapterDir = path.join(root, 'src/cs2');

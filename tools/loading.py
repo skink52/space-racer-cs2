@@ -60,8 +60,8 @@ S3 = 24                                 # one character of the scale-3 pixel fon
 
 # the frame on every slide
 DRIVE = [('W / S', 'GAS / BRAKE'), ('A / D', 'STEER'), ('MOUSE 1', 'BOOST'), ('MOUSE 2', 'SPIN ATTACK'), ('SPACE', 'DRIFT'), ('E', 'CAR ABILITY')]
-CHAT = [('R / !CAR', 'CAR PICKER'), ('!CAR 1-4', 'QUICK PICK'), ('!CAM', 'CAMERA VIEW'), ('!CRT', 'SCANLINES'),
-        ('!AFK', 'SIT OUT'), ('!HELP', 'ALL CONTROLS')]
+CHAT = [('R / !CAR', 'CAR PICKER'), ('!CAR 1-4', 'QUICK PICK'), ('!CAM', 'CAMERA VIEW'), ('!SHADE', 'YOUR COLOUR'),
+        ('!VOTE', 'NEXT TRACK'), ('!HELP', 'ALL CONTROLS')]
 WATCH = 'WATCHING: MOUSE 1/2 NEXT CAR, E NEXT ARENA'
 LOGO_Y = 104                             # the logo picture's top (its letters start 28 px lower)
 CTRL_Y0, CTRL_Y1 = 248, 588              # the controls panel

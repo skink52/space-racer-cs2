@@ -33,6 +33,8 @@ class Car {
     // used by the CS2 side (sound edges, the HUD's turn arrow). Every field a car will ever have is made here: a field
     // added later gives some cars a different shape and makes the physics noticeably slower.
     this.wasBoost = false; this.wasCharge = false; this.turnTick = -1; this.turnCls = null;
+    this.shade = 0;                // the driver's colour shade (index into their side's shades)
+    this.glow = 0;                 // 1..3: placed that high in the driver's race last round (the car glows)
   }
 
   placeAt(x, y, z, yaw, track) {

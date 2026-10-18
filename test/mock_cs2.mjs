@@ -38,7 +38,7 @@ const dirty = new Map();      // 'h'|'v'|'e' + key -> value at the start of this
 const ser = (kind, key) => { if (kind === 'h') { const v = obs.hud.get(key); return v ? [...v].sort().join(' ') : ''; } if (kind === 'v') return obs.vars.get(key) ?? ''; return obs.ents.get(key) ?? ''; };
 function touch(kind, key) { const k = kind + key; if (!dirty.has(k)) dirty.set(k, ser(kind, key)); }
 const r1 = (v) => (Math.round(v * 100) / 100).toFixed(2);
-function entState(e) { const p = e.pos, a = e.ang; return `${r1(p.x)},${r1(p.y)},${r1(p.z)} ${r1(a.pitch)},${r1(a.yaw)},${r1(a.roll)} ${e.model || ''} ${e.skin ?? ''} ${e.color ? e.color.a : ''}`; }
+function entState(e) { const p = e.pos, a = e.ang; return `${r1(p.x)},${r1(p.y)},${r1(p.z)} ${r1(a.pitch)},${r1(a.yaw)},${r1(a.roll)} ${e.model || ''} ${e.skin ?? ''} ${e.color ? e.color.a : ''}${e.glow ? ' glow ' + e.glow : ''}`; }
 function entKey(e) { return e.cls === 'camera' ? 'cam' + e.pawn.ctrl.slot : e.cls === 'player' ? 'pawn' + e.ctrl.slot : e.name; }
 function obsEnt(e) { if (!TRACE) return; const k = entKey(e); touch('e', k); obs.ents.set(k, entState(e)); }
 function traceTick() {
@@ -74,6 +74,9 @@ class Entity {
   Move(o) { stats.moves++; if (o.position) this.pos = { ...o.position }; if (o.angles) this.ang = { ...o.angles }; check(o.position, o.angles); obsEnt(this); }
   SetModel(m) { stats.setModel++; if (!models.has(m)) throw new Error('missing model ' + m); this.model = m; obsEnt(this); }
   SetColor(c) { this.color = c; obsEnt(this); }
+  Glow(c) { this.glow = c ? c.r + ',' + c.g + ',' + c.b : 'on'; stats.glows = (stats.glows || 0) + 1; obsEnt(this); }
+  Unglow() { this.glow = ''; obsEnt(this); }
+  IsGlowing() { return !!this.glow; }
   SetParent(p) { this.parent = p; }
   Kill() { this.valid = false; }
   Remove() { this.valid = false; }
@@ -102,7 +105,7 @@ class CustomHudLayout extends Entity {
     if (TRACE) { const k = slot + '|' + panel; touch('h', k); let set = obs.hud.get(k); if (!set) obs.hud.set(k, set = new Set()); if (on) set.add(cls); else set.delete(cls); }
     stats.hudCalls++; if (OPTS.includes('hudstats')) { const pk = panel.replace(/_\d+$/, '').replace(/\d+$/, ''); (stats.hudBy ||= {})[pk] = (stats.hudBy[pk] || 0) + 1; } if (OPTS.includes('hudtrace') && slot === 0 && (pk === 'spr_lap' || pk === 'spr_sub') && on && time > 60 && time < 64) console.log('t', time.toFixed(2), panel, cls); if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); classesUsed.set(cls, (classesUsed.get(cls) || 0) + 1); }
   SetDialogVariableStringForPlayer(slot, panel, name, value) { stats.hudVars++; if (TRACE) { touch('v', slot + '|' + panel); obs.vars.set(slot + '|' + panel, value); } if (!hudIds.has(panel)) throw new Error('unknown HUD panel ' + panel); if (typeof value !== 'string') throw new Error('non-string dialog var'); }
-  ResetForPlayer(slot) { if (TRACE) { for (const k of [...obs.hud.keys()]) if (k.startsWith(slot + '|')) { touch('h', k); obs.hud.delete(k); } for (const k of [...obs.vars.keys()]) if (k.startsWith(slot + '|')) { touch('v', k); obs.vars.delete(k); } } }
+  ResetForPlayer(slot) { rootCls.delete(slot); if (TRACE) { for (const k of [...obs.hud.keys()]) if (k.startsWith(slot + '|')) { touch('h', k); obs.hud.delete(k); } for (const k of [...obs.vars.keys()]) if (k.startsWith(slot + '|')) { touch('v', k); obs.vars.delete(k); } } }
 }
 const ents = JSON.parse(fs.readFileSync(path.join(root, 'build/entities.json'), 'utf8'));
 for (const e of ents) {
@@ -254,7 +257,7 @@ hooks.OnActivate();
 let rounds = 0;
 const t0 = Date.now();
 let thinkMs = 0, maxThink = 0;
-const CHATS = { 12: '!car 3', 16: '!car', 18: '!cam', 20: '!cam near', 22: '!tilt', 23: '!tilt', 25: '!race', 28: '!crt', 29: '!crt', 32: '!music',
+const CHATS = { 5: '!shade', 6: '!shade 4', 7: '!shade rose', 8: '!vote', 135: '!vote 2', 136: '!vote helix', 12: '!car 3', 16: '!car', 18: '!cam', 20: '!cam near', 22: '!tilt', 23: '!tilt', 25: '!race', 28: '!crt', 29: '!crt', 32: '!music',
   40: '!car meteor', 70: '!spec', 90: '!back', 100: '/car', 130: '!afk', 150: '!back', 170: '!pick', 175: '!car 2', 230: '/pick', 290: '!car' };
 const phases = {};
 // the car picker must never sit over the results board unless that player asked for it (!car / /car / !pick) since
@@ -288,6 +291,7 @@ while (time < SECONDS) {
       if (b.boost) bt |= CSInputs.ATTACK; if (b.drift) bt |= CSInputs.JUMP;
       if (Math.random() < 0.004) bt |= CSInputs.ATTACK2;
       if (Math.random() < 0.003) bt |= CSInputs.USE;
+      if (Math.random() < 0.004) bt |= CSInputs.BACK;     // (S: brakes in a race, moves a vote after one)
     } else {
     if (Math.random() < 0.3) bt |= CSInputs.ATTACK;
     if (Math.random() < 0.01) bt |= CSInputs.ATTACK2;
@@ -384,6 +388,7 @@ console.log('switched HUD classes with a rule of their own:', loneCls.join(' ') 
 if (loneCls.length) stats.errors.push('HUD state classes collide with panel classes: ' + loneCls.join(' '));
 console.log(`car picker: up ${((picker.ticks.get(0) || 0) / 64).toFixed(1)} s for the player typing !car, ${([...picker.ticks].filter(([k]) => k !== 0).reduce((n, [, v]) => n + v, 0) / 64 / Math.max(1, HUMANS - 1)).toFixed(1)} s on average for the others; over the results ${(picker.askedOverResults / 64).toFixed(1)} s when asked, ${(picker.overResults / 64).toFixed(1)} s unasked`);
 if (picker.overResults) stats.errors.push('the car picker covered the results board without !car: ' + (picker.overResults / 64).toFixed(1) + ' s');
+console.log(`votes: ${(stats.says.join(' | ').match(/VOTED/g) || []).length} voted arenas announced; glow calls ${stats.glows || 0}`);
 console.log('props teleported 3+ ticks in a row:', stats.tpRuns || 0, '; calls on entities that had gone away:', stats.invalidCalls || 0);
 if (stats.tpRuns) stats.errors.push('props teleported every tick (CS2 hides them): ' + stats.tpRuns);
 if (stats.errors.length) { console.log('ERRORS/WARNINGS:'); for (const e of [...new Set(stats.errors)].slice(0, 20)) console.log('  ' + e); }

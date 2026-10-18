@@ -43,6 +43,25 @@ SKINS = {
     'ct': ((70, 150, 255), (30, 70, 170)),
     'gold': ((255, 215, 60), (180, 140, 20)),
 }
+# the shades a player can pick with !shade: reds for T, blues for CT (the first of each is the side's usual colour).
+# Each becomes a skin on every car model, after the three above (so their skin numbers never move).
+SHADES = {
+    't': [('t', 'ORANGE'), ('t_red', 'RED'), ('t_crimson', 'CRIMSON'), ('t_coral', 'CORAL'), ('t_rose', 'ROSE'), ('t_maroon', 'MAROON')],
+    'ct': [('ct', 'BLUE'), ('ct_navy', 'NAVY'), ('ct_cyan', 'CYAN'), ('ct_teal', 'TEAL'), ('ct_indigo', 'INDIGO'), ('ct_ice', 'ICE')],
+}
+SKINS.update({
+    't_red': ((235, 45, 40), (140, 20, 18)),
+    't_crimson': ((200, 20, 70), (110, 10, 40)),
+    't_coral': ((255, 125, 110), (175, 62, 55)),
+    't_rose': ((255, 90, 150), (160, 40, 90)),
+    't_maroon': ((140, 30, 40), (75, 14, 20)),
+    'ct_navy': ((40, 70, 190), (16, 28, 100)),
+    'ct_cyan': ((40, 210, 255), (15, 110, 170)),
+    'ct_teal': ((30, 190, 185), (10, 100, 105)),
+    'ct_indigo': ((110, 85, 255), (55, 35, 155)),
+    'ct_ice': ((175, 215, 255), (95, 135, 195)),
+})
+SKIN_ORDER = ['t', 'ct', 'gold'] + [k for side in ('t', 'ct') for k, _ in SHADES[side][1:]]
 
 def write_palettes():
     paths = {}
@@ -291,7 +310,7 @@ def build_car(key, boost, pal_paths, shadow_mat, flame_mats):
     tris = mesh_voxels(g.occ, g.col, origin, VOX) + shadow_tris(L, W)
     mats = {'spr_pal': pal_paths['neutral'], 'spr_shadow': shadow_mat}
     if boost: mats['spr_flame'] = flame_mats['pad' if boost == 'pad' else key]
-    skins = [(name, [(pal_paths['neutral'], pal_paths[name])]) for name in ('t', 'ct', 'gold')]
+    skins = [(name, [(pal_paths['neutral'], pal_paths[name])]) for name in SKIN_ORDER]
     name = key + ('_' + boost if boost else '')
     return s2.write_model(OUT, MDIR, name, tris, mats, skins), g
 
@@ -521,7 +540,8 @@ def main():
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
-    json.dump(dict(cars=models, fx=fx, skins=['neutral', 't', 'ct', 'gold'], hover=HOVER), open(os.path.join(OUT, '_gen/car_models.json'), 'w'), indent=1)
+    shades = {side: [dict(skin=k, name=nm, rgb=list(SKINS[k][0])) for k, nm in SHADES[side]] for side in SHADES}
+    json.dump(dict(cars=models, fx=fx, skins=['neutral'] + SKIN_ORDER, shades=shades, hover=HOVER), open(os.path.join(OUT, '_gen/car_models.json'), 'w'), indent=1)
     # picker pictures: the view you get in the race (from behind, a little to the side and above)
     pdir = os.path.join(OUT, 'panorama/images/custom_game/spr'); os.makedirs(pdir, exist_ok=True)
     for key in CARS:
@@ -552,6 +572,16 @@ def main():
             im = render_voxels(grids[key], palette(*SKINS['ct' if i % 2 else 't']), size=300, az=180, el=14, fill=0.8)
             rear.alpha_composite(im, (i * 300, 0))
         rear.save(PREVIEW.replace('.png', '_rear.png'))
+        # every shade (!shade), on a Hornet and a Bastion
+        cs = 180
+        sh = Image.new('RGBA', (cs * 6, cs * 4 + 30), (14, 14, 22, 255))
+        dr = ImageDraw.Draw(sh)
+        for r, (side, key) in enumerate((('t', 'hornet'), ('t', 'bastion'), ('ct', 'hornet'), ('ct', 'bastion'))):
+            for i, (sk, nm) in enumerate(SHADES[side]):
+                im = render_voxels(grids[key + '_boost'], palette(*SKINS[sk]), size=cs, az=205, el=22, fill=0.8, style=key)
+                sh.alpha_composite(im, (i * cs, 30 + r * cs))
+                if r % 2 == 0: dr.text((i * cs + 8, 8 if r == 0 else 30 + r * cs + 4), '%d %s' % (i + 1, nm), fill=(230, 230, 240))
+        sh.save(PREVIEW.replace('.png', '_shades.png'))
     print('car models written:', sum(len(v) for v in models.values()), 'fx', len(fx))
 
 if __name__ == '__main__':

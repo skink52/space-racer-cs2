@@ -362,6 +362,13 @@ preview/    PNG renders of tracks, cars and the HUD for checking without CS2 (hu
   The race itself is bit-for-bit the same as before (test: a hash of every car's state every tic).
   test/mock_cs2.mjs runs the script like CS2 does (as a module, not in a vm context, which made timings ~2.5x too
   slow) and has `held`, `seed=`, `trace=` (compare two builds by what ends up on screen), `calls` and `maskall`.
+- Track votes (RoundManager.closeRace / vote / assignTracks): a finished race's top places (VOTE_WEIGHTS 3 / 2 / 1)
+  get a ballot of VOTE_CHOICES tracks (unraced this round first; ballots use their own seeded random so the race's
+  random sequence is untouched); at the next startRound each new group counts its own members' votes, arenas with
+  the strongest pick choose first, clashes fall to the next choice, no votes = the upcoming rotation. A person's
+  vote only counts while the same person holds the slot. The race's top glowPlaces get car.glow next round
+  (Glow() on the prop in their shade's colour); pe.shade / car.shade pick one of SHADES (tools/cars.py: six palette
+  skins per side after neutral / t / ct / gold, so the old skin numbers never move).
 - The sim runs at 64 Hz, one step per CS2 server tick (64 cars cost about 0.04 ms per tick in Node), so props are moved with `Move` every tick and the client
   interpolates; no sub-tick interpolation needed. `Teleport` only for a prop's first placement and real jumps
   (respawns): CS2 stops drawing a prop that is teleported every tick (the first test's invisible grid).

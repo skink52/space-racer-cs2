@@ -24,6 +24,8 @@ function buildCfg() {
     countdownTics: CONFIG.COUNTDOWN * TICRATE, finishWindow: CONFIG.FINISH_WINDOW, raceCap: CONFIG.RACE_CAP, endHold: CONFIG.RESULTS_HOLD, laps: CONFIG.LAPS,
     botSkill: CONFIG.BOT_SKILL, podium: CONFIG.PODIUM, shares: CONFIG.SHARES.slice(), koCredit: CONFIG.KO_CREDIT_TO_ATTACKER, tiebreak: CONFIG.TIEBREAK,
     trackBlacklist: CONFIG.TRACK_BLACKLIST.slice(), staggerArenas: true, defaultCar: CONFIG.DEFAULT_CAR,
+    votes: CONFIG.VOTES, voteWeights: CONFIG.VOTE_WEIGHTS.slice(), voteChoices: CONFIG.VOTE_CHOICES, botsVote: CONFIG.BOTS_VOTE,
+    glowPlaces: CONFIG.WINNER_GLOW ? CONFIG.GLOW_PLACES : 0,
   };
 }
 
@@ -90,7 +92,7 @@ function startRace() {
   cvars(['mp_ignore_round_win_conditions 1', 'mp_teammates_are_enemies 1']);
   guard('roundtime', () => Instance.SetRoundRemainingTime(CONFIG.COUNTDOWN + CONFIG.RACE_CAP + CONFIG.RESULTS_HOLD + CONFIG.ROUND_SLACK));
   pendingKills.length = 0;
-  const desc = rm.plan.map((it) => `${it.track.title} (${it.grp.length})`).join(', ');
+  const desc = rm.plan.map((it) => `${it.track.title} (${it.grp.length}${it.voted ? ', VOTED' : ''})`).join(', ');
   sayAll(`RACE ${rm.roundNumber}: ${desc}`);
   log(`round ${rm.roundNumber}: ${rm.plan.map((it) => it.track.id + ':' + it.grp.length).join(' ')}`);
 }
@@ -363,6 +365,11 @@ function handleRoundEvents() {
       case 'afkWarn': if (!e.person.bot) sub(e.person.slot, 'MOVE OR YOU WILL BE MARKED AFK', 5); break;
       case 'afk': if (!e.person.bot) { center(e.person.slot, 'AFK', 3, 'red'); log(`${e.person.name} marked AFK`); } break;
       case 'roundOver': endRace(); break;
+      case 'ballot': {
+        // the top places of a race that just ended vote the next track
+        for (const v of e.ballot.voters.values()) if (!v.pe.bot) sub(v.pe.slot, 'VOTE THE NEXT TRACK: W / S  (YOUR VOTE COUNTS X' + v.weight + ')', 8);
+        break;
+      }
     }
   }
   rm.events.length = 0;
@@ -389,7 +396,7 @@ function liveTally(now) {
 
 function raceInfo(pe, car, a, now, spectating) {
   // (rows = the arena's shared standings list; the HUD marks the row whose slot is info.me)
-  const info = { rows: standingsFor(a, now), me: car.slot, spectating, tally: liveTally(now), clock: arenaHud(a).clock };
+  const info = { rows: standingsFor(a, now), me: car.slot, spectating, tally: liveTally(now), clock: arenaHud(a).clock, vote: voteFor(pe, a) };
   const cm = timed(centerMsgs, pe.slot, now);
   if (cm) { info.center = cm.text; info.centerCls = cm.cls; }
   else if (a.state === 'grid' && a.countdown > 3 * TICRATE) info.center = '';
@@ -415,8 +422,16 @@ function roundRemaining() {
   if (remTick !== tickNo || !inThink) { remValue = guard('remaining', () => Instance.GetRoundRemainingTime()); remTick = inThink ? tickNo : -1; }
   return remValue;
 }
+// the ballot a player sees: their own (top places of a finished race), else the one of the race they are looking at
+function voteFor(pe, a) {
+  const own = rm.ballotOf(pe);
+  if (own) return own;
+  const b = a && a.ballot;
+  return b && b.voters.size ? b : null;
+}
+
 function lobbyInfo(pe, now) {
-  const info = { line1: '', line2: '', line3: '' };
+  const info = { line1: '', line2: '', line3: '', vote: voteFor(pe, null) };
   const car = CARS[pe.carChoice] || CARS.hornet;
   info.line2 = 'YOUR CAR: ' + car.name + ' - ' + car.perk + (pe.pickShown ? '  (A / D, E TO CONFIRM)' : '  (R TO CHANGE)');
   const nextT = rm.upcoming[0];
@@ -428,7 +443,9 @@ function lobbyInfo(pe, now) {
     if (a && a.ranking[0]) info.line3 = `${a.track.title}: ${a.state === 'over' ? 'RESULTS' : 'LEADER ' + a.ranking[0].name.slice(0, 16).toUpperCase()}`;
   } else if (phase === 'ending') {
     info.line1 = 'RACE OVER - NEXT ONE SOON';
-    if (nextT) info.line3 = `NEXT: ${nextT.title}${recordText(nextT)}`;
+    const vt = rm.voteLeader();
+    if (vt) info.line3 = `VOTES SO FAR: ${vt.title}${recordText(vt)}`;
+    else if (nextT) info.line3 = `NEXT: ${nextT.title}${recordText(nextT)}`;
   } else {
     let waiting = 0;
     for (const p of rm.people.values()) if ((p.csTeam === 2 || p.csTeam === 3) && !(p.afk && !p.bot)) waiting++;
@@ -438,7 +455,9 @@ function lobbyInfo(pe, now) {
       const t = Math.max(0, Math.ceil(startAt - now));
       info.line1 = Instance.IsFreezePeriod() ? 'THE RACE STARTS AFTER FREEZE TIME' : t > 0 ? `THE RACE STARTS IN ${t}` : 'STARTING...';
     }
-    if (nextT) info.line3 = `NEXT: ${nextT.title} - ${nextT.laps} LAPS${recordText(nextT)}`;
+    const vt = rm.voteLeader();
+    if (vt) info.line3 = `VOTED: ${vt.title} - ${vt.laps} LAPS${recordText(vt)}`;
+    else if (nextT) info.line3 = `NEXT: ${nextT.title} - ${nextT.laps} LAPS${recordText(nextT)}`;
   }
   if (pe.afk) info.line3 = 'AFK - TYPE !BACK OR PRESS A KEY TO RACE';
   else if (pe.csTeam !== 2 && pe.csTeam !== 3) info.line3 = 'JOIN T OR CT TO RACE';
@@ -475,7 +494,7 @@ function lobbyFrame(now, dt) {
     if (pe.bot) { if (!parked.has(pe.slot) && verifyTurn(pe.slot)) park(pe.slot); continue; }   // bots stand frozen in the booth too
     const pk = park(pe.slot, verifyTurn(pe.slot));
     if (!pk) { if (hudNow) guard('nopawnhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, false); }); continue; }
-    if (!playerCall('lobbyinput', pe.slot, () => { if (pickerInput(pe, pk)) rm.markActive(pe.slot); })) continue;   // pawn gone
+    if (!playerCall('lobbyinput', pe.slot, () => { const a = pickerInput(pe, pk), b = voteInput(pe, pk); if (a || b) rm.markActive(pe.slot); })) continue;   // pawn gone
     if (hudNow) guard('lobbyhud', () => { hudOptions(pe.slot, pe); hudLobby(pe.slot, lobbyInfo(pe, now)); hudPicker(pe.slot, pe, pickerAuto(pe) || pickerOpen(pe, now)); });
     // nothing to look at yet: a slow look around the first track from above
     if (!a0) playerCall('lobbycam', pe.slot, () => {
@@ -580,6 +599,9 @@ function frame(dt) {
         if (a.state === 'grid') hudPicker(pe.slot, pe, a.countdown > 3 * TICRATE && (pickerAuto(pe) || pickerOpen(pe, now)) ? 'mini' : false);
         else hudPicker(pe.slot, pe, !pe.car.racing && pickerOpen(pe, now));
       } else {
+        // placed in an arena that is still being built (one arena per tic): wait for it - turning them into
+        // spectators here used to leave them out of their race (the second arena came up empty of humans)
+        if (pe.status === 'planned') { hudLobby(pe.slot, lobbyInfo(pe, now)); return; }
         // spectators and people waiting for the next race
         if (!pe.spec) rm.spectate(pe);
         const a = rm.arenas[pe.spec ? pe.spec.arena : 0], v = a && views.get(a);
@@ -600,14 +622,16 @@ function playerInput(pe, pk) {
     if (pe.car.state === 'grid') { if (pe.arena.countdown > 3 * TICRATE ? pickerInput(pe, pk) : sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
     else if (pe.car.racing) { pe.raced = true; if (sampleInput(pe.slot, pe.car, pk)) rm.markActive(pe.slot); }
     else {
-      // wrecked / finished / withdrawn: watch the others after a moment (!car works from here on)
+      // wrecked / finished / withdrawn: watch the others after a moment (!car works from here on); W / S vote
       pickerInput(pe, pk);
+      voteInput(pe, pk);
       if (pe.car.stateTime > RULES.wreckShow || pe.car.state === 'gone' || pe.car.state === 'withdrawn') {
         pe.status = 'spectating'; pe.spec = { arena: pe.arena.index, target: null }; rm.fixSpectate(pe, 0);
       }
     }
   } else if (pe.status === 'spectating' || pe.status === 'none') {
-    if (spectatorInput(pe, pk)) rm.markActive(pe.slot);
+    const a = spectatorInput(pe, pk), b = voteInput(pe, pk);
+    if (a || b) rm.markActive(pe.slot);
   }
 }
 
@@ -762,6 +786,32 @@ Instance.OnPlayerChat(({ player, text }) => guard('chat', () => {
     if (pe.status === 'racing' && pe.arena) { const a = pe.arena; rm.leaveArena(pe, 'afk'); rm.spectate(pe, a); }
   } else if (t === '!back') {
     pe.afk = false; rm.markActive(slot);
+  } else if (word === '!vote' || word === '!v') {
+    // !vote 1-4 (or a track name) for the top places of a finished race; !vote alone says how
+    const b = rm.ballotOf(pe);
+    const arg = t.slice(word.length).trim();
+    if (!b) bottom(slot, CONFIG.VOTES ? 'ONLY THE TOP 3 OF A RACE VOTE' : 'TRACK VOTES ARE OFF ON THIS SERVER', 3);
+    else if (!arg) bottom(slot, 'W / S OR !VOTE 1-' + b.tracks.length + ' (THE BOX ON THE LEFT)', 4);
+    else {
+      const n = parseInt(arg, 10);
+      const id = n >= 1 && n <= b.tracks.length ? b.tracks[n - 1]
+        : b.tracks.find((tid) => tid.startsWith(arg) || trackTitle(tid).toLowerCase().startsWith(arg));
+      const got = id ? rm.vote(pe, id) : null;
+      bottom(slot, got ? 'YOUR VOTE: ' + trackTitle(got) : 'NOT ON THE BALLOT - !VOTE 1-' + b.tracks.length, 3);
+    }
+  } else if (word === '!shade' || word === '!color' || word === '!colour') {
+    // !shade cycles your colour (reds on T, blues on CT); !shade 1-6 or a name picks one
+    const side = pe.csTeam === 3 ? 'ct' : 't';
+    const list = SHADES[side];
+    const arg = t.slice(word.length).trim();
+    const n = parseInt(arg, 10);
+    let k = (pe.shade || 0);
+    if (!arg) k = (k + 1) % list.length;
+    else if (n >= 1 && n <= list.length) k = n - 1;
+    else { const f = list.findIndex((sh) => sh.name.toLowerCase().startsWith(arg)); if (f >= 0) k = f; else { bottom(slot, '!SHADE 1-' + list.length + ': ' + list.map((sh) => sh.name).join(' ').slice(0, 26), 5); return; } }
+    pe.shade = k;
+    if (pe.car) pe.car.shade = k;                 // the car changes colour straight away
+    bottom(slot, 'SHADE: ' + list[k].name + ' (' + (k + 1) + '/' + list.length + ')  !SHADE 1-' + list.length, 3);
   } else if (t === '!race' || t === '!help' || t === '!spr') {
     pe.helpUntil = gameTime() + CONFIG.HELP_SECONDS;      // hudOptions takes it down again
     hudHelp(slot, true);

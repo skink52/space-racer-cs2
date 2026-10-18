@@ -53,3 +53,12 @@ function flushSays() {
   Instance.ServerCommand(sayQueue.shift());
   sayNext = now + CONFIG.SAY_GAP;
 }
+
+// track titles by id (votes, chat)
+const TRACK_TITLE = {};
+for (const t of TRACKS) TRACK_TITLE[t.id] = t.title;
+function trackTitle(id) { return TRACK_TITLE[id] || String(id).toUpperCase(); }
+
+// the colour shades (!shade): per side, the car skin and the colour (for the glow), from tools/cars.py
+const SHADES = CAR_MODELS.shades || { t: [{ skin: 't', name: 'ORANGE', rgb: [255, 150, 40] }], ct: [{ skin: 'ct', name: 'BLUE', rgb: [70, 150, 255] }] };
+

@@ -317,6 +317,15 @@ def race_state(grid=False, results=False):
     cells = [(rnd.randint(3, 20) * 2, rnd.randint(3, 20) * 2, rnd.choice(['T', 'CT'])) for _ in range(9)]
     dots(cells, (30, 28), (14, 20))
 
+def vote_state(lobby=False):
+    # the end of a race with the vote box (a voter: 2nd place, 2 votes, voted HAIRPIN HARBOUR)
+    if lobby: lobby_state(); BYID['spr_root'].cls.discard('stPick')
+    else: race_state(results=True)
+    add('spr_root', 'stVote')
+    for i, (nm, n) in enumerate([('SWITCHBACK SPIRE', '3'), ('HAIRPIN HARBOUR', '2'), ('SKYWAY', ''), ('NULL GAP', '1')]):
+        text('spr_vn%d' % i, nm, 'gold' if i == 1 else 'white', 'pulse' if i == 1 else None); text('spr_vc%d' % i, n, 'cyan')
+    text('spr_vf', 'YOUR VOTE X2  W/S', 'gold')
+
 def lobby_state():
     reset()
     add('spr_root', 'stLobby', 'stPick')
@@ -362,12 +371,16 @@ def main():
     lobby_state(); shots.append(render(1920, BG, PREFIX + '_lobby.png'))
     race_state(results=True); render(1920, BG, PREFIX + '_results.png')
     help_state(); render(1920, BG, PREFIX + '_help.png')
+    vote_state(); render(1920, BG, PREFIX + '_vote.png')
+    vote_state(); render(1440, BG, PREFIX + '_vote_43.png')
     for W in (1920, 2333):           # 16:9 and Zach's wide screen
         race_state(); check(W, 'race')
         race_state(grid=True); check(W, 'grid')
         race_state(results=True); check(W, 'results')
         lobby_state(); check(W, 'lobby')
         help_state(); check(W, 'help')
+        vote_state(); check(W, 'results')
+        vote_state(lobby=True); check(W, 'lobby')
     seen = set()
     for p in problems:
         if p not in seen: seen.add(p); print('LAYOUT:', p)

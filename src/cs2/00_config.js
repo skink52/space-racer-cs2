@@ -26,6 +26,14 @@ const CONFIG = {
   KILL_CASCADE_TICKS: 3,         // end-of-race deaths go out one every N ticks so the killfeed rolls
   ADD_SCORE: false,              // only when REAL_KILLS is off: AddScore(+1) per credited kill
 
+  // ---- track votes and the winners' glow
+  VOTES: true,                   // the top places of each finished race vote the next track (W / S or !vote 1-4)
+  VOTE_WEIGHTS: [3, 2, 1],       // votes each: 1st, 2nd, 3rd (only these places vote); each new arena counts its own racers' votes
+  VOTE_CHOICES: 4,               // tracks on each ballot (the ones not raced this round first)
+  BOTS_VOTE: false,              // CS2 bots in the top places vote at random too
+  WINNER_GLOW: true,             // last round's top places drive with a neon outline glow in their colour
+  GLOW_PLACES: 3,                // ... this many per race (1 = only the winners)
+
   // ---- AFK
   AFK_WARN: 20, AFK_KICK: 30,    // seconds without input while driving a race
   AFK_LOBBY: 120,                // seconds without any input at all (lobby + watching) before you sit out the next race
@@ -100,4 +108,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.3.2';
+const VERSION = '0.4.0';

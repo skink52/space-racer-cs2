@@ -65,6 +65,16 @@ radar and map icon are in `panorama/images/` and compile with the HUD. The radar
   3rd (32 cars: 15 / 9 / 5). A car wrecked by another player's attack is that player's kill at once. The CS2 round
   goes to the side with more cars in the top 8 (added over both arenas; under 8 cars the winner's side gets the
   point; ties go to the better single finish).
+- Track vote: when a race ends, its top 3 vote the next track from a box of 4 on the left (W / S, or `!vote 1-4`):
+  1st place's vote counts 3, 2nd's 2, 3rd's 1 (only those three vote; CS2 bots don't unless `BOTS_VOTE`). Votes
+  can change until the next race is set up. Arenas are re-drawn every round, so each new arena counts the votes of
+  the players who end up in it, wherever they voted; if two arenas want the same track, the one with more votes
+  behind it gets it and the other takes its next choice. An arena with no voters gets the usual rotation. Everyone
+  watching that race sees the box and the votes; the chat line at the next start says which tracks were VOTED.
+- Colours: `!shade` changes your car's shade - six reds on T (orange, red, crimson, coral, rose, maroon), six blues
+  on CT (blue, navy, cyan, teal, indigo, ice); `!shade 1-6` or a name picks one. It's remembered and changes your
+  car at once.
+- Winners' glow: last round's top 3 of each race drive the next race with a neon outline glow in their own colour.
 - AFK: 20 s without input in a race = warning, 30 s = your car withdraws and you sit out until you press a key or
   type `!back`.
 - CS2 bots race using the script's own driving AI (`bot_quota 31` fills a test grid).
@@ -82,10 +92,12 @@ radar and map icon are in `panorama/images/` and compile with the HUD. The radar
 | Space | drift |
 | Mouse | nothing while racing - the camera follows the car and turns a little into the bend ahead |
 | Mouse 1 / 2, E (watching) | next car / previous car / next arena (E confirms instead while the picker is up; Space changes arena too) |
+| W / S (after a race, top 3) | move your track vote up / down the box on the left |
 
 Chat (`!` or `/`): `!car` (the car picker for 6 seconds; also `!pick`), `!car 1-4` or a name (pick straight away),
 `!cam` (camera: high = default, far, near), `!tilt` (camera lean in corners on / off for you), `!crt` (CRT
-scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!help` or `!race` (controls on your own screen).
+scanlines on / off for you), `!shade` / `!shade 1-6` (your colour), `!vote` / `!vote 1-4` (the top 3 after a race),
+`!music`, `!spec`, `!afk`, `!back`, `!help` or `!race` (controls on your own screen).
 
 ## Settings
 
@@ -93,7 +105,8 @@ scanlines on / off for you), `!music`, `!spec`, `!afk`, `!back`, `!help` or `!ra
 podium size and kill shares, `KO_CREDIT_TO_ATTACKER`, tie-break, AFK times, bot skill, camera distance, and the
 cvars the map applies, the camera presets (`CAMERAS`, `CAM_LOOKAHEAD`, `CAM_BANK`, `CAM_SHAKE`), `ENGINE_HUM`,
 `MUSIC` (chiptune music for everyone; volume: `MUSIC_VOL` in `tools/sounds.py`), `MINIMAP_DOT_HZ` (how often the
-other cars' minimap dots move; 4 instead of 8 halves the biggest share of HUD traffic), `PERF_LOG` (the once-a-minute
+other cars' minimap dots move; 4 instead of 8 halves the biggest share of HUD traffic), `VOTES` / `VOTE_WEIGHTS` /
+`VOTE_CHOICES` / `BOTS_VOTE` (the track vote), `WINNER_GLOW` / `GLOW_PLACES` (the winners' glow), `PERF_LOG` (the once-a-minute
 `script time` line in the console). The four cars and the physics rules are in `const CARS` / `const RULES` just below.
 
 When `APPLY_CVARS` is on the map sets: `mp_respawn_on_death_t/ct 1`, `mp_respawn_immunitytime 0`,
@@ -112,5 +125,6 @@ Same risks as FreeDM. On this map, turn off or exempt:
 - **Weapon / loadout / knife plugins**: parked bodies are stripped of weapons every round; a plugin re-giving them
   shows a viewmodel over the race.
 - **Anti-stuck / noblock / third-person plugins** that move or unfreeze bodies or change the camera.
-- **Chat commands** `!car !pick !cam !tilt !crt !music !spec !afk !back !help !race` may clash with plugin commands.
+- **Chat commands** `!car !pick !cam !tilt !crt !shade !vote !music !spec !afk !back !help !race` may clash with plugin
+  commands (map votes especially: `!vote` / `!rtv` plugins).
 - **Team balancers**: balance at round start only; a mid-race team change takes the player out of the race.

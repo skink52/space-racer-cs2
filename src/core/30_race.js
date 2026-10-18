@@ -32,6 +32,7 @@ class Arena {
     this.pairs = null;              // flat copies of positions for the pair loops in step()
     this.lanes = null;              // the bots' lane picture for this tic (laneCars)
     this.hudCache = null; this.newRecord = false;   // used by the CS2 side
+    this.ballot = null;             // the track vote of this race's top places (RoundManager.closeRace)
   }
 
   addCar(slot, name, clsKey, team) {

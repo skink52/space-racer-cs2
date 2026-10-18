@@ -10,7 +10,17 @@ const DEFAULT_CFG = {
   botSkill: 0.5,
   podium: 3, shares: [50, 30, 20], koCredit: true, tiebreak: true,
   trackBlacklist: [], staggerArenas: true, defaultCar: 'hornet',
+  // track votes: the top places of each finished race vote the next track, worth these many votes each (1st, 2nd, 3rd);
+  // the choices on each ballot; whether CS2 bots in the top places vote (at random) too
+  votes: true, voteWeights: [3, 2, 1], voteChoices: 4, botsVote: false,
+  glowPlaces: 3,                   // the top N of each race glow in the next round
 };
+
+// a small seeded random for the ballots, so votes never touch the race's own random sequence
+function ballotRandom(seed) {
+  let st = (seed >>> 0) || 1;
+  return () => { st = (st + 0x6D2B79F5) >>> 0; let t = st; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
 
 // layouts: '2x32' (up to 2 arenas of 32), '4x16' (up to 4 arenas of 16), 'alternate' (switches every round)
 const LAYOUTS = { '2x32': { arenaMax: 32, maxArenas: 2 }, '4x16': { arenaMax: 16, maxArenas: 4 } };
@@ -55,6 +65,9 @@ class RoundManager {
     this.lastTracks = [];
     this.upcoming = [];
     this.events = [];
+    this.ballots = [];             // this round's finished races: { arena, tracks, voters: Map(slot -> voter), ver }
+    this.glow = new Map();         // person -> place (1..glowPlaces) in last round's race: their car glows this round
+    this.glowNext = new Map();
     this.pickUpcoming();
   }
 
@@ -72,7 +85,7 @@ class RoundManager {
     let pe = this.people.get(slot);
     if (!pe) {
       pe = { slot, name, csTeam, bot: !!bot, arena: null, car: null, status: 'none', lastActive: this.clock, afk: false, spec: null,
-             carChoice: bot ? CAR_KEYS[Math.floor(rnd() * CAR_KEYS.length)] : this.cfg.defaultCar, wins: 0, races: 0 };
+             carChoice: bot ? CAR_KEYS[Math.floor(rnd() * CAR_KEYS.length)] : this.cfg.defaultCar, wins: 0, races: 0, shade: 0 };
       this.people.set(slot, pe);
     } else { pe.name = name; pe.csTeam = csTeam; pe.bot = !!bot; }
     return pe;
@@ -119,11 +132,13 @@ class RoundManager {
     this.layout = layoutFor(this.cfg, this.roundNumber);
     const sizes = arenaSizes(eligible.length, Object.assign({}, this.cfg, this.layout));
     const groups = this.splitGroups(eligible, sizes);
-    // tracks: the ones the lobby showed (different per arena, none from the last round)
+    // tracks: what each arena's own voters chose (votes from last round's top places who race in that arena), else
+    // the ones the lobby showed (different per arena, none from the last round)
     if (this.upcoming.length < groups.length) this.pickUpcoming();
-    const cands = this.upcoming;
-    this.plan = groups.map((grp, i) => ({ grp, track: cands[i % cands.length] }));
+    this.plan = this.assignTracks(groups);
     this.lastTracks = this.plan.map((p) => p.track.id);
+    this.ballots = [];
+    this.glow = this.glowNext; this.glowNext = new Map();
     this.pickUpcoming();
     for (const item of this.plan) for (const pe of item.grp) pe.status = 'planned';
     // anyone eligible but not placed (over 64) spectates
@@ -168,7 +183,7 @@ class RoundManager {
     this.arenas.push(arena);
     for (const pe of grp) {
       const car = arena.addCar(pe.slot, pe.name, pe.carChoice, pe.csTeam === 3 ? 1 : 0);
-      car.person = pe; car.isBot = pe.bot;
+      car.person = pe; car.isBot = pe.bot; car.shade = pe.shade || 0; car.glow = this.glow.get(pe) || 0;
       if (pe.bot) car.bot = makeBot(this.cfg.botSkill);
       pe.arena = arena; pe.car = car; pe.status = 'racing'; pe.spec = null; pe.lastActive = this.clock; pe.races++;
     }
@@ -225,6 +240,7 @@ class RoundManager {
       if (a.state === 'over' && a.finishedAt >= a.cfg.endHold * TICRATE) continue;
       for (const c of a.order) if (c.isBot) botThink(a, c);
       a.step();
+      if (a.result && !a.ballot) this.closeRace(a);
     }
     this.checkAfk();
     this.checkEnds();
@@ -299,6 +315,102 @@ class RoundManager {
     counts.forEach((n, i) => { for (let j = 0; j < n && k < losers.length; j++, k++) plan.push({ victim: losers[k], killer: podium[i] || null }); });
     while (k < losers.length) plan.push({ victim: losers[k++], killer: podium[0] || null });
     return plan;
+  }
+
+  // ------------------------------------------------------------------ track votes and the winners' glow
+  // a race is over: its top places get a ballot of tracks for the next round, and glow next round
+  closeRace(a) {
+    const r = a.result.ranking, cfg = this.cfg;
+    r.slice(0, cfg.glowPlaces).forEach((c, i) => { if (c.person && !c.left) this.glowNext.set(c.person, i + 1); });
+    const rand = ballotRandom(this.roundNumber * 7919 + a.index * 104729 + this.clock);
+    const raced = new Set(this.arenas.map((x) => x.track.id));
+    const usable = this.tracks.filter((t) => !cfg.trackBlacklist.includes(t.id));
+    const fresh = usable.filter((t) => !raced.has(t.id)), rest = usable.filter((t) => raced.has(t.id));
+    const mix = (list) => { for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; } return list; };
+    const tracks = mix(fresh).concat(mix(rest)).slice(0, Math.max(2, cfg.voteChoices)).map((t) => t.id);
+    const voters = new Map();
+    if (cfg.votes && tracks.length > 1) {
+      r.slice(0, cfg.voteWeights.length).forEach((c, i) => {
+        const pe = c.person;
+        if (!pe || c.left || (pe.bot && !cfg.botsVote)) return;
+        voters.set(pe.slot, { pe, weight: cfg.voteWeights[i], place: i + 1, choice: pe.bot ? tracks[Math.floor(rand() * tracks.length)] : null });
+      });
+    }
+    a.ballot = { arena: a.index, track: a.track.id, tracks, voters, ver: 0 };
+    this.ballots.push(a.ballot);
+    if (voters.size) this.events.push({ type: 'ballot', arena: a, ballot: a.ballot });
+  }
+
+  // the ballot `pe` votes on (the person must still be the one who raced), or null
+  ballotOf(pe) {
+    if (!pe) return null;
+    for (const b of this.ballots) { const v = b.voters.get(pe.slot); if (v && v.pe === pe) return b; }
+    return null;
+  }
+  // vote for a track (id) or move the vote up / down the ballot (dir 1 / -1); returns the track voted for, or null
+  vote(pe, idOrDir) {
+    const b = this.ballotOf(pe);
+    if (!b) return null;
+    const v = b.voters.get(pe.slot);
+    let id = idOrDir;
+    if (typeof idOrDir === 'number') {
+      const i = v.choice ? b.tracks.indexOf(v.choice) : (idOrDir > 0 ? -1 : 0);
+      id = b.tracks[((i + idOrDir) % b.tracks.length + b.tracks.length) % b.tracks.length];
+    }
+    if (!b.tracks.includes(id)) return null;
+    if (v.choice !== id) { v.choice = id; b.ver++; }
+    return id;
+  }
+  // votes per track on one ballot
+  tally(b) {
+    const t = new Map();
+    for (const id of b.tracks) t.set(id, 0);
+    for (const v of b.voters.values()) if (v.choice && this.people.get(v.pe.slot) === v.pe) t.set(v.choice, (t.get(v.choice) || 0) + v.weight);
+    return t;
+  }
+  // the track leading all the votes so far (shown in the lobby), or null
+  voteLeader() {
+    const all = new Map();
+    for (const b of this.ballots) for (const [id, n] of this.tally(b)) if (n) all.set(id, (all.get(id) || 0) + n);
+    let best = null, bn = 0;
+    for (const [id, n] of all) if (n > bn) { best = id; bn = n; }
+    return best ? this.tracks.find((t) => t.id === best) || null : null;
+  }
+
+  // the next round's tracks: each arena counts the votes of its own racers (wherever they voted); the arena with the
+  // most votes behind its pick chooses first, so two arenas never get the same track; arenas without votes take the
+  // lobby's upcoming tracks
+  assignTracks(groups) {
+    const byId = new Map(this.tracks.map((t) => [t.id, t]));
+    const counts = groups.map((grp) => {
+      const inGrp = new Set(grp);
+      const c = new Map();
+      for (const b of this.ballots) for (const v of b.voters.values()) {
+        if (!v.choice || !inGrp.has(v.pe) || this.people.get(v.pe.slot) !== v.pe) continue;
+        c.set(v.choice, (c.get(v.choice) || 0) + v.weight);
+      }
+      // highest first; ties go to the track first seen on the ballots (stable)
+      return [...c].sort((x, y) => y[1] - x[1]);
+    });
+    const order = groups.map((_, i) => i).sort((i, j) => ((counts[j][0] || [0, 0])[1] - (counts[i][0] || [0, 0])[1]) || i - j);
+    const taken = new Set(), picks = new Array(groups.length).fill(null), voted = new Array(groups.length).fill(false);
+    for (const i of order) {
+      for (const [id] of counts[i]) {
+        const t = byId.get(id);
+        if (t && !taken.has(id) && !this.cfg.trackBlacklist.includes(id)) { picks[i] = t; voted[i] = true; taken.add(id); break; }
+      }
+    }
+    const cands = this.upcoming;
+    let k = 0;
+    for (let i = 0; i < groups.length; i++) {
+      if (picks[i]) continue;
+      // the lobby's next tracks in order, skipping any an arena voted for
+      let t = null;
+      for (let n = 0; n < cands.length * 2 && !t; n++) { const c = cands[(k + n) % cands.length]; if (!taken.has(c.id)) { t = c; k = (k + n + 1) % cands.length; } }
+      if (!t) t = cands[i % cands.length];
+      picks[i] = t; taken.add(t.id);
+    }
+    return groups.map((grp, i) => ({ grp, track: picks[i], voted: voted[i] }));
   }
 
   endRoundCleanup() {

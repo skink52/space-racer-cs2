@@ -234,7 +234,7 @@ for k in KEYS:
 rule('.SprWrap', width='100%', height='100%')
 rule('.SprOpts', width='100%', height='100%')
 rule('.SprRoot', width='100%', height='100%', opacity='0')
-for c in ('stOn', 'stLobby', 'stPick', 'stPickMini', 'stHelp'):
+for c in ('stOn', 'stLobby', 'stPick', 'stPickMini', 'stHelp', 'stVote'):
     rule('.SprRoot.' + c, opacity='1')
 rule('.Screen', width='100%', height='1080px')
 rule('.Full', width='100%', height='100%')
@@ -256,6 +256,7 @@ show_when('Logo', 'stLobby')
 show_when('Pick', 'stPick')
 show_when('PickMini', 'stPickMini')
 show_when('Help', 'stHelp')
+show_when('Vote', 'stVote')
 show_when('ResLogo', 'stRes')
 rule('.SprRoot.stOn.stRes .TopBlock', opacity='0')
 show_when('ResBoard', 'stRes')
@@ -505,9 +506,21 @@ lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 
 HELP = [('SPACE RACER - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
         ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('E        YOUR CAR\'S ABILITY', 'W'), ('R        PICK A CAR', 'W'),
         ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SPEC  !AFK  !BACK', 'P')]
+        ('RAMPS: HIT THEM FAST!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SHADE !VOTE !SPEC !AFK !BACK', 'P')]
 help_ = P('spr_help', box('Help', 'cyan', 640, len(HELP) * 28 + 24, center=True, y=180),
           [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
+
+# ---------------------------------------------------------------- the track vote (left, under the clock; after a race)
+# The top 3 of a finished race vote the next track with W / S (or !vote 1-4): four tracks with the votes each has,
+# the voter's pick in gold. Everyone watching that race sees the box too. It sits between the clock box (ends y 386)
+# and CS2's chat (from y 600), and left of the results board even on a 4:3 screen (board from x 336 there).
+VOTE_W, VOTE_ROWS = 300, 4
+vote = P('spr_vote', box('Vote', 'gold', VOTE_W, 180, x=24, y=400), [
+    stext('TRACK VOTE', 'S', 'Y', center=True, y=8),
+    *[gtext('spr_vn%d' % i, 16, 'XS', 'W', align='left', x=8, y=42 + i * 26) for i in range(VOTE_ROWS)],
+    *[gtext('spr_vc%d' % i, 1, 'XS', 'C', align='right', right=8, y=42 + i * 26) for i in range(VOTE_ROWS)],
+    gtext('spr_vf', 18, 'XS', 'Y', center=True, y=42 + VOTE_ROWS * 26 + 8),
+])
 
 # ---------------------------------------------------------------- centre messages and the bottom message line
 centre = [
@@ -538,7 +551,7 @@ screen = P(None, 'Screen', [
     P(None, 'SpeedFxPad Full', [P(None, 'SpeedP0 Full'), P(None, 'SpeedP1 Full')]),
     logo, res, minimap, top, clock,
     *centre,
-    bars, speed, stand, resboard, lobby, pick, pickmini, help_,
+    bars, speed, stand, resboard, vote, lobby, pick, pickmini, help_,
     P(None, 'Vig Full'),
     P(None, 'Crt Full'),
 ])

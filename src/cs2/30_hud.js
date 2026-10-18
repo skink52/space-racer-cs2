@@ -22,6 +22,7 @@ class HudSlot {
     this.dots = new Int32Array(MAX_DOTS + 2).fill(-1);   // per dot: packed x / y / colour / shown (-1 = unknown)
     this.optCrt = null; this.optHelp = null;
     this.picker = null;
+    this.vote = null; this.voteVer = -1; this.voteKey = '';   // the ballot on screen, its version, the voter's pick
   }
 }
 
@@ -182,14 +183,14 @@ function hudReset(slot) {
 
 // state classes on spr_root all start with "st" (stOn, stLobby, stPick, stHelp, stRes, stSpec, stBoost): a state
 // class must never share its name with a panel's class, or the root picks up that panel's layout
-const ROOT_GROUPS = ['on', 'lobby', 'pick', 'help', 'res', 'spec', 'boost'];
+const ROOT_GROUPS = ['on', 'lobby', 'pick', 'help', 'res', 'spec', 'boost', 'vote'];
 const RK = {};
 for (const g of ROOT_GROUPS) RK[g] = gkey('spr_root', g);
 function rootSwap(hs, slot, group, cls) { return hudSwapK(hs, slot, 'spr_root', RK[group], cls); }
 function hudOff(slot) {
   const hs = hslot(slot);
   for (const g of ROOT_GROUPS) rootSwap(hs, slot, g, null);
-  hs.picker = null; hs.optHelp = null;     // their root classes are gone: redraw them next time
+  hs.picker = null; hs.optHelp = null; hs.vote = null;     // their root classes are gone: redraw them next time
 }
 
 const W_CLS = [];
@@ -351,6 +352,32 @@ function hudResults(hs, slot, arena, me) {
   hs.resRank = ok ? r : null; hs.resMe = me; hs.resKey = key;
 }
 
+// the track vote box (left): four tracks with their votes, a voter's pick in gold. Redrawn only when a vote changes.
+const VOTE_ROWS = 4;
+function hudVote(hs, slot, ballot) {
+  if (!ballot) {
+    if (hs.vote !== false) hs.vote = rootSwap(hs, slot, 'vote', null) ? false : null;
+    return;
+  }
+  const v = ballot.voters.get(slot);
+  const mine = v && rm.person(slot) === v.pe ? v : null;
+  const key = mine ? (mine.choice || '-') + mine.weight : '';
+  if (hs.vote === ballot && hs.voteVer === ballot.ver && hs.voteKey === key) return;
+  const tally = rm.tally(ballot);
+  let ok = rootSwap(hs, slot, 'vote', 'stVote');
+  for (let i = 0; i < VOTE_ROWS; i++) {
+    const id = ballot.tracks[i];
+    const picked = !!(mine && id && mine.choice === id);
+    hudText(slot, 'spr_vn' + i, id ? trackTitle(id) : '', picked ? 'cY' : 'cW', picked ? 'pulse' : null);
+    const n = id ? tally.get(id) || 0 : 0;
+    hudText(slot, 'spr_vc' + i, n ? String(Math.min(9, n)) : '', 'cC');
+    if (!hs.rows.has('spr_vn' + i) || !hs.rows.has('spr_vc' + i)) ok = false;
+  }
+  hudText(slot, 'spr_vf', mine ? (mine.choice ? 'YOUR VOTE X' + mine.weight + '  W/S' : 'W/S TO VOTE  X' + mine.weight) : 'TOP 3 ARE VOTING', mine && !mine.choice ? 'cY' : 'cP', mine && !mine.choice ? 'blink' : null);
+  if (!hs.rows.has('spr_vf')) ok = false;
+  hs.vote = ok ? ballot : null; hs.voteVer = ballot.ver; hs.voteKey = key;
+}
+
 // lap timer and best lap (tenths), under the race clock
 function lapText(sec) { return sec > 0 ? fmtTime(sec).slice(0, -1) : '-'; }
 
@@ -429,6 +456,7 @@ function hudRace(slot, car, arena, info) {
   hudDots(hs, slot, arena, car);
   rootSwap(hs, slot, 'spec', info.spectating ? 'stSpec' : null);
   rootSwap(hs, slot, 'lobby', null);
+  hudVote(hs, slot, info.vote || null);
 }
 // the turn arrow for a car, worked out once per tick however many players look through that car
 function turnClass(car, arena) {
@@ -457,6 +485,7 @@ function hudLobby(slot, info) {
   hudText(slot, 'spr_sub', '');
   hudText(slot, 'spr_msg', info.msg || '', 'cC');
   hudSwapK(hs, slot, 'spr_flash', 'spr_flash', null);
+  hudVote(hs, slot, info.vote || null);
 }
 
 function hudHelp(slot, on) { const hs = hslot(slot); rootSwap(hs, slot, 'help', on ? 'stHelp' : null); hs.optHelp = null; }
