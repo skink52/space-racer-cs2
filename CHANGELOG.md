@@ -36,8 +36,6 @@
 - `VOTES`, `VOTE_WEIGHTS`, `VOTE_CHOICES` and `BOTS_VOTE` control the track vote.
 - `WINNER_GLOW` and `GLOW_PLACES` control the glow. `GLOW_PLACES 1` limits it to winners only.
 
-## v0.3.2 (18 Oct 2026)
-
 ### Performance
 - The map's script uses about a third of the server time it did, and makes about a third as many calls into CS2
   each tick. Nothing looks or plays differently.
