@@ -7,6 +7,9 @@
   - The cars are Space Racer's voxel cars again, with near-black hulls and glowing team-colour trim and edge lines.
   - Every track texture and sky is drawn in chunky dithered pixels in a neon palette.
   - Flight gates are glowing pixel rings again.
+- **Faster vis compile**: Neon Racer's vis made 3.7 million clusters. The Low hints along every road are gone; nothing
+  in a track box occludes, so they bought nothing. The whole map is now one Lowest hint, with Low only in the lobby
+  rooms (both games; Space Racer on its next build).
 - **Pylons tied to the track**: each trackside pylon has an arm under the road's edge and a stepped brace from its
   foot up to the road's underside, so it no longer floats beside the track (both games).
 - **Start gantry**: its towers now stand clear of the track name. The letters had run into the pillars. This changes
