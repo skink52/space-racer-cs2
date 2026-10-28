@@ -625,6 +625,19 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
         h = 520 + rng.randint(0, 420)
         tris += s2.box_tris('post', p[0] - 14, p[1] - 14, p[2] - SKIRT - 160, p[0] + 14, p[1] + 14, p[2] + h, uscale=1 / 256.0)
         tris += s2.box_tris('beacon', p[0] - 32, p[1] - 32, p[2] + h, p[0] + 32, p[1] + 32, p[2] + h + 64)
+        # tied to the track: an arm under the road's edge and a stepped brace from the pylon's foot up to the road's belly
+        e, m = G.at(i, side * hw[i]), G.at(i, side * hw[i] * 0.35)
+        zu = min(e[2], m[2]) - SKIRT
+        tris += box_along('post', (p[0], p[1]), (m[0], m[1]), zu - 26, zu - 2, 10)
+        foot = p[2] - SKIRT - 150
+        if zu - 40 > foot:
+            steps = 5
+            for s_ in range(steps):
+                t0, t1 = s_ / steps, (s_ + 1) / steps
+                a2 = (p[0] + (m[0] - p[0]) * t0, p[1] + (m[1] - p[1]) * t0)
+                b2 = (p[0] + (m[0] - p[0]) * t1, p[1] + (m[1] - p[1]) * t1)
+                z0 = foot + (zu - 26 - foot) * t0
+                tris += box_along('post', a2, b2, z0, z0 + (zu - 26 - foot) / steps + 6, 8)
     # turn signs on the outside of every real corner, facing the cars coming towards them
     head = np.unwrap(np.arctan2(tan[:, 1], tan[:, 0]))
     total = head[-1] - head[0] + math.atan2(math.sin(head[0] - head[-1]), math.cos(head[0] - head[-1]))

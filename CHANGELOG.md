@@ -7,6 +7,8 @@
   - The cars are Space Racer's voxel cars again, with near-black hulls and glowing team-colour trim and edge lines.
   - Every track texture and sky is drawn in chunky dithered pixels in a neon palette.
   - Flight gates are glowing pixel rings again.
+- **Pylons tied to the track**: each trackside pylon has an arm under the road's edge and a stepped brace from its
+  foot up to the road's underside, so it no longer floats beside the track (both games).
 - **Start gantry**: its towers now stand clear of the track name. The letters had run into the pillars. This changes
   the generator for both games; Space Racer's tracks change too on their next build.
 
