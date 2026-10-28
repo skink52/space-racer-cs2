@@ -25,6 +25,7 @@ class Car {
     this.fallTimer = 0; this.fx = 0;   // fx bits for the renderer: 1 hit, 2 rail, 4 pulsed, 8 pad, 16 fell
     this.pulsed = 0; this.noDamage = 0; this.calm = 0;   // seconds of no-damage after the start
     this.air = false; this.tz = 0; this.lift = 0; this.airTime = 0;   // jumps: airborne flag, track height, ramp height under the car
+    this.fly = false;              // in a flight section (air is true too)
     this.bank = 0;                 // tan of the road's lean under the car (banked bends)
     this.yawRate = 0;              // how fast the car is turning (radians per second, smoothed; + = left)
     this.gasAt = null; this.stall = 0;   // turbo start: when the gas went down on the grid; seconds of stalled engine
@@ -39,7 +40,7 @@ class Car {
 
   placeAt(x, y, z, yaw, track) {
     this.x = x; this.y = y; this.z = z; this.yaw = yaw; this.vx = 0; this.vy = 0; this.vz = 0; this.speed = 0; this.vf = 0; this.vl = 0;
-    this.air = false; this.tz = z; this.lift = 0; this.yawRate = 0;
+    this.air = false; this.fly = false; this.tz = z; this.lift = 0; this.yawRate = 0;
     const p = track.locateAll(x, y, z);
     this.seg = p.i; this.t = p.t; this.d = p.d; this.s = p.s; this.prevS = p.s;
   }
@@ -68,9 +69,9 @@ class Car {
     if (this.stall > 0) this.stall -= dt;
     const throttle = finished ? 0.4 : this.stall > 0 ? 0 : clamp(c.throttle, -1, 1);
     const steer = finished ? this.autoSteer(track) : (this.spinTimer > 0 ? 0 : clamp(c.steer, -1, 1));
-    const air = this.air;
+    const flying = this.fly, air = this.air && !flying;    // flying: driven like the road (thrust, grip), height by W / S
     const wantBoost = !finished && !air && c.boost && this.charge > 0;
-    this.drifting = !finished && !air && c.drift && this.speed > 250;
+    this.drifting = !finished && !this.air && c.drift && this.speed > 250;
     // spin attack
     // the start: no spins, no Shockwave and no Seeker Bolt (the E abilities that hit others); Nova Burn and Aegis off
     // the line are fine
@@ -120,6 +121,8 @@ class Car {
     let acc = sp.accel * (this.boosting ? 1.6 : 1) * (this.padTimer > 0 ? 1.5 : 1) * (this.novaTimer > 0 ? 2 : 1) * (this.draft ? 1.15 : 1);
     if (air) {
       vf -= vf * 0.05 * dt;            // no thrust or brakes in the air
+    } else if (flying) {
+      if (vf < target) vf = Math.min(target, vf + acc * dt);     // flight: always full thrust (W / S work the height)
     } else if (throttle > 0) {
       if (vf < target) vf = Math.min(target, vf + acc * throttle * dt);
     } else if (throttle < 0) {
@@ -157,7 +160,10 @@ class Car {
     const lift = track.rampLift(p.i, p.t);
     const ground = p.z + lift;
     const road = track.road[p.i];
-    if (this.air) {
+    if (track.fly[p.i] && (this.state === 'racing' || finished)) {
+      this.flyStep(track, p, finished ? clamp((p.z - this.z) / 120, -1, 1) : clamp(c.throttle, -1, 1), dt, tic, finished);
+    } else if (this.air) {
+      if (this.fly) this.fly = false;   // out of the corridor: falls onto the landing road
       this.airTime += dt;
       this.vz -= RULES.gravity * dt;
       this.z += this.vz * dt;
@@ -184,7 +190,7 @@ class Car {
     if (this.state === 'falling') { this.speed = Math.hypot(this.vx, this.vy); return; }
     // rails and gaps
     const limit = p.hw - CAR_R * 0.7;
-    if (Math.abs(this.d) > limit) {
+    if (!this.fly && Math.abs(this.d) > limit) {
       const side = this.d > 0 ? 1 : -1;
       const nx = track.nx[p.i] * side, ny = track.ny[p.i] * side;   // points out of the track on this side
       if (p.rail || finished) {
@@ -213,13 +219,13 @@ class Car {
     this.progress(track, tic);
     // features under the car
     this.onCharge = false; this.slick = false;
-    const feats = this.air ? null : track.featuresAt(this.seg, -this.d / Math.max(1, p.hw));
+    const feats = this.fly ? this.ringsAt(track, p) : this.air ? null : track.featuresAt(this.seg, -this.d / Math.max(1, p.hw));
     if (feats && !finished) {
       for (const f of feats) {
-        if (f.kind === 'boost') {
+        if (f.kind === 'boost' || f.kind === 'ring') {
           if (this.padTimer <= 0) { this.vx += fx * RULES.padKick; this.vy += fy * RULES.padKick; this.fx |= 8; }
           this.padTimer = Math.max(this.padTimer, RULES.padTime * sp.padMult);
-        } else if (f.kind === 'charge') {
+        } else if (f.kind === 'charge' || f.kind === 'cring') {
           this.onCharge = true;
           this.charge = Math.min(sp.charge, this.charge + RULES.chargeRate * sp.chargeMult * dt);
           this.shield = Math.min(sp.shield, this.shield + RULES.chargeShield * dt);
@@ -241,6 +247,46 @@ class Car {
     this.wrongWayFlag = this.wrongWay > RULES.wrongWayTime;
   }
 
+  // one step in a flight section: height from W / S, the corridor's edge bounces like a rail
+  flyStep(track, p, climb, dt, tic, finished) {
+    if (!this.fly) { this.fly = true; this.air = true; this.airTime = 0; this.lift = 0; this.fx |= 8192; }
+    this.airTime += dt;
+    const want = climb > 0.1 ? climb * RULES.flyClimb : climb < -0.1 ? climb * RULES.flyDive : -RULES.flySink;
+    this.vz += (want - this.vz) * Math.min(1, dt * RULES.flyResp);
+    this.z += this.vz * dt;
+    const R = Math.max(40, track.flyR[p.i] - CAR_R * 0.6);
+    const dz = this.z - p.z, r = Math.hypot(this.d, dz);
+    if (r <= R) return;
+    const ud = this.d / r, uz = dz / r, nx = track.nx[p.i], ny = track.ny[p.i];
+    // back onto the edge
+    const dd = ud * R - this.d;
+    this.x += nx * dd; this.y += ny * dd; this.d += dd; this.z = p.z + uz * R;
+    // bounce off it
+    const vlat = this.vx * nx + this.vy * ny, vr = vlat * ud + this.vz * uz;
+    if (vr <= 0) return;
+    const k = 1 + RULES.flyRest;
+    this.vx -= nx * k * vr * ud; this.vy -= ny * k * vr * ud; this.vz -= k * vr * uz;
+    const hard = Math.max(0, vr - 140);
+    if (hard > 0 && !finished) {
+      if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * 0.04), null, tic);
+      this.fx |= 2;
+    } else this.fx |= 64;
+  }
+
+  // flight rings under the car: a ring counts when the car passes through it (centre d / height dz, radius rr)
+  ringsAt(track, p) {
+    const list = track.featAt[this.seg];
+    if (!list) return null;
+    let out = null;
+    const dz = this.z - p.z;
+    for (const k of list) {
+      const f = track.feats[k];
+      if (f.kind !== 'ring' && f.kind !== 'cring') continue;
+      if (Math.hypot(this.d - f.rd, dz - f.rz) < f.rr) (out || (out = [])).push(f);
+    }
+    return out;
+  }
+
   autoSteer(track) {
     const p = track.point(this.s + 260);
     const want = Math.atan2(p.y - this.y, p.x - this.x);
@@ -259,7 +305,7 @@ class Car {
       const p = track.point(s);
       this.x = p.x; this.y = p.y; this.z = p.z; this.yaw = Math.atan2(p.ty, p.tx);
       this.vx = 0; this.vy = 0; this.vz = 0; this.speed = 0; this.vf = 0; this.vl = 0;
-      this.seg = p.i; this.s = s; this.prevS = s; this.d = 0; this.air = false; this.tz = p.z; this.lift = 0;
+      this.seg = p.i; this.s = s; this.prevS = s; this.d = 0; this.air = false; this.fly = false; this.tz = p.z; this.lift = 0;
       this.state = 'racing'; this.stateTime = 0; this.ghost = 1.5; this.padTimer = 0;
       this.shield -= RULES.fallPenalty;
       this.fx |= 128;

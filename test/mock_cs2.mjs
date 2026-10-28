@@ -17,7 +17,7 @@ import vm from 'node:vm';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const HUMANS = +(process.argv[2] || 10), BOTS = +(process.argv[3] || 22), SECONDS = +(process.argv[4] || 400);
 const OPTS = process.argv[5] || '';
-const NAME = process.env.SPR_NAME || 'space_racer';
+const NAME = process.env.SPR_NAME || (process.env.SPR_THEME === 'neon' ? 'neon_racer' : 'space_racer');
 
 const CSInputs = { NONE: 0, FORWARD: 1, BACK: 2, LEFT: 4, RIGHT: 8, WALK: 16, DUCK: 32, JUMP: 64, USE: 128, ATTACK: 256, ATTACK2: 512, RELOAD: 1024, SHOW_SCORES: 2048, LOOK_AT_WEAPON: 4096 };
 const CustomCameraMode = { DISABLED: 0, CONTROLLED: 1, CONTROLLED_POSITION: 2, FOLLOW_POSITION: 3 };

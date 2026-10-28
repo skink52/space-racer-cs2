@@ -125,3 +125,81 @@ def make_sky(theme, th, scenery, seed):
     horizon(img, rng, scenery, th['glow'])
     q = quantize(img, 30)
     return up(q, 4)
+
+# ---------------------------------------------------------------- Neon Racer: smooth 2048 x 1024 neon skies
+def make_sky_neon(theme, th, scenery, seed):
+    """black sky over a glowing horizon, a perspective grid floor below it, a striped sun (or a ringed planet drawn in
+    lines), a skyline whose edges glow, and a few stars. Smooth, not pixel art."""
+    Wn, Hn = 2048, 1024
+    rng = np.random.RandomState(seed)
+    top, mid, hor = [np.array(c, np.float32) for c in th['sky']]
+    glow = np.array(th['glow'], np.float32); acc = np.array(th.get('accent', th['glow']), np.float32)
+    yy, xx = np.mgrid[0:Hn, 0:Wn].astype(np.float32)
+    lat = 1 - yy / (Hn / 2)                          # 1 up, 0 horizon, -1 down
+    img = np.zeros((Hn, Wn, 3), np.float32)
+    up_ = np.clip(lat, 0, 1)[..., None]
+    img += top * up_ ** 0.6 + mid * (1 - up_ ** 0.6)
+    img += glow * 0.55 * np.exp(-np.abs(lat) / 0.06)[..., None] + glow * 0.18 * np.exp(-np.abs(lat) / 0.25)[..., None]
+    # stars
+    for _ in range(700):
+        x, y = rng.randint(0, Wn), int(rng.rand() ** 1.4 * Hn * 0.42)
+        img[y, x] += 160 + 95 * rng.rand()
+    # the grid floor: lines across that close up towards the horizon, lines along that fan out
+    below = lat < 0
+    depth = 1.0 / np.maximum(-lat, 1e-3)              # distance-ish
+    rows = np.abs(((depth * 2.0) % 1.0) - 0.5)
+    rowline = np.exp(-(0.5 - rows) * 40.0 / np.maximum(depth, 1) ** 0.2)
+    ang = (xx / Wn * 2 * math.pi)
+    cols = np.abs(((ang / (2 * math.pi) * 64) % 1.0) - 0.5)
+    colline = np.exp(-(0.5 - cols) * 30.0 * np.clip(-lat * 6, 0.3, 4))
+    fade = np.clip(-lat * 4, 0, 1)
+    img += (glow * (np.maximum(rowline, colline) * fade * below)[..., None])
+    img[below] *= 0.85
+    # sun or planet
+    cx, cy = rng.randint(300, Wn - 300), Hn // 2 - 150
+    global LAST_PLANET
+    if th['planet'][1] == 'sun':
+        R = 190; cy = Hn // 2 - 110
+        d = np.hypot(xx - cx, yy - cy)
+        t = np.clip((yy - (cy - R)) / (2 * R), 0, 1)
+        col = (np.array((255, 230, 90), np.float32)[None, None] * (1 - t[..., None]) + acc[None, None] * t[..., None])
+        stripe = (t > 0.45) & (((yy - cy) % np.maximum(8, 30 - t * 22)) < (4 + t * 10))
+        m = (d < R) & ~stripe & (yy < Hn // 2)
+        img[m] = col[m]
+        img += acc * 0.5 * np.exp(-np.maximum(d - R, 0) / 40)[..., None] * (yy < Hn // 2)[..., None]
+    else:
+        R = 150
+        d = np.hypot(xx - cx, yy - cy)
+        img[d < R] = img[d < R] * 0.2 + np.array((4, 4, 10), np.float32)
+        img += acc * np.exp(-np.abs(d - R) / 3.0)[..., None]
+        for k in range(4):
+            img += acc * 0.35 * np.exp(-np.abs(d - R * (0.85 - k * 0.2)) / 1.5)[..., None] * (d < R)[..., None]
+        if th['planet'][1] in ('ringed', 'banded'):
+            e = np.hypot((xx - cx) / (R * 1.9), (yy - cy) / (R * 0.35))
+            ring = np.exp(-np.abs(e - 1) * 60) * ((yy > cy) | (d > R))
+            img += glow * ring[..., None]
+    LAST_PLANET = (cx // 4, cy // 4, (190 if th['planet'][1] == 'sun' else 150) // 4)   # in the pixel skies' 512 x 256 units
+    # skyline: towers (city) or crystal spikes, black with glowing outlines
+    hy = Hn // 2
+    x = 0
+    sil = np.zeros((Hn, Wn), bool)
+    while x < Wn:
+        w = rng.randint(14, 60); h = rng.randint(14, 110) if scenery == 'city' else rng.randint(10, 70)
+        if scenery == 'city':
+            sil[hy - h:hy, x:x + w] = True
+        else:
+            for c in range(w):
+                hh = int(h * (1 - abs(c - w / 2) / (w / 2)))
+                sil[hy - hh:hy, (x + c) % Wn] = True
+        x += w + rng.randint(0, 10)
+    edge = sil & ~(np.roll(sil, 1, 0) & np.roll(sil, -1, 0) & np.roll(sil, 1, 1) & np.roll(sil, -1, 1))
+    img[sil] = np.array((3, 3, 8), np.float32)
+    img[edge] = glow
+    lit = sil & (rng.rand(Hn, Wn) < 0.012)
+    img[lit] = acc
+    return np.clip(img, 0, 255).astype(np.uint8)
+
+_make_sky_pixel = make_sky
+def make_sky(theme, th, scenery, seed):
+    from theme import NEON
+    return make_sky_neon(theme, th, scenery, seed) if NEON else _make_sky_pixel(theme, th, scenery, seed)

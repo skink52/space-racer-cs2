@@ -198,7 +198,7 @@ function placeCamera(pk, car, view, dt, preset, tilt) {
   pk.tubeK = (pk.tubeK || 0) + ((inTube ? 1 : 0) - (pk.tubeK || 0)) * Math.min(1, dt * 3);
   if (pk.tubeK > 0.001) { up = lerp(up, Math.min(up, CONFIG.CAM_TUBE_UP), pk.tubeK); back = lerp(back, Math.min(back, CONFIG.CAM_TUBE_BACK), pk.tubeK); }
   // in the air the camera follows the car's height but not its bounces
-  const cz = car.air ? Math.max(car.tz, car.z - 40) : car.z;
+  const cz = car.air && !car.fly ? Math.max(car.tz, car.z - 40) : car.z;
   const pos = view.world(car.x - Math.cos(cy) * back, car.y - Math.sin(cy) * back, cz + up);
   const sh = shakeOffset(pk);
   if (sh) { pos.x += sh.x; pos.y += sh.y; pos.z += sh.z; }

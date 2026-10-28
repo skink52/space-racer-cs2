@@ -77,6 +77,8 @@ const RULES = {
   driftStreak: 0.35,
   // big air: a clean landing after this long in the air pays some charge
   bigAirTime: 0.7, bigAirCharge: 15,
+  // ---- flight sections (Neon Racer): W climbs, S dives, no input sinks slowly; the corridor's edge bounces like a rail
+  flyClimb: 420, flyDive: 520, flySink: 70, flyResp: 5, flyRest: 0.3,
   // ---- the cars' E abilities (CARS[*].ability; cooldown and charge cost per car)
   // SEEKER BOLT (Hornet): a bolt fired forward along the road, curving towards the first car ahead; the car it hits is
   // shoved, skids and loses shield (an Aegis shell stops it)

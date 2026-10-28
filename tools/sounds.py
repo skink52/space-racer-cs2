@@ -302,9 +302,15 @@ def mix(parts, sec, gain=0.85):
     f = n_of(0.005)
     for ch in (L, R): ch[:f] *= np.linspace(0, 1, f); ch[-f:] *= np.linspace(1, 0, f)
     return np.stack([L, R], 1)
-for name, fn in (('mus_race', song_race), ('mus_race2', song_race2), ('mus_lobby', song_lobby), ('mus_results', song_results)):
-    parts, sec = fn()
-    MUSIC[name] = (mix(parts, sec), sec)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from theme import NEON
+if NEON:
+    import electro                 # Neon Racer: electro / synthwave pieces instead of chiptune
+    MUSIC = electro.neon_music()
+else:
+    for name, fn in (('mus_race', song_race), ('mus_race2', song_race2), ('mus_lobby', song_lobby), ('mus_results', song_results)):
+        parts, sec = fn()
+        MUSIC[name] = (mix(parts, sec), sec)
 
 # ---------------------------------------------------------------- files
 RANGE = {'dash': 1500, 'quake': 2500, 'nova': 2500, 'aegis': 1800, 'beep': 6000, 'beep2': 6000, 'go': 7000, 'wreck': 3500, 'finish': 2500, 'warp': 2500, 'lap': 1200, 'best': 1200, 'pulse': 3500, 'pulsed': 1200,

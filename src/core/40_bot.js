@@ -48,6 +48,7 @@ function laneTraffic(arena, car, lane, ahead) {
 function botThink(arena, car) {
   const b = car.bot, T = arena.track, c = car.cmd;
   if (!b || car.state !== 'racing') { c.throttle = 0; c.steer = 0; c.boost = false; c.drift = false; return; }
+  if (car.fly) { botFly(arena, car, b, c); return; }
   if (car.air) { c.steer = 0; c.throttle = 1; c.boost = false; c.drift = false; return; }
   b.think--;
   if (b.think > 0) return;             // decisions a few times a second; the previous command keeps running
@@ -130,8 +131,37 @@ function botThink(arena, car) {
   }
   // the E ability
   b.abilThink = (b.abilThink || 0) - dt;
-  if (car.lock > 0 && car.spec.ability === 'quake') b.abilThink = car.lock + (1 - b.aggression) * 3;   // the calmer Meteors wait a little longer
+  if (car.lock > 0 && (car.spec.ability === 'quake' || car.spec.ability === 'bolt')) b.abilThink = car.lock + (1 - b.aggression) * 3;   // the calmer Meteors wait a little longer
   if (!ramp && b.abilThink <= 0 && car.abilCd <= 0 && car.charge >= car.spec.abilityCost) { b.abilThink = 0.25; botAbility(arena, car, b, c, straight); }
+}
+
+// a flight section: aim for the next ring (boost rings, a charge ring when low), else the corridor's middle
+function botFly(arena, car, b, c) {
+  const T = arena.track;
+  b.think--;
+  if (b.think > 0) return;
+  b.think = 2 + Math.round((1 - b.skill) * 3);
+  let td = 0, tz = 0, best = null;
+  const lowCharge = car.charge < car.spec.charge * 0.35;
+  for (let k = 2; k <= 16 && !best; k++) {
+    const list = T.featAt[(car.seg + k) % T.n];
+    if (!list) continue;
+    for (const fi of list) {
+      const f = T.feats[fi];
+      if (f.kind === 'ring' || (f.kind === 'cring' && lowCharge)) { best = f; break; }
+    }
+  }
+  if (best) { td = best.rd; tz = best.rz; }
+  const look = clamp(140 + car.speed * 0.32, 200, 520);
+  const p = T.point(car.s + look);
+  const want = Math.atan2(p.y + p.ny * td - car.y, p.x + p.nx * td - car.x);
+  const diff = normRad(want - car.yaw);
+  b.noise = b.noise * 0.7 + (rnd() - 0.5) * (1 - b.skill) * 0.2;
+  c.steer = clamp(diff * 2.4 + b.noise, -1, 1);
+  const dz = car.z - T.zAtS(car.s);
+  c.throttle = clamp((tz - dz) / 90, -1, 1);
+  c.drift = false;
+  c.boost = car.charge > 40 + (1 - b.aggression) * 30 && Math.abs(diff) < 0.3;
 }
 
 // when a bot uses its car's E ability: a Seeker Bolt at a foe ahead in line, a Shockwave into a crowd,

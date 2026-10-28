@@ -137,7 +137,7 @@ class Arena {
       const ahead = (((o.s - c.s) % L) + L) % L;
       if (ahead > 20 && ahead < best) { best = ahead; target = o; }
     }
-    const b = { owner: c, s: c.s + CAR_LEN * 0.6, d: c.d, z: c.z, x: c.x, y: c.y, yaw: c.yaw, speed: Math.max(0, c.speed) + RULES.boltSpeed, left: RULES.boltRange, target, id: ++this.boltIds };
+    const b = { owner: c, s: c.s + CAR_LEN * 0.6, d: c.d, z: c.z, x: c.x, y: c.y, yaw: c.yaw, speed: Math.max(0, c.speed) + RULES.boltSpeed, left: RULES.boltRange, target, id: ++this.boltIds, h: c.fly ? c.z - this.track.zAtS(c.s) : 0 };
     this.placeBolt(b);
     this.bolts.push(b);
     this.events.push({ type: 'bolt', bolt: b });
@@ -146,7 +146,7 @@ class Arena {
     const T = this.track, p = T.point(b.s);
     b.d = clamp(b.d, -p.hw, p.hw);
     b.x = p.x + p.nx * b.d; b.y = p.y + p.ny * b.d;
-    b.z = p.z - b.d * T.bankAt(p.i, 0) + RULES.boltLift;
+    b.z = p.z - b.d * T.bankAt(p.i, 0) + RULES.boltLift + (b.h || 0);
     b.yaw = Math.atan2(p.ty, p.tx);
   }
   moveBolts(cars, dt) {
@@ -158,7 +158,11 @@ class Arena {
       const t = b.target;
       if (t && t.solid) {
         const ahead = (((t.s - b.s) % L) + L) % L;
-        if (ahead < L / 2) b.d += clamp(t.d - b.d, -RULES.boltTurn * dt, RULES.boltTurn * dt);
+        if (ahead < L / 2) {
+          b.d += clamp(t.d - b.d, -RULES.boltTurn * dt, RULES.boltTurn * dt);
+          const th = t.fly ? t.z - this.track.zAtS(t.s) : 0;           // in a flight section it climbs / dives after the target
+          b.h += clamp(th - b.h, -RULES.boltTurn * dt, RULES.boltTurn * dt);
+        }
       }
       this.placeBolt(b);
       let hit = null;

@@ -13,6 +13,9 @@ class Track {
     this.road = data.road || new Array(this.n).fill(1);
     this.bk = data.bk || new Array(this.n).fill(0);       // banking: tan of the lean (positive = left side low)
     this.tube = data.tube || new Array(this.n).fill(0);   // 1 inside a tube
+    this.fly = data.fly || new Array(this.n).fill(0);     // 1 in a flight section (no road: a corridor of gates)
+    this.flyR = data.flyR || new Array(this.n).fill(0);   // the corridor's radius there
+    this.hasFly = this.fly.some((v) => v);
     this.zmin = data.zmin || 0; this.zmax = data.zmax || 0;
     this.ramps = this.feats.filter((f) => f.kind === 'ramp');
     this.rampOf = new Array(this.n).fill(null);

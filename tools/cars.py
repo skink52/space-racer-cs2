@@ -10,6 +10,8 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(__file__))
 import s2
 import retro
+from theme import NEON
+if NEON: import neoncars
 from retro import *
 
 OUT = sys.argv[1] if __name__ == '__main__' else None          # (importable: tools/workshop.py renders the cars too)
@@ -553,12 +555,15 @@ def main():
     models = {}
     grids = {}
     flame_mats = {style: flame_material(style) for style in FLAME_STYLES}
+    if NEON: neon_flames = neoncars.flame_materials(OUT, PAL_DIR, FLAME_STYLES)
     for key in CARS:
         models[key] = {}
         for boost in (False, 'boost', 'pad'):
             path, g = build_car(key, boost, pal_paths, shadow_mat, flame_mats)
-            models[key][boost or 'base'] = path
+            if not NEON: models[key][boost or 'base'] = path
             grids[key + ('_' + boost if boost else '')] = g
+        if NEON:                       # Neon Racer: the Tripo3D cars (the voxel ones above stay for the workshop art)
+            models[key] = neoncars.build(OUT, MDIR, PAL_DIR, key, SKINS, SKIN_ORDER, neon_flames, HOVER, shadow_mat)
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
@@ -568,12 +573,23 @@ def main():
     pdir = os.path.join(OUT, 'panorama/images/custom_game/spr'); os.makedirs(pdir, exist_ok=True)
     for key in CARS:
         for skin in ('neutral', 't', 'ct'):
-            img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86, style=key)
+            if NEON: img = neoncars.picture(key, None if skin == 'neutral' else SKINS[skin][0], 256)
+            else: img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86, style=key)
             img.save(os.path.join(pdir, 'car_%s_%s.png' % (key, skin)))
     # big renders for the loading screen
     for i, key in enumerate(CARS):
-        render_voxels(grids[key + '_boost'], palette(*SKINS['t' if i % 2 == 0 else 'ct']), size=420, az=200, el=18, fill=0.9, style=key).save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
-    if PREVIEW:
+        sk = SKINS['t' if i % 2 == 0 else 'ct']
+        img = neoncars.picture(key, sk[0], 420, az=200, el=18) if NEON else render_voxels(grids[key + '_boost'], palette(*sk), size=420, az=200, el=18, fill=0.9, style=key)
+        img.save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
+    if PREVIEW and NEON:
+        cell = 220
+        sheet = Image.new('RGBA', (cell * 6, cell * 4), (14, 14, 22, 255))
+        for r, key in enumerate(CARS):
+            for i, (az, sk) in enumerate(((200, 'neutral'), (160, 't'), (270, 'ct'), (20, 'gold'), (110, 't_rose'), (335, 'ct_teal'))):
+                im = neoncars.picture(key, None if sk == 'neutral' else SKINS[sk][0], cell, az=az, el=20)
+                sheet.alpha_composite(im, (i * cell, r * cell))
+        sheet.save(PREVIEW)
+    elif PREVIEW:
         # every car from 8 directions (the models are true 3D, so every angle is drawn correctly in game)
         cell = 200
         angles = [180, 225, 270, 315, 0, 45, 90, 135]

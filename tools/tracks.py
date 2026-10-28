@@ -14,7 +14,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 import s2, pixfont
 from retro import *
 import retro
-from trackdefs import TRACKS, THEMES, HALF
+from theme import NEON
+if NEON: from trackdefs_neon import TRACKS, THEMES, HALF
+else: from trackdefs import TRACKS, THEMES, HALF
 
 OUT = sys.argv[1] if __name__ == '__main__' else None
 PREVIEW = sys.argv[2] if len(sys.argv) > 2 and __name__ == '__main__' else None
@@ -244,6 +246,13 @@ def gate_texture(color):
     img[:, :2] = WHITE
     return up(quantize(img, 8), 8)
 
+def ring_texture(color, hi):
+    """flight rings: bright bands with white chevrons running round them"""
+    img = np.zeros((16, 32, 3), np.float32); img[:] = color
+    yy, xx = np.mgrid[0:16, 0:32]
+    img[((xx + np.abs(yy - 7.5) * 0.8) % 8) < 2.5] = hi
+    return up(quantize(img, 6), 8)
+
 def hazard_texture(a=GOLD, b=BLACK):
     yy, xx = np.mgrid[0:16, 0:16]
     st = ((xx + yy) // 4) % 2 == 0
@@ -371,6 +380,10 @@ def billboard_texture(text, th):
     for x in range(8, W - 8, 16): img[1, x] = WHITE; img[-2, x] = WHITE
     return up(img, 4)
 
+if NEON:
+    from neonlook import *          # Neon Racer: the same pieces drawn as glowing lines on black
+    import neoncars                 # ... with Tripo3D pylons and flight gates
+
 # ---------------------------------------------------------------- materials
 SHARED = {}
 def shared_materials():
@@ -386,6 +399,12 @@ def shared_materials():
     SHARED['white'] = s2.write_material(OUT, mdir + '/white', solid(WHITE), comment='white light')
     SHARED['cloud'] = s2.write_material(OUT, mdir + '/cloud_top', cloud_texture(True), comment='cloud')
     SHARED['cloud2'] = s2.write_material(OUT, mdir + '/cloud_side', cloud_texture(False), comment='cloud side')
+    SHARED['ring'] = s2.write_material(OUT, mdir + '/ring_boost', ring_texture(GOLD, WHITE), comment='flight boost ring')
+    SHARED['cring'] = s2.write_material(OUT, mdir + '/ring_charge', ring_texture(SKYBLUE, ICE), comment='flight charge ring')
+    if NEON:
+        for key in ('pylon', 'gate'):
+            img = np.asarray(Image.open(neoncars.prop(key)[3]).convert('RGB'))
+            SHARED['n' + key] = s2.write_material(OUT, mdir + '/neon_' + key, img, comment='Neon Racer %s (Tripo3D)' % key)
 
 def build_materials(track):
     th = THEMES[track['theme']]
@@ -609,6 +628,11 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
         dd = np.hypot(pts_all[:, 0] - p[0], pts_all[:, 1] - p[1]) - hw
         if ((np.abs(pos[:, 2] - p[2]) < 900) & (dd < 120)).any(): continue
         h = 520 + rng.randint(0, 420)
+        if NEON:
+            if k % 2 == 0:
+                hh = h * 0.75
+                tris += neoncars.prop_tris('pylon', 'npylon', (p[0], p[1], p[2] - 60), hh * 0.32, hh * 0.32, hh, rng.rand() * 6.28)
+            continue
         tris += s2.box_tris('post', p[0] - 14, p[1] - 14, p[2] - SKIRT - 160, p[0] + 14, p[1] + 14, p[2] + h, uscale=1 / 256.0)
         tris += s2.box_tris('beacon', p[0] - 32, p[1] - 32, p[2] + h, p[0] + 32, p[1] + 32, p[2] + h + 64)
     # turn signs on the outside of every real corner, facing the cars coming towards them
@@ -851,6 +875,45 @@ def torus_tris(R, r, rot, c, seg=28, side=4):
             tris += s2.quad_n(mat, P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1), (0, 0), (1, 0), (1, 1), (0, 1), tuple(n))
     return tris
 
+def ring_tris(mat, c, tan, R, r, seg=24, side=4):
+    """a ring standing across the track (its axis along the track direction tan), centre c"""
+    t = np.array([tan[0], tan[1], 0.0]); t /= np.linalg.norm(t)
+    a = np.array([-t[1], t[0], 0.0]); b = np.array([0.0, 0.0, 1.0])
+    rot = np.stack([a, b, t], 1)                    # torus local x, y in the ring's plane, z along the track
+    tris = []
+    def P(u, v):
+        p = np.array([(R + r * math.cos(v)) * math.cos(u), (R + r * math.cos(v)) * math.sin(u), r * math.sin(v)])
+        return tuple(rot @ p + np.array(c))
+    for i in range(seg):
+        u0, u1 = 2 * math.pi * i / seg, 2 * math.pi * (i + 1) / seg
+        for k in range(side):
+            v0, v1 = 2 * math.pi * k / side + math.pi / 4, 2 * math.pi * (k + 1) / side + math.pi / 4
+            um, vm = (u0 + u1) / 2, (v0 + v1) / 2
+            n = rot @ np.array([math.cos(vm) * math.cos(um), math.cos(vm) * math.sin(um), math.sin(vm)])
+            tris += s2.quad_n(mat, P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1), (i / seg * 4, 0), ((i + 1) / seg * 4, 0), ((i + 1) / seg * 4, 1), (i / seg * 4, 1), tuple(n))
+    return tris
+
+def flight_tris(S, fly, flyR, feats):
+    """flight sections: a gate frame every few samples marks the corridor (its edge is the wall), plus the rings"""
+    pos, tan, N = S['pos'], S['tan'], S['N']
+    tris = []
+    k = 0
+    for i in range(N):
+        if not fly[i]: k = 0; continue
+        if NEON:
+            if k % (14 if fly.sum() > 150 else 10) == 0:
+                sc = 2 * flyR[i] / 0.74
+                tris += neoncars.prop_tris('gate', 'ngate', (pos[i][0], pos[i][1], pos[i][2] - sc * 0.5), sc, sc * 0.4, sc,
+                                           math.atan2(tan[i][1], tan[i][0]) - math.pi / 2)
+        elif k % 7 == 0: tris += ring_tris('gate', pos[i], tan[i], flyR[i], 9, seg=20)
+        k += 1
+    for f in feats:
+        if f['kind'] not in ('ring', 'cring'): continue
+        i = f['a']; n = (-tan[i][1], tan[i][0])
+        c = (pos[i][0] + n[0] * f['rd'], pos[i][1] + n[1] * f['rd'], pos[i][2] + f['rz'])
+        tris += ring_tris(f['kind'], c, tan[i], f['rr'], 12, seg=18)
+    return tris
+
 # ---------------------------------------------------------------- banking and tubes
 def banking(track, S, curv, zero):
     """bank angle per sample from the smoothed curvature; forced flat where zero[i] (start, crossings, jumps, tubes)"""
@@ -897,7 +960,7 @@ def minimap(track, S, path, size=192):
     Image.fromarray(up(a, 4)).save(path)
     return dict(scale=sc * 4, size=size)
 
-def preview_draw(dr, S, feats, gapset, cps, tubes, ox, oy, sc, th, title, road, bankdeg):
+def preview_draw(dr, S, feats, gapset, cps, tubes, ox, oy, sc, th, title, road, bankdeg, fly=None):
     pos, hw, tan, N = S['pos'], S['hw'], S['tan'], S['N']
     nrm = np.stack([-tan[:, 1], tan[:, 0]], 1)
     def P(x, y): return (ox + x * sc, oy - y * sc)
@@ -915,8 +978,15 @@ def preview_draw(dr, S, feats, gapset, cps, tubes, ox, oy, sc, th, title, road, 
         if i not in gapset:
             dr.line([P(*l0), P(*l1)], fill=th['rail'], width=2); dr.line([P(*r0), P(*r1)], fill=th['rail'], width=2)
     colors = {'boost': GOLD, 'charge': ICE, 'slick': PINK, 'ramp': HOT}
+    if fly is not None:
+        for i in np.where(fly)[0]:
+            if i % 2 == 0: dr.ellipse([P(*pos[i, :2])[0] - 2, P(*pos[i, :2])[1] - 2, P(*pos[i, :2])[0] + 2, P(*pos[i, :2])[1] + 2], fill=th['gate'])
     for ft in feats:
         i = ft['a']
+        if ft['kind'] in ('ring', 'cring'):
+            n = nrm[i]; c = P(*(pos[i, :2] + n * ft['rd'])); r = max(3, ft['rr'] * sc)
+            dr.ellipse([c[0] - r, c[1] - r, c[0] + r, c[1] + r], outline=GOLD if ft['kind'] == 'ring' else ICE, width=2)
+            continue
         for _ in range(N):
             j = (i + 1) % N
             def lat(k, f): return pos[k % N, :2] - nrm[k % N] * hw[k % N] * f
@@ -962,21 +1032,45 @@ def build_track(ti, track):
             for k in range(-8, 9): tubes[(i + k) % N] = True
     for i in np.where(tubes)[0]:
         for k in range(-6, 7): zero[(i + k) % N] = True
+    # flight sections: no road, a round corridor (radius tapering to the road at the end, so cars come down onto it)
+    fly = np.zeros(N, np.int8); flyR = np.zeros(N)
+    for a, b, R in track.get('flights', []):
+        ia, ib = frac_idx(a), frac_idx(b)
+        run = []; i = ia
+        while True:
+            run.append(i % N)
+            if i % N == ib: break
+            i += 1
+        for k, i in enumerate(run):
+            fly[i] = 1; road[i] = 0
+            t = min(1.0, (len(run) - 1 - k) / 14.0)
+            flyR[i] = 110 + (R - 110) * (t * t * (3 - 2 * t))
+        for k in range(-12, len(run) + 12): zero[(ia + k) % N] = True
+    for frac, lat, dz, rr, kind in track.get('rings', []):
+        i = frac_idx(frac)
+        assert fly[i], 'ring outside a flight section: %s %.3f' % (track['id'], frac)
+        feats.append(dict(kind=kind, a=i, b=(i + 1) % N, l0=-1.0, l1=1.0, rd=round(-lat * float(flyR[i]), 1), rz=float(dz), rr=float(rr)))
     curv = curvature(S)
     tb, bankdeg = banking(track, S, curv, zero)
+    tb[fly == 1] = 0; bankdeg[fly == 1] = 0
     G = Geo(S, lift, tb)
     tubes = tube_clear(S, tubes, G)
     gapset = ranges_to_set(gaps_idx, N)
     cps = []
     for k in range(CHECKPOINTS):
         c = int(round(k * N / CHECKPOINTS)) % N
+        c0 = c
         while not road[c] or not road[(c - 1) % N] or (k and tubes[c]): c = (c + 1) % N
+        if k and (c - c0) % N > 40:                          # pushed past a long flight: the last road before it instead
+            c = c0
+            while not road[c] or not road[(c - 1) % N] or tubes[c]: c = (c - 1) % N
+        if k and (c <= cps[-1] + 20 or c >= N - 20): continue  # nothing left between: one checkpoint fewer
         cps.append(c)
     rail = np.ones(N, np.int8)
     for i in gapset: rail[i] = 0
     rail[road == 0] = 0
     return dict(S=S, problems=problems, crossings=crossings, feats=feats, gaps_idx=gaps_idx, gapset=gapset, road=road, lift=lift,
-                tubes=tubes, tb=tb, bankdeg=bankdeg, curv=curv, G=G, cps=cps, rail=rail)
+                tubes=tubes, tb=tb, bankdeg=bankdeg, curv=curv, G=G, cps=cps, rail=rail, fly=fly, flyR=flyR)
 
 def main():
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
@@ -994,6 +1088,7 @@ def main():
         th = THEMES[track['theme']]
         mats = build_materials(track)
         tris = track_tris(track, S, B['G'], B['feats'], B['gapset'], B['cps'], B['road'], B['tubes'], mats, th)
+        if B['fly'].any(): tris += flight_tris(S, B['fly'], B['flyR'], B['feats'])
         ntrack = len(tris)
         tris += billboards(track, S, B['G'], B['road'], B['tubes'], mats, B['curv'])
         st, nscen, floor = scenery(track, S, th)
@@ -1010,6 +1105,7 @@ def main():
             tx=[round(float(v), 4) for v in tan[:, 0]], ty=[round(float(v), 4) for v in tan[:, 1]],
             hw=[round(float(v), 1) for v in hw], rail=[int(v) for v in B['rail']], road=[int(v) for v in B['road']],
             bk=[round(float(v), 4) for v in B['tb']], tube=[int(v) for v in B['tubes']],
+            **(dict(fly=[int(v) for v in B['fly']], flyR=[round(float(v), 1) for v in B['flyR']]) if B['fly'].any() else {}),
             cp=B['cps'], feats=B['feats'], crossing=bool(track.get('crossing')),
             mm=dict(scale=round(mm['scale'], 5), size=mm['size']),
             ext=round(float(np.abs(pos[:, :2]).max() + hw.max()), 1),
@@ -1023,7 +1119,7 @@ def main():
             len(B['feats']), len(B['crossings']), nscen, len(tris), ntrack))
         if dr:
             ox = 350 + (ti % 4) * 700; oy = 350 + (ti // 4) * 700
-            preview_draw(dr, S, B['feats'], B['gapset'], B['cps'], B['tubes'], ox, oy, 330 / HALF, th, track['title'] + '  lap %.0f' % L, B['road'], B['bankdeg'])
+            preview_draw(dr, S, B['feats'], B['gapset'], B['cps'], B['tubes'], ox, oy, 330 / HALF, th, track['title'] + '  lap %.0f' % L, B['road'], B['bankdeg'], B['fly'])
     json.dump(runtime, open(os.path.join(OUT, '_gen/tracks.json'), 'w'), separators=(',', ':'))
     json.dump(props, open(os.path.join(OUT, '_gen/track_props.json'), 'w'))
     if prev: prev.save(PREVIEW)

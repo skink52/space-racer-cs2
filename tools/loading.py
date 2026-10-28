@@ -25,7 +25,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 import pixfont, skies
 from retro import *
 import retro
-from trackdefs import THEMES as RTHEMES, TRACKS as RDEFS
+from theme import NEON, TITLE
+if NEON: from trackdefs_neon import THEMES as RTHEMES, TRACKS as RDEFS
+else: from trackdefs import THEMES as RTHEMES, TRACKS as RDEFS
 
 OUT, MAP = sys.argv[1], sys.argv[2]
 PREVIEW = sys.argv[3] if len(sys.argv) > 3 else None
@@ -69,6 +71,7 @@ FEAT_Y0, FEAT_Y1 = 604, 948              # the panel that changes
 
 # the slides: what the second panel shows, and whose sky is behind it (slide 0 is <map>.png, then <map>_1.png ...)
 SLIDES = [('cars', 'oval'), ('tracks', 'crosswire'), ('win', 'spire'), ('track', 'skyway')]
+if NEON: SLIDES = [('cars', 'grid'), ('tracks', 'voidhop'), ('win', 'pulse'), ('track', 'dive')]
 
 CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: SEEKER BOLT']),
         ('meteor', 'METEOR', 'RAM', ['BUMPS HURT THEM', 'E: SHOCKWAVE']),
@@ -76,13 +79,15 @@ CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: SEEKER BOLT
         ('bastion', 'BASTION', 'SLIPSTREAM', ['TOUGHEST SHIELD', 'E: AEGIS'])]
 TRACK_TAGS = {'oval': 'FLAT OUT', 'hairpin': 'THREE HAIRPINS', 'crosswire': 'SPIRAL LOOP', 'nullgap': 'NO RAILS',
               'spire': 'CLIMB AND DIVE', 'ringworld': 'OVER AND UNDER', 'skyway': 'BIG JUMPS', 'helix': 'CORKSCREW'}
+TRACK_TAGS.update({'grid': 'FLAT OUT', 'pulse': 'TWO HAIRPINS', 'voidhop': 'FLY THE GAP', 'stream': 'ROLLERCOASTER',
+                   'dive': 'FLY DOWN', 'overclock': 'OVER AND UNDER'})
 
 
 def background(theme_id, seed):
     """the track's own sky (the one the race uses), turned so its planet sits beside the panels, over a neon floor"""
-    th = RTHEMES[theme_id]
-    k = [t['id'] for t in RDEFS].index(theme_id)
-    sky = skies.make_sky(theme_id, th, [t for t in RDEFS if t['id'] == theme_id][0]['scenery'], k + 5)[::4, ::4]
+    k = [t['id'] for t in RDEFS].index(theme_id)        # (a track id; in Space Racer each track's theme has its id)
+    th = RTHEMES[RDEFS[k]['theme']]
+    sky = skies.make_sky(RDEFS[k]['theme'], th, RDEFS[k]['scenery'], k + 5)[::4, ::4]
     px, py, pr = skies.LAST_PLANET
     want = 372                                          # the planet's x at 1x: right of the panels (x 1488)
     sky = np.roll(sky, want - px, axis=1)[:, :LW]
@@ -122,7 +127,7 @@ def heading(big, x, y, s, color, shadow, align='center'):
 
 def frame(big):
     """the part that is the same on every slide: logo, strap line, the controls panel"""
-    lg = pixfont.logo('SPACE RACER', 7)
+    lg = pixfont.logo(TITLE, 7)
     pixfont.paste(big, lg, CX - lg.shape[1] // 2, LOGO_Y)
     pixfont.draw(big, CX, LOGO_Y + 96, '32-CAR ANTI-GRAV RACING', 3, ICE, shadow=PURPLE, align='center')
     panel(big, X0, CTRL_Y0, X1, CTRL_Y1, TEAL)
@@ -170,7 +175,7 @@ def feat_cars(big, edge):
 
 
 def feat_tracks(big, edge):
-    heading(big, CX, FEAT_Y0 + 20, 'EIGHT TRACKS - 2 OR 3 LAPS', GOLD, RUST)
+    heading(big, CX, FEAT_Y0 + 20, '%s TRACKS - 2 OR 3 LAPS' % ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'][len(RDEFS)], GOLD, RUST)
     cw = (X1 - X0) // 4
     for i, T in enumerate(tracks):
         th = RTHEMES[T['theme']]
@@ -257,7 +262,7 @@ FEATURES = {'cars': feat_cars, 'tracks': feat_tracks, 'win': feat_win, 'track': 
 def slide(kind, theme_id, n):
     big = background(theme_id, n)
     frame(big)
-    edge = tuple(RTHEMES[theme_id]['rail'])
+    edge = tuple(RTHEMES[[t for t in RDEFS if t['id'] == theme_id][0]['theme']]['rail'])
     panel(big, X0, FEAT_Y0, X1, FEAT_Y1, edge)
     FEATURES[kind](big, edge)
     # which slide of how many: little dots under the panels

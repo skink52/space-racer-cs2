@@ -167,7 +167,8 @@ def main():
     paste(img, hero, hx, hy)
     big = up(img.astype(np.uint8), 4).copy()
     # the logo and the strap line, at full size
-    lg = pixfont.logo('SPACE RACER', 8)
+    from theme import TITLE
+    lg = pixfont.logo(TITLE, 8)
     pixfont.paste(big, lg, (B * 4 - lg.shape[1]) // 2, 34)
     pixfont.draw(big, B * 2, 34 + lg.shape[0] + 10, '32-CAR ANTI-GRAV RACING', 4, ICE, shadow=PURPLE, align='center')
     big = retro.scanlines(big, 4, 0.86)

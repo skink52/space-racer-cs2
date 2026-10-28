@@ -1,5 +1,23 @@
 # Space Racer changelog
 
+## Neon Racer v0.5.0 (28 Oct 2026, first build)
+
+A second addon, `mg_neon_racer`, built from this repository (`SPR_THEME=neon`). It plays like Space Racer v0.5.0.
+- **Six new tracks**: Grid Circuit, Pulse City, Void Hop, Data Stream, Skyline Dive and Overclock.
+- **Flight sections** on Void Hop and Skyline Dive:
+  - The road ends and you fly a corridor of gates. W climbs, S dives and A / D steer.
+  - The corridor's edge bounces you like a rail. Gold rings boost you and blue rings charge you.
+  - The corridor narrows onto the road at the end.
+  - Bots fly through the rings, and the Seeker Bolt follows its target's height.
+- **Neon look**: glowing-line roads, rails and towers, synthwave skies over an endless grid, Tripo3D pylons and
+  flight gates.
+- **Cars** made from skink52's Tripo3D models (about 9k triangles each). Their glowing strips show your side's colour.
+- **Music**: four original electro pieces in place of chiptune.
+
+Shared code changes (no effect on Space Racer's tracks):
+- The track data can have flight sections and flight rings.
+- A checkpoint that a long flight pushes onto the next one moves back before the flight instead.
+
 ## v0.5.0 (28 Oct 2026)
 
 ### Changed
