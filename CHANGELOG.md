@@ -1,5 +1,15 @@
 # Space Racer changelog
 
+## Neon Racer pixel update (28 Oct 2026, evening)
+
+- **Pixel style, neon colours**:
+  - The Tripo3D cars, pylons and gates are gone.
+  - The cars are Space Racer's voxel cars again, with near-black hulls and glowing team-colour trim and edge lines.
+  - Every track texture and sky is drawn in chunky dithered pixels in a neon palette.
+  - Flight gates are glowing pixel rings again.
+- **Start gantry**: its towers now stand clear of the track name. The letters had run into the pillars. This changes
+  the generator for both games; Space Racer's tracks change too on their next build.
+
 ## Neon Racer v0.5.0 (28 Oct 2026, first build)
 
 A second addon, `mg_neon_racer`, built from this repository (`SPR_THEME=neon`). It plays like Space Racer v0.5.0.
@@ -12,6 +22,7 @@ A second addon, `mg_neon_racer`, built from this repository (`SPR_THEME=neon`). 
 - **Neon look**: glowing-line roads, rails and towers, synthwave skies over an endless grid, Tripo3D pylons and
   flight gates.
 - **Cars** made from skink52's Tripo3D models (about 9k triangles each). Their glowing strips show your side's colour.
+  Replaced by pixel cars in the evening update.
 - **Music**: four original electro pieces in place of chiptune.
 
 Shared code changes (no effect on Space Racer's tracks):

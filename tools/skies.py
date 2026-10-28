@@ -197,7 +197,8 @@ def make_sky_neon(theme, th, scenery, seed):
     img[edge] = glow
     lit = sil & (rng.rand(Hn, Wn) < 0.012)
     img[lit] = acc
-    return np.clip(img, 0, 255).astype(np.uint8)
+    from neonlook import pixelate                  # Space Racer's chunky pixels, in neon colours
+    return pixelate(np.clip(img, 0, 255), 4, 10.0)
 
 _make_sky_pixel = make_sky
 def make_sky(theme, th, scenery, seed):

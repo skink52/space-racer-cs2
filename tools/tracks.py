@@ -381,8 +381,7 @@ def billboard_texture(text, th):
     return up(img, 4)
 
 if NEON:
-    from neonlook import *          # Neon Racer: the same pieces drawn as glowing lines on black
-    import neoncars                 # ... with Tripo3D pylons and flight gates
+    from neonlook import *          # Neon Racer: the same pieces drawn as glowing lines on black, in chunky pixels
 
 # ---------------------------------------------------------------- materials
 SHARED = {}
@@ -401,10 +400,6 @@ def shared_materials():
     SHARED['cloud2'] = s2.write_material(OUT, mdir + '/cloud_side', cloud_texture(False), comment='cloud side')
     SHARED['ring'] = s2.write_material(OUT, mdir + '/ring_boost', ring_texture(GOLD, WHITE), comment='flight boost ring')
     SHARED['cring'] = s2.write_material(OUT, mdir + '/ring_charge', ring_texture(SKYBLUE, ICE), comment='flight charge ring')
-    if NEON:
-        for key in ('pylon', 'gate'):
-            img = np.asarray(Image.open(neoncars.prop(key)[3]).convert('RGB'))
-            SHARED['n' + key] = s2.write_material(OUT, mdir + '/neon_' + key, img, comment='Neon Racer %s (Tripo3D)' % key)
 
 def build_materials(track):
     th = THEMES[track['theme']]
@@ -598,15 +593,15 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
         tv, _, _ = voxel_text('%d' % (k + 1), c, (-nrm[ci, 0], -nrm[ci, 1], 0), (0, 0, 1), (-tan[ci, 0], -tan[ci, 1], 0), 12, 14, 'letter', 'letter2')
         tris += tv
     # start gantry: two towers, a beam and the track's name in voxel letters facing the grid
-    out = 140
+    cols = len(track['title']) * 9 - 1
+    vox = max(9, min(18, (2 * hw[0] + 1100) / cols))
+    out = max(140, cols * vox / 2 - hw[0] + 90)          # the towers stand clear of the title's letters
     l, r = G.at(0, hw[0] + out), G.at(0, -hw[0] - out)
     top = max(l[2], r[2]) + 470
     for p in (l, r):
         tris += s2.box_faces(dict(top='post', x='gate', y='gate'), p[0] - 40, p[1] - 40, p[2] - SKIRT - 100, p[0] + 40, p[1] + 40, top + 40)
         tris += s2.box_tris('beacon', p[0] - 50, p[1] - 50, top + 40, p[0] + 50, p[1] + 50, top + 100)
     right = (-nrm[0, 0], -nrm[0, 1], 0); fwd = (-tan[0, 0], -tan[0, 1], 0)
-    cols = len(track['title']) * 9 - 1
-    vox = max(9, min(18, (2 * hw[0] + 1100) / cols))
     c = ((l[0] + r[0]) / 2, (l[1] + r[1]) / 2, top + 4 * vox + 10)
     tv, tw, thh = voxel_text(track['title'], c, right, (0, 0, 1), fwd, vox, 20, 'letter', 'letter2')
     tris += tv
@@ -628,11 +623,6 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
         dd = np.hypot(pts_all[:, 0] - p[0], pts_all[:, 1] - p[1]) - hw
         if ((np.abs(pos[:, 2] - p[2]) < 900) & (dd < 120)).any(): continue
         h = 520 + rng.randint(0, 420)
-        if NEON:
-            if k % 2 == 0:
-                hh = h * 0.75
-                tris += neoncars.prop_tris('pylon', 'npylon', (p[0], p[1], p[2] - 60), hh * 0.32, hh * 0.32, hh, rng.rand() * 6.28)
-            continue
         tris += s2.box_tris('post', p[0] - 14, p[1] - 14, p[2] - SKIRT - 160, p[0] + 14, p[1] + 14, p[2] + h, uscale=1 / 256.0)
         tris += s2.box_tris('beacon', p[0] - 32, p[1] - 32, p[2] + h, p[0] + 32, p[1] + 32, p[2] + h + 64)
     # turn signs on the outside of every real corner, facing the cars coming towards them
@@ -900,12 +890,7 @@ def flight_tris(S, fly, flyR, feats):
     k = 0
     for i in range(N):
         if not fly[i]: k = 0; continue
-        if NEON:
-            if k % (14 if fly.sum() > 150 else 10) == 0:
-                sc = 2 * flyR[i] / 0.74
-                tris += neoncars.prop_tris('gate', 'ngate', (pos[i][0], pos[i][1], pos[i][2] - sc * 0.5), sc, sc * 0.4, sc,
-                                           math.atan2(tan[i][1], tan[i][0]) - math.pi / 2)
-        elif k % 7 == 0: tris += ring_tris('gate', pos[i], tan[i], flyR[i], 9, seg=20)
+        if k % 7 == 0: tris += ring_tris('gate', pos[i], tan[i], flyR[i], 12, seg=24)
         k += 1
     for f in feats:
         if f['kind'] not in ('ring', 'cring'): continue

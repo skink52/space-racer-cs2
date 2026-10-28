@@ -9,7 +9,6 @@ Licence: code MIT, art and sounds CC BY 4.0 (see LICENSE in the source repositor
 
 Not affiliated with or endorsed by Valve or any racing-game publisher.
 
-Neon Racer (mg_neon_racer, the same game in a neon look): the cars, the trackside pylons and the flight gates are 3D
-models skink52 generated with Tripo3D (studio.tripo3d.ai). They are decimated and recoloured by tools/neoncars.py.
-The music synthesiser tools/synth.py comes from skink52's hellmatch-cs2 (MIT).
+Neon Racer (mg_neon_racer, the same game in a neon look) uses the same original voxel cars and pixel art in neon
+colours. Its music synthesiser tools/synth.py comes from skink52's hellmatch-cs2 (MIT).
 

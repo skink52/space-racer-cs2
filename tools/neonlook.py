@@ -1,9 +1,27 @@
-"""Neon Racer's look for the track pieces: the same texture functions as tracks.py, drawn as thin glowing lines on
-near-black surfaces (smooth, no dithering, higher resolution). tracks.py imports these over its own when SPR_THEME=neon.
-Every material is unlit, so the bright lines read as light."""
+"""Neon Racer's look for the track pieces: the same texture functions as tracks.py, drawn as glowing lines on
+near-black surfaces, then turned into Space Racer-style pixel art: shrunk 4x, dithered to a neon palette and blown
+back up with chunky pixels. tracks.py imports these over its own when SPR_THEME=neon. Every material is unlit, so
+the bright lines read as light."""
 import math
 import numpy as np
-from retro import WHITE, BLACK, INK
+from retro import WHITE, BLACK, INK, quantize, up
+
+def _neon_palette():
+    hues = [(0, 235, 255), (255, 40, 200), (255, 140, 20), (110, 255, 60), (150, 80, 255), (255, 40, 70), (255, 210, 60),
+            (60, 120, 255)]
+    pal = [(0, 0, 0), (6, 8, 16), (14, 16, 30), (26, 28, 48), (255, 255, 255), (200, 240, 255), (255, 230, 245)]
+    for h in hues:
+        for k in (1.0, 0.6, 0.3, 0.14):
+            pal.append(tuple(int(c * k) for c in h))
+    return pal
+NEON_PAL = _neon_palette()
+
+def pixelate(img, k=4, spread=14.0):
+    """full-size float image -> shrink k x (box average), dither to the neon palette, nearest-neighbour back up"""
+    a = np.asarray(img, np.float32)
+    h, w = a.shape[0] // k * k, a.shape[1] // k * k
+    small = a[:h, :w].reshape(h // k, k, w // k, k, 3).mean((1, 3))
+    return up(quantize(small, spread, NEON_PAL), k)
 
 DARK = np.array((6, 8, 16), np.float32)
 
@@ -17,7 +35,7 @@ def add(img, color, k):
     img += _f(color)[None, None, :] * k[..., None]
 
 def finish(img):
-    return np.clip(img, 0, 255).astype(np.uint8)
+    return pixelate(np.clip(img, 0, 255))
 
 def road_texture(th):
     """256 along x 256 across: black glass with a faint grid, glowing edge lines and centre dashes"""

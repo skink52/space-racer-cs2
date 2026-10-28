@@ -11,7 +11,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 import s2
 import retro
 from theme import NEON
-if NEON: import neoncars
 from retro import *
 
 OUT = sys.argv[1] if __name__ == '__main__' else None          # (importable: tools/workshop.py renders the cars too)
@@ -21,6 +20,35 @@ HOVER = 12                     # units the hull floats above the road
 MDIR = 'models/spr/cars'
 PAL_DIR = 'materials/spr/cars'
 
+def palette_neon(team):
+    """Neon Racer: the same voxel cars, but a near-black hull with the team colour as glowing trim and edge lines"""
+    t = np.array(team, np.float32)
+    neon = tuple(np.clip(t * 1.0 + 15, 0, 255).astype(int))
+    hull = tuple((t * 0.16 + 14).astype(int)); hull2 = tuple((t * 0.08 + 8).astype(int))
+    base = [hull, hull2, neon, (24, 26, 36), (150, 235, 255), (255, 220, 120), (255, 255, 230), tuple(neon),
+            (255, 40, 80), (255, 255, 255), tuple(np.clip(t * 1.3 + 50, 0, 255).astype(int)), (6, 6, 10)]
+    pal = np.zeros((64, 3), np.float32)
+    for c, col in enumerate(base):
+        for sh in range(4):
+            k = SHADE[sh] if c not in GLOW + (2, 10) else (1.0 if sh == 0 else 0.92)
+            pal[c * 4 + sh] = np.array(col, np.float32) * k
+    return pal.clip(0, 255).astype(np.uint8)
+
+def neon_edges(g):
+    """hull voxels on the body's edges (open above and open to a side or end) become glowing trim lines"""
+    o = np.pad(g.occ, 1)
+    up_ = ~o[1:-1, 1:-1, 2:]
+    lat = ~o[1:-1, 2:, 1:-1] | ~o[1:-1, :-2, 1:-1]
+    # the outermost voxel across the car in each (x, z) column: the outline seen from above / behind
+    ys = np.arange(g.W)[None, :, None]
+    occ_y = np.where(g.occ, ys, -1); left = occ_y.max(1, keepdims=True)
+    occ_y2 = np.where(g.occ, ys, 999); right = occ_y2.min(1, keepdims=True)
+    outer = (ys == left) | (ys == right)
+    top = g.occ & up_
+    zt = np.where(top, np.arange(g.H)[None, None, :], -1).max(2, keepdims=True)
+    edge = g.occ & up_ & lat & outer & np.isin(g.col, (0, 1, 3, 11))
+    g.col[edge] = 2
+
 # ---------------------------------------------------------------- palette: 12 colours x 4 shades (top, side, end, bottom)
 # colour roles: 0 primary (team), 1 secondary (team, darker), 2 trim (light), 3 dark metal, 4 canopy glass,
 # 5 engine glow, 6 flame core, 7 flame outer, 8 tail light (red), 9 light bar (white), 10 accent stripe, 11 black
@@ -28,6 +56,7 @@ SHADE = [1.0, 0.78, 0.64, 0.45]
 GLOW = (5, 6, 7, 8, 9)
 NCOL = 12
 def palette(primary, secondary):
+    if NEON: return palette_neon(primary)
     accent = tuple(min(255, int(c * 1.25 + 30)) for c in primary)
     base = [primary, secondary, (225, 228, 235), (52, 56, 66), (120, 220, 255), (255, 200, 90), (255, 250, 200), (255, 120, 20),
             (255, 40, 60), (255, 255, 255), accent, (18, 18, 22)]
@@ -63,6 +92,7 @@ SKINS.update({
     'ct_indigo': ((110, 85, 255), (55, 35, 155)),
     'ct_ice': ((175, 215, 255), (95, 135, 195)),
 })
+if NEON: SKINS['neutral'] = ((0, 225, 255), (0, 110, 140))     # Neon Racer: cars glow cyan before a team is picked
 SKIN_ORDER = ['t', 'ct', 'gold'] + [k for side in ('t', 'ct') for k, _ in SHADES[side][1:]]
 
 def write_palettes():
@@ -308,6 +338,7 @@ def build_car(key, boost, pal_paths, shadow_mat, flame_mats):
         CARS[key](ShiftedGrid(g, FLAME_X), boost)
     else:
         CARS[key](g, False)
+    if NEON: neon_edges(g)
     origin = (-(L / 2) * VOX - (FLAME_X * VOX if boost else 0), -(W / 2) * VOX, HOVER)
     tris = mesh_voxels(g.occ, g.col, origin, VOX) + shadow_tris(L, W)
     mats = {'spr_pal': pal_paths['neutral'], 'spr_shadow': shadow_mat}
@@ -555,15 +586,12 @@ def main():
     models = {}
     grids = {}
     flame_mats = {style: flame_material(style) for style in FLAME_STYLES}
-    if NEON: neon_flames = neoncars.flame_materials(OUT, PAL_DIR, FLAME_STYLES)
     for key in CARS:
         models[key] = {}
         for boost in (False, 'boost', 'pad'):
             path, g = build_car(key, boost, pal_paths, shadow_mat, flame_mats)
-            if not NEON: models[key][boost or 'base'] = path
+            models[key][boost or 'base'] = path
             grids[key + ('_' + boost if boost else '')] = g
-        if NEON:                       # Neon Racer: the Tripo3D cars (the voxel ones above stay for the workshop art)
-            models[key] = neoncars.build(OUT, MDIR, PAL_DIR, key, SKINS, SKIN_ORDER, neon_flames, HOVER, shadow_mat)
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
@@ -573,23 +601,14 @@ def main():
     pdir = os.path.join(OUT, 'panorama/images/custom_game/spr'); os.makedirs(pdir, exist_ok=True)
     for key in CARS:
         for skin in ('neutral', 't', 'ct'):
-            if NEON: img = neoncars.picture(key, None if skin == 'neutral' else SKINS[skin][0], 256)
-            else: img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86, style=key)
+            img = render_voxels(grids[key + '_boost'], palette(*SKINS[skin]), size=256, az=205, el=22, fill=0.86, style=key)
             img.save(os.path.join(pdir, 'car_%s_%s.png' % (key, skin)))
     # big renders for the loading screen
     for i, key in enumerate(CARS):
         sk = SKINS['t' if i % 2 == 0 else 'ct']
-        img = neoncars.picture(key, sk[0], 420, az=200, el=18) if NEON else render_voxels(grids[key + '_boost'], palette(*sk), size=420, az=200, el=18, fill=0.9, style=key)
+        img = render_voxels(grids[key + '_boost'], palette(*sk), size=420, az=200, el=18, fill=0.9, style=key)
         img.save(os.path.join(OUT, '_gen', 'big_%s.png' % key))
-    if PREVIEW and NEON:
-        cell = 220
-        sheet = Image.new('RGBA', (cell * 6, cell * 4), (14, 14, 22, 255))
-        for r, key in enumerate(CARS):
-            for i, (az, sk) in enumerate(((200, 'neutral'), (160, 't'), (270, 'ct'), (20, 'gold'), (110, 't_rose'), (335, 'ct_teal'))):
-                im = neoncars.picture(key, None if sk == 'neutral' else SKINS[sk][0], cell, az=az, el=20)
-                sheet.alpha_composite(im, (i * cell, r * cell))
-        sheet.save(PREVIEW)
-    elif PREVIEW:
+    if PREVIEW:
         # every car from 8 directions (the models are true 3D, so every angle is drawn correctly in game)
         cell = 200
         angles = [180, 225, 270, 315, 0, 45, 90, 135]

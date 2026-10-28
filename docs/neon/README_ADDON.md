@@ -2,7 +2,7 @@
 
 Neon Racer is Space Racer's game in a new look. It is a 32-car anti-grav racer run by the cs_script
 `maps/scripts/neon_racer.js`, with no server plugins and up to 64 players in two arenas. It has six new tracks, two of
-them with **flight sections**, cars made with Tripo3D, glowing-line visuals and electro / synthwave music. Rules,
+them with **flight sections**, Space Racer's pixel-art style in neon colours and electro / synthwave music. Rules,
 controls, chat commands, rounds and kill credit are the same as Space Racer's (see Space Racer's README_ADDON.md). The
 map name is `mg_neon_racer`.
 
@@ -35,8 +35,9 @@ The entity names are Space Racer's, with the script name `neon_racer`. The `poin
   - Gold rings are boost pads. Blue rings charge you.
   - The Hornet's Seeker Bolt climbs and dives after its target.
 - **Cars**:
-  - The four classes are the same as Space Racer's, built from Tripo3D models.
-  - Their glowing strips show your side's colour: T orange to red shades, CT blue to cyan shades, gold for winners.
+  - The four cars are Space Racer's voxel cars with near-black hulls.
+  - Their glowing trim and edge lines show your side's colour: T orange to red shades, CT blue to cyan shades, gold
+    for winners, cyan before a team is picked.
 - **Music**: four original electro pieces: two race loops at 124 and 128 bpm, a 96 bpm lobby loop and a results sting.
 
 Source: github.com/skink52/space-racer-cs2. `SPR_THEME=neon sh tools/build_all.sh` builds this addon.
