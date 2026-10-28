@@ -233,6 +233,12 @@ def icon(kind):
         g[3, :] = tuple(PINK) + (255,)
         for d in range(4):
             put(8 + d, 7 - d, ICE); put(8 + d, 8 + d, ICE)
+    elif kind == 'fly':                                  # a gate ring with a car going through it, nose up
+        for a in range(48):
+            t = a / 48 * 2 * math.pi
+            put(int(round(5.5 + 5 * math.sin(t))), int(round(7.5 + 6 * math.cos(t))), SKYBLUE if a % 6 < 3 else ICE)
+        for x, y in ((5, 8), (6, 7), (7, 7), (8, 6), (9, 6), (10, 5)): put(y, x, GOLD); put(y + 1, x, ORANGE)
+        put(4, 11, WHITE)
     elif kind == 'shield':                               # the shield bar running out
         g[3:9, 0:16] = tuple(BLACK) + (255,)
         for s in range(5):
@@ -246,6 +252,10 @@ def feat_track(big, edge):
     items = [('boost', 'GOLD PADS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS', 'CHARGE + SHIELD', MINT),
              ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM), ('slick', 'PURPLE WAVES', 'LOW GRIP', PINK),
              ('pulse', 'THE PULSE', 'CATCH-UP CHARGE', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
+    if NEON:      # flight sections: W / S fly up and down there; the rings work like the pads
+        items = [('boost', 'GOLD PADS/RINGS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS/RINGS', 'CHARGE + SHIELD', MINT),
+                 ('fly', 'FLIGHT: W UP S DOWN', 'FLY THE GATES', ICE), ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM),
+                 ('slick', 'PURPLE WAVES', 'LOW GRIP', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
     colw = (X1 - X0) // 2
     for i, (kind, title, desc, col) in enumerate(items):
         x = X0 + 44 + (i % 2) * colw
