@@ -110,13 +110,14 @@ for tp in tracks:
     box = (ox - hb, oy - hb, oz + tp['floor'] - 500, ox + hb, oy + hb, oz + tp['zmax'] + 4800)   # tall enough for the lobby's overview camera
     boxes.append(box)
     shell(box, SKY_MATS[tp['id']], 0)      # the track's own sky; no toolsskybox shell (it would show the one env_sky instead)
-# vis: nothing inside a track box blocks sight (track and scenery are props that don't occlude), so fine vis only
-# matters where cameras go. Low hints cover a band along the road: chunks of the centreline, padded sideways and
-# up for the chase / flyover / results cameras; everything else in the box is left to the whole-map Lowest hint.
+# vis: nothing inside a track box blocks sight (track and scenery are props that don't occlude), so fine vis buys
+# nothing there: the whole map is one Lowest hint and only the sealed lobby rooms get Low. (Until 28 Oct a chain of
+# Low hints ran along every road; Neon Racer's vis then made 3.7 million clusters and took far too long.)
 TRACKDATA = {t['id']: t for t in json.load(open(os.path.join(OUT, '_gen/tracks.json')))}
 CHUNK, PAD_XY, PAD_DOWN, PAD_UP = 40, 900, 350, 1100
+ROAD_HINTS = os.environ.get('SPR_ROAD_HINTS') == '1'       # the old Low band along the roads, if ever needed again
 band_hints = 0
-for tp, box in zip(tracks, boxes):
+for tp, box in zip(tracks if ROAD_HINTS else [], boxes):
     T = TRACKDATA[tp['id']]
     ox, oy, oz = tp['off']
     n = T['n']
@@ -212,6 +213,6 @@ for c in kids[2]:
     ents.append(dict(classname=ep.get('classname'), targetname=ep.get('targetname', ''), origin=list(c.get('origin'))))
 os.makedirs('build', exist_ok=True)
 json.dump(ents, open('build/entities.json', 'w'))
-print('vmap: %d vis hints along the roads' % band_hints)
+print('vmap: %d Low vis hints along the roads (SPR_ROAD_HINTS=1 for the old band)' % band_hints)
 print('vmap: %d entities, %d track boxes, replaced %d old nodes, world %s..%s -> %s' % (
     sum(counts.values()), len(boxes), removed, tuple(int(x) for x in whole[:3]), tuple(int(x) for x in whole[3:]), OUTPATH))

@@ -312,10 +312,9 @@ banded, cratered, or a striped retro sun) and a skyline or mountain silhouette o
 World layout: each track sits in its own 13,800-unit box. The eight boxes are two layers of 2 x 2 (layer 0 at
 z -5000: oval, hairpin, crosswire, null gap; layer 1 at z +3600: spire, ringworld, skyway, helix), all inside the
 CS2 world limits. Each box is a moondome shell showing that track's own pixel sky (no toolsskybox shell: it would
-show the map's single env_sky instead). Vis hints: Lowest over the whole map; Low only in a band along each road
-(chunks of 40 samples padded 900 units sideways, 350 down, 1100 up, where the chase / flyover / results cameras
-go) and in the lobby rooms. Nothing inside a box occludes (the track and scenery are props with visoccluder off), so
-coarse vis away from the road loses nothing, and the Low volume is about a quarter of what whole boxes were. Only
+show the map's single env_sky instead). Vis hints: Lowest over the whole map, Low only in the lobby rooms. Nothing inside a box occludes (the track and
+scenery are props with visoccluder off), so fine vis there buys nothing. Until 28 Oct a band of Low hints ran along
+each road; Neon Racer's vis then made 3.7 million clusters (`SPR_ROAD_HINTS=1` brings the band back). Only
 one box is ever in view, so the scenery (25-35k triangles per track) costs little.
 
 ## Loading screen
