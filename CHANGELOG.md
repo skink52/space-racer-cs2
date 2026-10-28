@@ -7,6 +7,7 @@
   - The cars are Space Racer's voxel cars again, with near-black hulls and glowing team-colour trim and edge lines.
   - Every track texture and sky is drawn in chunky dithered pixels in a neon palette.
   - Flight gates are glowing pixel rings again.
+- **Flight rings**: the stray strip across the corridor floor under each ring is gone. The rings were also being drawn as road pads.
 - **Flight controls inverted**: like a plane, S pulls up and W noses down. The flight message, help panel, loading
   screen and Void Hop's billboard all say so.
 - **Music with more punch**:

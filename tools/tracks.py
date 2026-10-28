@@ -562,7 +562,7 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
     # pads: quads 0.5 above the road between lateral fractions (lat -1 = left edge)
     for ft in feats:
         kind, a, b, l0f, l1f = ft['kind'], ft['a'], ft['b'], ft['l0'], ft['l1']
-        if kind == 'ramp': continue
+        if kind in ('ramp', 'ring', 'cring'): continue          # flight rings are drawn as rings (flight_tris), not pads
         i = a; k = 0
         for _ in range(N):
             j = i + 1
