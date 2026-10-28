@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import pixfont, retro
 from retro import *
 import cars as C
+from theme import NEON
 
 OUTD = sys.argv[1] if len(sys.argv) > 1 else '.'
 HERO = sys.argv[2] if len(sys.argv) > 2 else 'hornet'
@@ -131,6 +132,29 @@ def road(img):
             img[y, VX - w // 2:VX - w // 2 + w] = PINK
 
 
+def neon_recolour(img):
+    """Neon Racer: the grid and the road's rails in cyan instead of magenta"""
+    for a, b in ((MAGENTA, SKYBLUE), (PINK, ICE), (PURPLE, BLUE)):
+        m = (img[..., 0] == a[0]) & (img[..., 1] == a[1]) & (img[..., 2] == a[2])
+        m[:HZ] = False
+        img[m] = b
+
+
+def gates(img):
+    """Neon Racer: flight gate rings over the road, shrinking towards the sun"""
+    for k, (cy, rx, ry, col, col2) in enumerate(((HZ - 6, 26, 22, ICE, SKYBLUE), (HZ + 8, 48, 40, ICE, SKYBLUE),
+                                                (HZ + 34, 92, 76, WHITE, ICE))):
+        for a in np.linspace(0, 2 * math.pi, 900):
+            for t, c in ((-0.6, col), (0, col), (0.6, col), (1.8 + k, col2), (2.4 + k, col2)):
+                x = int(round(VX + (rx + t) * math.cos(a))); y = int(round(cy - (ry + t) * math.sin(a)))
+                if 0 <= x < B and 0 <= y < B and y < B - 40: img[y, x] = c
+        # a gold boost ring inside the middle gate
+        if k == 1:
+            for a in np.linspace(0, 2 * math.pi, 400):
+                x = int(round(VX + 16 * math.cos(a))); y = int(round(cy - 4 - 14 * math.sin(a)))
+                img[y, x] = GOLD
+
+
 def speed_lines(img):
     for _ in range(26):
         side = rng.choice([-1, 1])
@@ -156,6 +180,9 @@ def main():
     skyline(img)
     ground(img)
     road(img)
+    if NEON:
+        neon_recolour(img)
+        gates(img)
     speed_lines(img)
     # the hero, seen from behind like the chase camera sees it, flames lit, heading for the sun
     hero = car_sprite(HERO, 't', 150)
@@ -163,14 +190,14 @@ def main():
     hx, hy = VX + 4 - hero.shape[1] // 2, B - 8 - hero.shape[0]
     yy, xx = np.mgrid[0:B, 0:B]
     glow = ((xx - VX - 4) / 46.0) ** 2 + ((yy - (B - 22)) / 6.0) ** 2 <= 1
-    img[glow & ((xx + yy) % 2 == 0)] = TEAL
+    img[glow & ((xx + yy) % 2 == 0)] = ORANGE if NEON else TEAL
     paste(img, hero, hx, hy)
     big = up(img.astype(np.uint8), 4).copy()
     # the logo and the strap line, at full size
     from theme import TITLE
     lg = pixfont.logo(TITLE, 8)
     pixfont.paste(big, lg, (B * 4 - lg.shape[1]) // 2, 34)
-    pixfont.draw(big, B * 2, 34 + lg.shape[0] + 10, '32-CAR ANTI-GRAV RACING', 4, ICE, shadow=PURPLE, align='center')
+    pixfont.draw(big, B * 2, 34 + lg.shape[0] + 10, '32-CAR ANTI-GRAV RACING' if not NEON else 'RACE AND FLY - 32 CARS', 4, ICE, shadow=PURPLE, align='center')
     big = retro.scanlines(big, 4, 0.86)
     os.makedirs(OUTD, exist_ok=True)
     Image.fromarray(big).save(os.path.join(OUTD, 'icon.png'), optimize=True)
