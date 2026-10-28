@@ -510,7 +510,7 @@ lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 
 HELP = [(TITLE + ' - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
         ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('E        YOUR CAR\'S ABILITY', 'W'), ('R        PICK A CAR', 'W'),
         ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R') if not NEON else ('FLYING: W UP  S DOWN  RINGS!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SHADE !VOTE !SPEC !AFK !BACK', 'P')]
+        ('RAMPS: HIT THEM FAST!', 'R') if not NEON else ('FLYING: W DOWN  S UP  RINGS!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SHADE !VOTE !SPEC !AFK !BACK', 'P')]
 help_ = P('spr_help', box('Help', 'cyan', 640, len(HELP) * 28 + 24, center=True, y=180),
           [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
 

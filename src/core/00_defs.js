@@ -40,7 +40,7 @@ const RULES = {
   driftChargeRate: 10,      // charge per second while sliding in a drift
   spinTime: 0.5, spinCooldown: 3.0, spinDamage: 20,
   spinReach: 35,            // a spinning car hits cars this much further away than touching (its swinging tail)
-  spinKnock: 480,           // a spin hit shoves the other car sideways: its speed change is this x attacker mass / its mass
+  spinKnock: 640,             // a spin hit shoves the other car sideways: its speed change is this x attacker mass / its mass
   spinStagger: 0.55,        // ... then it skids for this long (grip and steering cut) so the shove carries it across the road
   staggerGrip: 0.25, staggerSteer: 0.5, spinSlow: 0.12,  // grip and steering it keeps while skidding; forward speed lost
   contactMax: 20,           // most shield one bump or rail hit can take
@@ -77,17 +77,17 @@ const RULES = {
   driftStreak: 0.35,
   // big air: a clean landing after this long in the air pays some charge
   bigAirTime: 0.7, bigAirCharge: 15,
-  // ---- flight sections (Neon Racer): W climbs, S dives, no input sinks slowly; the corridor's edge bounces like a rail
+  // ---- flight sections (Neon Racer): S climbs, W dives (like a plane), no input sinks slowly; the corridor's edge bounces like a rail
   flyClimb: 420, flyDive: 520, flySink: 70, flyResp: 5, flyRest: 0.3,
   // ---- the cars' E abilities (CARS[*].ability; cooldown and charge cost per car)
   // SEEKER BOLT (Hornet): a bolt fired forward along the road, curving towards the first car ahead; the car it hits is
   // shoved, skids and loses shield (an Aegis shell stops it)
-  boltSpeed: 900, boltRange: 2500, boltTurn: 280, boltRadius: 34, boltDamage: 6, boltKnock: 260, boltStagger: 0.6, boltSlow: 0.25, boltLift: 30,
+  boltSpeed: 900, boltRange: 2500, boltTurn: 280, boltRadius: 34, boltDamage: 10, boltKnock: 260, boltStagger: 0.6, boltSlow: 0.25, boltLift: 30,
   // SHOCKWAVE (Meteor): every car close by is shoved sideways (harder the closer), skids and loses shield
-  quakeRadius: 320, quakeKnock: 300, quakeDamage: 2, quakeStagger: 0.3,
+  quakeRadius: 320, quakeKnock: 300, quakeDamage: 6, quakeStagger: 0.3,
   // NOVA BURN (Comet): all the charge at once - a kick and a long overdrive - and a trail of fire behind
   novaKick: 220, novaSpeed: 1.5, novaTime: 0.7, novaTimePerCharge: 0.012,
-  fireGap: 0.15, fireFor: 0.8, fireTime: 2.0, fireRadius: 90, fireDamage: 2, fireEvery: 0.5,   // fire for the first second
+  fireGap: 0.15, fireFor: 0.8, fireTime: 2.0, fireRadius: 90, fireDamage: 4, fireEvery: 0.5,   // fire for the first second
   // AEGIS (Bastion): an energy shell - no damage, no shoves, cars bounce off - and a shield top-up for teammates near
   aegisTime: 2.5, aegisMass: 4, aegisBump: 1, aegisShare: 20, aegisRange: 500,
 };

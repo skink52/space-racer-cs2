@@ -352,7 +352,7 @@ function handleArenaEvents(a, now) {
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);
     if (f & 512) sfxCar(view, 'jump', car, 0.3);
     if (f & 1024) { sfxCar(view, 'land', car, 0.3); if (human) shake(pe.slot, 0.3, 12); }
-    if (f & 8192 && human) bottom(pe.slot, 'FLIGHT: W UP  S DOWN  HIT THE RINGS', 3);
+    if (f & 8192 && human) bottom(pe.slot, 'FLIGHT: W DOWN  S UP  HIT THE RINGS', 3);
     if (f & 4096) { sfxCar(view, 'pulsed', car, 0.4); if (human) bottom(pe.slot, 'BIG AIR! +' + RULES.bigAirCharge + ' CHARGE', 2); }
     if (car.boosting && !car.wasBoost) sfxCar(view, 'boost', car, 0.8);
     if (car.onCharge && !car.wasCharge) sfxCar(view, 'charge', car, 1.0);

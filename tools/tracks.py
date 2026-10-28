@@ -393,7 +393,7 @@ def shared_materials():
     SHARED['start'] = s2.write_material(OUT, mdir + '/startline', start_texture(), comment='start line')
     SHARED['edge'] = s2.write_material(OUT, mdir + '/edge_hazard', hazard_texture(), comment='rail-less edge stripe')
     SHARED['ramp'] = s2.write_material(OUT, mdir + '/ramp', chevron_texture(GOLD, BLACK), comment='jump ramp')
-    SHARED['sign'] = s2.write_material(OUT, mdir + '/turn_sign', sign_texture(), backfaces=True, comment='turn sign')
+    SHARED['sign'] = s2.write_material(OUT, mdir + '/turn_sign', sign_texture(), comment='turn sign (front only: its back is not drawn)')
     SHARED['back'] = s2.write_material(OUT, mdir + '/board_back', solid(INK), comment='back of boards')
     SHARED['white'] = s2.write_material(OUT, mdir + '/white', solid(WHITE), comment='white light')
     SHARED['cloud'] = s2.write_material(OUT, mdir + '/cloud_top', cloud_texture(True), comment='cloud')
@@ -652,10 +652,13 @@ def track_tris(track, S, G, feats, gapset, cps, road, tubes, mats, th):
         left = turn[i] > 0
         side = -1.0 if left else 1.0
         c = G.at(si, side * (hw[si] + 90))
-        dirv = (nrm[si, 0] * (1 if left else -1), nrm[si, 1] * (1 if left else -1))
+        # one-sided: the face looks back at the cars coming (left to right as they see it), the arrows point into the
+        # turn; from behind there is nothing (a two-sided sign showed its mirror image to cars that had passed it)
+        dirv = (-nrm[si, 0], -nrm[si, 1])
         w, z0, z1 = 360, 60, 240
         p0 = (c[0] - dirv[0] * w / 2, c[1] - dirv[1] * w / 2, c[2] + z0); p1 = (c[0] + dirv[0] * w / 2, c[1] + dirv[1] * w / 2, c[2] + z0)
-        tris += s2.quad('sign', p0, p1, Z(p1, z1 - z0), Z(p0, z1 - z0), (0, 0), (1, 0), (1, 1), (0, 1), (-tan[si, 0], -tan[si, 1], 0))
+        ua, ub = (1, 0) if left else (0, 1)
+        tris += s2.quad_n('sign', p0, p1, Z(p1, z1 - z0), Z(p0, z1 - z0), (ua, 0), (ub, 0), (ub, 1), (ua, 1), (-tan[si, 0], -tan[si, 1], 0))
         for q in (p0, p1):
             tris += s2.box_tris('post', q[0] - 10, q[1] - 10, q[2] - z0 - SKIRT, q[0] + 10, q[1] + 10, q[2], uscale=1 / 256.0)
     tris += tube_tris(S, G, tubes, road)
@@ -757,7 +760,7 @@ def billboards(track, S, G, road, tubes, mats, curv):
             break
     return tris
 
-def scenery(track, S, th):
+def scenery(track, S, th, flyR=None):
     """the world around the road: a grid floor plus the theme's things (towers, rocks, crystals, rings, clouds)"""
     pos, hw, N = S['pos'], S['hw'], S['N']
     rng = np.random.RandomState(1000 + sum(map(ord, track['id'])))
@@ -770,11 +773,21 @@ def scenery(track, S, th):
         tris += s2.quad_n('floor', (-E, -E, floor), (E, -E, floor), (E, E, floor), (-E, E, floor),
                           (0, 0), (2 * E / 1024, 0), (2 * E / 1024, 2 * E / 1024), (0, 2 * E / 1024), (0, 0, 1))
     pts2 = pos[:, :2]
+    # how far the track reaches sideways from its centreline: the road, or a flight corridor (plus its gate rings)
+    reach = hw if flyR is None else np.maximum(hw, flyR + 40)
     def clearance(x, y):
-        """distance from (x, y) to the road edge, and the road height there"""
-        d = np.hypot(pts2[:, 0] - x, pts2[:, 1] - y) - hw
+        """distance from (x, y) to the track's edge, and the lowest track height near there (where the track passes
+        over itself, or a flight dives, the deck under the point is what a building must stay below)"""
+        d = np.hypot(pts2[:, 0] - x, pts2[:, 1] - y) - reach
         k = int(d.argmin())
-        return float(d[k]), float(pos[k, 2])
+        near = d < d[k] + 600
+        zl = float(pos[near, 2].min())
+        if flyR is not None and flyR[near].max() > 0: zl = min(zl, float((pos[near, 2] - flyR[near] - 80).min()))
+        return float(d[k]), zl
+    def near_track(x, y, z, r_xy, r_z):
+        """is (x, y, z) within r_xy sideways and r_z up / down of any part of the track"""
+        d = np.hypot(pts2[:, 0] - x, pts2[:, 1] - y) - reach
+        return bool(((d < r_xy) & (np.abs(pos[:, 2] - z) < r_z + (0 if flyR is None else flyR))).any())
     count = 0
     if kind in ('city', 'rings'):
         step = 620 if kind == 'city' else 900
@@ -803,8 +816,7 @@ def scenery(track, S, th):
             x, y = rng.uniform(-E + 400, E - 400, 2)
             z = rng.uniform(zmin - 1300, zmax + 1600)
             rad = 40 + 600 * rng.rand() ** 3
-            d, rz = clearance(x, y)
-            if d < rad + 350 and abs(z - rz) < rad + 700: continue
+            if near_track(x, y, z, rad + 350, rad + 700): continue
             v, f = icosphere(rad, rng, squash=(1, rng.uniform(0.6, 1), rng.uniform(0.5, 0.9)))
             tris += shaded_mesh(v, f, (x, y, z), rot_matrix(rng), ('rock0', 'rock1', 'rock2'))
             n_rocks -= 1; count += 1
@@ -822,6 +834,7 @@ def scenery(track, S, th):
             tilt = rng.uniform(-0.25, 0.25, 2)
             ring = [(x + rad * math.cos(a), y + rad * math.sin(a), floor + h * 0.15) for a in np.arange(6) * math.pi / 3 + rng.rand()]
             tipp = (x + tilt[0] * h, y + tilt[1] * h, top)
+            if any(near_track(x + tilt[0] * h * f, y + tilt[1] * h * f, floor + h * f, rad * (1 - f) + 200, 300) for f in (0.4, 0.6, 0.8, 1.0)): continue
             basep = (x, y, floor)
             v = np.array([tipp, basep] + ring) - np.array([x, y, floor])
             faces = [(0, 2 + k, 2 + (k + 1) % 6) for k in range(6)] + [(1, 2 + (k + 1) % 6, 2 + k) for k in range(6)]
@@ -831,8 +844,7 @@ def scenery(track, S, th):
         for _ in range(90):
             x, y = rng.uniform(-E + 400, E - 400, 2)
             z = rng.uniform(zmin, zmax + 1500)
-            d, rz = clearance(x, y)
-            if d < 500 and abs(z - rz) < 800: continue
+            if near_track(x, y, z, 500, 800): continue
             r_ = rng.uniform(60, 200)
             v = np.array([(0, 0, r_ * 2.2), (0, 0, -r_ * 2.2)] + [(r_ * math.cos(a), r_ * math.sin(a), 0) for a in np.arange(6) * math.pi / 3])
             faces = [(0, 2 + k, 2 + (k + 1) % 6) for k in range(6)] + [(1, 2 + (k + 1) % 6, 2 + k) for k in range(6)]
@@ -1089,7 +1101,7 @@ def main():
         if B['fly'].any(): tris += flight_tris(S, B['fly'], B['flyR'], B['feats'])
         ntrack = len(tris)
         tris += billboards(track, S, B['G'], B['road'], B['tubes'], mats, B['curv'])
-        st, nscen, floor = scenery(track, S, th)
+        st, nscen, floor = scenery(track, S, th, B['flyR'])
         tris += st
         allmats = dict(mats); allmats.update(SHARED)
         used = set(t[0] for t in tris)

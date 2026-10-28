@@ -30,7 +30,7 @@ The entity names are Space Racer's, with the script name `neon_racer`. The `poin
 
 - **Flight sections**:
   - The road ends and the car flies down a corridor of gates.
-  - W climbs, S dives and A / D steer. Thrust is always on, and boost, spin and E still work.
+  - Like a plane: S pulls up (climbs), W noses down (dives) and A / D steer. Thrust is always on, and boost, spin and E still work.
   - The corridor's edge bounces you like a rail. The corridor narrows at the end so you come down onto the road.
   - Gold rings are boost pads. Blue rings charge you.
   - The Hornet's Seeker Bolt climbs and dives after its target.

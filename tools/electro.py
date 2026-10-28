@@ -12,8 +12,6 @@ def chord(root, kind='min', octave=4):
     r = m(root + str(octave))
     return [r, r + (3 if kind == 'min' else 4), r + 7]
 
-BRIGHT = ((180, -3.0, 1.0), (3000, 3.0, 0.8), (8000, 3.0, 0.7))   # master tone: less mud, more shine
-
 def loop(parts_fn, bars, bpm, tail=2.5):
     beat = 60.0 / bpm
     sec = bars * 4 * beat
@@ -21,40 +19,59 @@ def loop(parts_fn, bars, bpm, tail=2.5):
     out = parts_fn(beat, bars, nt)
     out[:S.sec(tail)] += out[n:]
     out = out[:n]
-    out = out / (np.max(np.abs(out)) + 1e-9) * S.db(-1.0)
+    rms = np.sqrt(np.mean(out ** 2)) + 1e-9                    # loud and dense: bring the body up, round off the peaks
+    out = S.softclip(out * (S.db(-12.0) / rms), 0.65)
+    out = out / (np.max(np.abs(out)) + 1e-9) * S.db(-1.5)
     f = S.sec(0.004)
     out[:f] *= np.linspace(0, 1, f)[:, None]; out[-f:] *= np.linspace(1, 0, f)[:, None]
     return out, sec
 
-def four_floor(beat, bars, clap=True, ohat=True, fill_every=8, hats16=False, half=False):
+def punch_kick(times, n):
+    """an extra kick layer for weight: a long sub thump (60 -> 42 Hz) and a short click, on every kick"""
+    k = S.sec(0.42); t = np.arange(k) / S.SR
+    f = 42 + 70 * np.exp(-t / 0.035)
+    sub = S.sine(f, k) * np.exp(-t / 0.22) * np.minimum(t / 0.002, 1)
+    click = S.hp(S.noise(k, np.random.default_rng(3)), 2500) * np.exp(-t / 0.004) * 0.5
+    one = np.tanh(2.2 * (sub + click)) * 0.9
+    buf = np.zeros(n)
+    for t0 in times: S.add(buf, one, S.sec(t0))
+    return buf
+
+def four_floor(beat, bars, clap=True, ohat=True, fill_every=8, hats16=False):
     ev, kicks = [], []
     for b in range(bars):
         for q in range(4):
             t = (b * 4 + q) * beat
-            if not half or q in (0, 2) or True:
-                ev.append((t, 'kick', 1.0)); kicks.append(t)
-            if clap and q in ((2,) if half else (1, 3)): ev.append((t, 'clap', 0.85))
-            if ohat: ev.append((t + beat / 2, 'ohat', 0.55))
+            ev.append((t, 'kick', 1.0)); kicks.append(t)
+            if clap and q in (1, 3): ev.append((t, 'clap', 0.9)); ev.append((t, 'snare', 0.85))
+            if ohat: ev.append((t + beat / 2, 'ohat', 0.5))
             if hats16:
-                for s in (1, 3): ev.append((t + s * beat / 4, 'hat', 0.35))
+                for s_ in (1, 3): ev.append((t + s_ * beat / 4, 'hat', 0.3))
         if fill_every and b % fill_every == fill_every - 1:
             ev.append(((b * 4 + 2) * beat, 'riser', 0.6))
         if b % 8 == 0: ev.append((b * 4 * beat, 'crash', 0.6))
     return ev, kicks
 
+PUNCH = ((70, 1.0, 0.9), (300, -3.0, 1.0), (2500, 3.0, 0.9), (7000, 2.0, 0.8))     # master tone: weight in the lows, less box, some bite
+
+def mix_drums(mx, kit, kicks, n, hat_db=-9):
+    mx.add(punch_kick(kicks, n), -8, 0.0)
+    for g, x in kit.items(): mx.add(x, {'kick': -4, 'snare': -2, 'hat': hat_db + 2, 'cym': -9}.get(g, -8), 0.0, -20 if g not in ('kick',) else -100)
+
 def race1(beat, bars, n):
-    """'Grid Runner' - 124 bpm, A minor: rolling 16th bass, a pulse arpeggio, a soaring detuned lead in the second half"""
+    """'Grid Runner' - 124 bpm, A minor: a driven rolling 16th saw bass pumping under a four-on-the-floor kick,
+    a filtered saw arpeggio, a wide supersaw lead in the second half"""
     prog = [('A', 'min'), ('F', 'maj'), ('C', 'maj'), ('G', 'maj')]
     bass, arp, pad, lead = [], [], [], []
     for b in range(bars):
         root, kind = prog[b % 4]
         ch = chord(root, kind, 4)
-        pad.append((b * 4 * beat, 4 * beat, ch, 0.7, {}))
-        r2 = m(root + '2')
-        for s in range(16):
-            t = (b * 4 + s / 4) * beat
-            if s % 4 != 0: bass.append((t, beat / 4 * 0.8, r2 + (12 if s % 4 == 2 else 0), 0.9, {}))
-            arp.append((t, beat / 4 * 0.7, ch[s % 3] + 12 * (s // 8), 0.6, {}))
+        pad.append((b * 4 * beat, 4 * beat, [c - 12 for c in ch], 0.7, {}))
+        r1 = m(root + '1') if root in ('A', 'G') else m(root + '2') - 12
+        for s_ in range(16):
+            t = (b * 4 + s_ / 4) * beat
+            if s_ % 4 != 0: bass.append((t, beat / 4 * 0.85, r1 + (12 if s_ % 4 == 2 else 0), 1.0 if s_ % 4 == 2 else 0.8, {}))
+            arp.append((t, beat / 4 * 0.6, ch[s_ % 3] + 12 * (s_ // 8), 0.55, {}))
     mel = [('E5', 2), ('A5', 1), ('C6', 1), ('B5', 2), ('G5', 2), ('A5', 3), ('E5', 1), ('C5', 2), ('D5', 2),
            ('E5', 2), ('G5', 1), ('A5', 1), ('B5', 2), ('D6', 2), ('C6', 3), ('B5', 1), ('A5', 4)]
     t = (bars // 2) * 4 * beat
@@ -62,20 +79,20 @@ def race1(beat, bars, n):
         tt = t + k * 16 * beat
         for note, d in mel:
             if tt >= bars * 4 * beat: break
-            lead.append((tt, d * beat * 0.95, m(note), 0.85, {'slide': d >= 3}))
+            lead.append((tt, d * beat * 0.95, m(note), 0.9, {'slide': d >= 3}))
             tt += d * beat
     drums, kicks = four_floor(beat, bars, hats16=True)
     kit = S.Drums(seed=11, style='electronic').render(drums, n)
-    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.55, 0.12)
-    mx.add(S.Bass(seed=3, electronic=True, drive=2.0).render(bass, n), -7, 0.0, -100, 0.85)
-    mx.add(S.Lead(seed=4, voices=2, detune=6, drive=1.4, delay=beat * 0.75, dmix=0.25, square=0.7, vib_depth=0.0).render(arp, n), -6, 0.0, -20, 0.6)
-    mx.add(S.Pad(seed=5, mode='strings', voices=6, detune=18).render(pad, n), -9, 0.0, -10, 0.7)
-    if lead: mx.add(S.Lead(seed=6, voices=5, detune=14, drive=2.0, delay=beat * 0.75, dmix=0.3).render(lead, n), -3, 0.0, -12, 0.3)
-    for g, x in kit.items(): mx.add(x, {'kick': -3, 'snare': -5, 'hat': -7, 'cym': -9}.get(g, -8), 0.0, -18 if g != 'kick' else -100)
-    return mx.master(comp_thr=-12, ratio=3.5, eq=BRIGHT)
+    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.7, 0.14)
+    mx.add(S.Bass(seed=3, electronic=False, drive=4.0, sub=0.6, fc=1400).render(bass, n), -8, 0.0, -100, 0.9)
+    mx.add(S.lp(S.Lead(seed=4, voices=3, detune=8, drive=1.6, delay=beat * 0.75, dmix=0.2, square=0.0, vib_depth=0.0).render(arp, n)[:, 0], 4000, 2), -9, -0.25, -18, 0.7)
+    mx.add(S.Pad(seed=5, mode='strings', voices=6, detune=16).render(pad, n), -13, 0.0, -10, 0.8)
+    if lead: mx.add(S.Lead(seed=6, voices=7, detune=18, drive=2.4, vib_depth=0.12, delay=beat * 0.75, dmix=0.25).render(lead, n), -3, 0.1, -12, 0.35)
+    mix_drums(mx, kit, kicks, n)
+    return mx.master(comp_thr=-18, ratio=4.0, drive_db=8.0, eq=PUNCH)
 
 def race2(beat, bars, n):
-    """'Neon Highway' - 128 bpm, F# minor: an octave-bouncing bass, gated chords, a call-and-answer lead"""
+    """'Neon Highway' - 128 bpm, F# minor: an octave-bouncing driven bass, stabbed saw chords, a call-and-answer lead"""
     prog = [('F#', 'min'), ('D', 'maj'), ('A', 'maj'), ('E', 'maj')]
     bass, gate, lead = [], [], []
     for b in range(bars):
@@ -84,70 +101,71 @@ def race2(beat, bars, n):
         r1 = m(root + '1') if root in ('F#', 'E') else m(root + '2') - 12
         for e in range(8):
             t = (b * 4 + e / 2) * beat
-            bass.append((t, beat / 2 * 0.7, r1 + (12 if e % 2 else 0), 0.9, {}))
-            if e % 2 == 1 or e == 0: gate.append((t, beat / 2 * 0.5, ch, 0.7 if e else 0.9, {}))
+            bass.append((t, beat / 2 * 0.75, r1 + (12 if e % 2 else 0), 1.0 if e % 2 else 0.85, {}))
+            if e in (1, 3, 6): gate.append((t, beat / 2 * 0.35, ch, 0.9, {}))
     call = [('C#5', 1), ('E5', 1), ('F#5', 2), ('-', 4)]
     answer = [('A5', 1), ('G#5', 1), ('E5', 1), ('C#5', 1), ('E5', 4)]
     for b in range(4, bars, 2):
         tt = b * 4 * beat
         for note, d in (call if (b // 2) % 2 == 0 else answer):
-            if note != '-': lead.append((tt, d * beat * 0.9, m(note), 0.8, {}))
+            if note != '-': lead.append((tt, d * beat * 0.9, m(note), 0.9, {}))
             tt += d * beat
     drums, kicks = four_floor(beat, bars, ohat=True)
     kit = S.Drums(seed=12, style='electronic').render(drums, n)
-    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.6, 0.11)
-    mx.add(S.Bass(seed=7, electronic=True, drive=2.6, sub=0.8).render(bass, n), -7, 0.0, -100, 0.9)
-    mx.add(S.Pad(seed=8, mode='strings', voices=5, detune=12).render(gate, n), -5, 0.0, -14, 0.8)
-    mx.add(S.Lead(seed=9, voices=4, detune=10, drive=1.8, delay=beat * 0.75, dmix=0.35, square=0.3).render(lead, n), -3, 0.15, -12, 0.3)
-    for g, x in kit.items(): mx.add(x, {'kick': -3, 'snare': -4, 'hat': -7, 'cym': -9}.get(g, -8), 0.0, -18 if g != 'kick' else -100)
-    return mx.master(comp_thr=-12, ratio=3.5, eq=BRIGHT)
+    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.7, 0.13)
+    mx.add(S.Bass(seed=7, electronic=False, drive=4.5, sub=0.6, fc=1300).render(bass, n), -8, 0.0, -100, 0.9)
+    mx.add(S.Lead(seed=8, voices=5, detune=14, drive=2.0, delay=beat * 0.5, dmix=0.2, vib_depth=0.0).render(gate, n), -6, 0.0, -14, 0.8)
+    mx.add(S.Lead(seed=9, voices=7, detune=16, drive=2.4, vib_depth=0.1, delay=beat * 0.75, dmix=0.3).render(lead, n), -3, 0.15, -12, 0.35)
+    mix_drums(mx, kit, kicks, n, -10)
+    return mx.master(comp_thr=-18, ratio=4.0, drive_db=8.0, eq=PUNCH)
 
 def lobby(beat, bars, n):
-    """'After Hours' - 96 bpm, D minor: a slow synthwave groove, warm pads and a sparkling arpeggio"""
+    """'After Hours' - 100 bpm, D minor: a heavy half-time groove, a dark pad and a slow saw arpeggio"""
     prog = [('D', 'min'), ('A#', 'maj'), ('F', 'maj'), ('C', 'maj')]
     bass, arp, pad = [], [], []
     for b in range(bars):
         root, kind = prog[b % 4]
         ch = chord(root, kind, 4)
-        pad.append((b * 4 * beat, 4 * beat, ch + [ch[0] + 12], 0.8, {}))
-        r2 = m(root + '2')
+        pad.append((b * 4 * beat, 4 * beat, [c - 12 for c in ch], 0.8, {}))
+        r1 = m(root + '2') - 12
         for e in range(8):
-            bass.append(((b * 4 + e / 2) * beat, beat / 2 * 0.9, r2, 0.8 if e % 2 else 0.95, {}))
-        for s in range(8):
-            arp.append(((b * 4 + s / 2) * beat, beat / 2 * 0.6, ch[(0, 1, 2, 1)[s % 4]] + 12, 0.5, {}))
+            bass.append(((b * 4 + e / 2) * beat, beat / 2 * 0.8, r1 + (12 if e in (3, 7) else 0), 0.95 if e % 2 == 0 else 0.7, {}))
+        for s_ in range(8):
+            arp.append(((b * 4 + s_ / 2) * beat, beat / 2 * 0.5, ch[(0, 1, 2, 1)[s_ % 4]] + 12, 0.5, {}))
     ev, kicks = [], []
     for b in range(bars):
         for q in range(4):
             t = (b * 4 + q) * beat
-            if q in (0, 2): ev.append((t, 'kick', 0.9)); kicks.append(t)
-            if q == 2: ev.append((t, 'snare', 0.7))
-            ev.append((t + beat / 2, 'hat', 0.4))
+            if q == 0 or (q == 2 and b % 2): ev.append((t, 'kick', 1.0)); kicks.append(t)
+            if q == 2: ev.append((t, 'snare', 0.9)); ev.append((t, 'clap', 0.7))
+            ev.append((t + beat / 2, 'hat', 0.35))
     kit = S.Drums(seed=13, style='electronic').render(ev, n)
-    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.3, 0.2)
-    mx.add(S.Bass(seed=14, electronic=True, drive=1.5).render(bass, n), -5, 0.0, -100, 0.5)
-    mx.add(S.Pad(seed=15, mode='strings', voices=7, detune=20).render(pad, n), -9, 0.0, -6, 0.4)
-    mx.add(S.Lead(seed=16, voices=2, detune=5, drive=1.2, delay=beat * 0.75, dmix=0.45, fb=0.5, square=0.8, vib_depth=0.0).render(arp, n), -12, 0.0, -10, 0.3)
-    for g, x in kit.items(): mx.add(x, {'kick': -3, 'snare': -7, 'hat': -14, 'cym': -12}.get(g, -8), 0.0, -14 if g != 'kick' else -100)
-    return mx.master(comp_thr=-14, ratio=2.5)
+    mx = S.Mixer(n); mx.pump = S.pump_curve(kicks, n, 0.5, 0.25)
+    mx.add(S.Bass(seed=14, electronic=False, drive=3.0, sub=0.6, fc=1000).render(bass, n), -8, 0.0, -100, 0.7)
+    mx.add(S.Pad(seed=15, mode='strings', voices=7, detune=20).render(pad, n), -8, 0.0, -6, 0.5)
+    mx.add(S.lp(S.Lead(seed=16, voices=3, detune=7, drive=1.3, delay=beat * 0.75, dmix=0.4, fb=0.5, square=0.0, vib_depth=0.0).render(arp, n)[:, 0], 3500, 2), -8, -0.2, -10, 0.4)
+    mix_drums(mx, kit, kicks, n, -12)
+    return mx.master(comp_thr=-18, ratio=3.5, drive_db=7.0, eq=PUNCH)
 
 def results(beat, bars, n):
-    """a short electro fanfare: a rising arpeggio into a held chord"""
+    """a short electro sting: a rising saw arpeggio into a held supersaw chord over a sub hit"""
     notes = [m(x) for x in ('A4', 'C5', 'E5', 'A5', 'C6', 'E6')]
     arp = [(k * beat / 4, beat / 4 * 0.9, p, 0.8, {}) for k, p in enumerate(notes * 2)]
     hold = [(3 * beat, 4 * beat, [m('A4'), m('C#5'), m('E5'), m('A5')], 0.9, {})]
     bass = [(3 * beat, 4 * beat, m('A1'), 1.0, {})]
-    drums = [(0, 'riser', 0.7), (3 * beat, 'kick', 1.0), (3 * beat, 'crash', 0.9)]
+    drums = [(0, 'riser', 0.7), (3 * beat, 'kick', 1.0), (3 * beat, 'crash', 0.9), (3 * beat, 'clap', 0.9)]
     kit = S.Drums(seed=17, style='electronic').render(drums, n)
     mx = S.Mixer(n)
-    mx.add(S.Lead(seed=18, voices=3, detune=8, delay=beat * 0.5, dmix=0.3, square=0.5).render(arp, n), -6, 0.0, -10)
-    mx.add(S.Pad(seed=19, mode='strings', voices=7, detune=16).render(hold, n), -5, 0.0, -6)
-    mx.add(S.Bass(seed=20, electronic=True).render(bass, n), -5)
+    mx.add(S.Lead(seed=18, voices=5, detune=12, delay=beat * 0.5, dmix=0.3).render(arp, n), -6, 0.0, -10)
+    mx.add(S.Lead(seed=19, voices=7, detune=18, drive=2.0, delay=beat * 0.75, dmix=0.3).render([(3 * beat, 4 * beat, p, 0.8, {}) for p in hold[0][2]], n), -6, 0.0, -8)
+    mx.add(S.Bass(seed=20, drive=3.0, sub=1.0).render(bass, n), -3)
+    mx.add(punch_kick([3 * beat], n), -1)
     for g, x in kit.items(): mx.add(x, -4, 0.0, -12)
-    return mx.master()
+    return mx.master(drive_db=4.0, eq=PUNCH)
 
 def neon_music():
     out = {}
-    for name, fn, bars, bpm in (('mus_race', race1, 16, 124), ('mus_race2', race2, 16, 128), ('mus_lobby', lobby, 8, 96)):
+    for name, fn, bars, bpm in (('mus_race', race1, 16, 124), ('mus_race2', race2, 16, 128), ('mus_lobby', lobby, 8, 100)):
         out[name] = loop(fn, bars, bpm)
     x, _ = loop(results, 2, 120, tail=0.01)
     out['mus_results'] = (x, 4 * 60 / 120 * 2)

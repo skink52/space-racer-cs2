@@ -10,8 +10,8 @@ Build `maps/mg_neon_racer.vmap` in Hammer first. Then load the map with `bot_quo
 - The car picker (R) and the loading screen show the new cars.
 
 ## N2. Flight sections (Void Hop, about 40 % of the lap; Skyline Dive, about 66 % of the lap)
-- When the road ends, the bottom line says `FLIGHT: W UP  S DOWN  HIT THE RINGS`.
-- W climbs and S dives. With no key pressed you sink slowly. A / D steer.
+- When the road ends, the bottom line says `FLIGHT: W DOWN  S UP  HIT THE RINGS`.
+- S climbs and W dives (like a plane). With no key pressed you sink slowly. A / D steer.
 - Flying into the edge of the gate rings bounces you back and hurts like a rail. You can't fall out.
 - Gold rings give a boost and blue rings charge you.
 - At the end of a flight the corridor narrows and you land on the road with no big drop.

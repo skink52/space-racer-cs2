@@ -159,7 +159,7 @@ function botFly(arena, car, b, c) {
   b.noise = b.noise * 0.7 + (rnd() - 0.5) * (1 - b.skill) * 0.2;
   c.steer = clamp(diff * 2.4 + b.noise, -1, 1);
   const dz = car.z - T.zAtS(car.s);
-  c.throttle = clamp((tz - dz) / 90, -1, 1);
+  c.throttle = -clamp((tz - dz) / 90, -1, 1);      // flight is inverted: S climbs, W dives
   c.drift = false;
   c.boost = car.charge > 40 + (1 - b.aggression) * 30 && Math.abs(diff) < 0.3;
 }

@@ -7,6 +7,20 @@
   - The cars are Space Racer's voxel cars again, with near-black hulls and glowing team-colour trim and edge lines.
   - Every track texture and sky is drawn in chunky dithered pixels in a neon palette.
   - Flight gates are glowing pixel rings again.
+- **Flight controls inverted**: like a plane, S pulls up and W noses down. The flight message, help panel, loading
+  screen and Void Hop's billboard all say so.
+- **Music with more punch**:
+  - A heavier kick with an extra sub layer and click, and claps layered on snares.
+  - Driven saw basses pumping hard under the kick, wide supersaw leads, and saw arpeggios in place of square ones.
+  - A harder master: compression, drive and loudness normalised to about -11 LUFS.
+- **Scenery out of the track**: buildings and spikes stay below the lowest part of the track near them. That counts
+  every deck where the track passes over itself, and the flight corridors with their full radius. Tilted crystal
+  spikes keep their tips clear. Before this, Skyline Dive's buildings stood in the flight corridor, and Overclock
+  and Switchback Spire had some too (both games).
+- **Turn signs are one-sided**: the face looks back at the cars coming, and from behind nothing is drawn. The back
+  had shown a mirror image (both games).
+- **Harder hits**: the Seeker Bolt does 6 -> 10 damage, the Shockwave 2 -> 6 and Nova fire 2 -> 4 every half second.
+  The spin knockback is 480 -> 640 (shared game code: Space Racer gets it on its next build).
 - **Faster vis compile**: Neon Racer's vis made 3.7 million clusters. The Low hints along every road are gone; nothing
   in a track box occludes, so they bought nothing. The whole map is now one Lowest hint, with Low only in the lobby
   rooms (both games; Space Racer on its next build).

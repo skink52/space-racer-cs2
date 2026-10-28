@@ -254,7 +254,7 @@ def feat_track(big, edge):
              ('pulse', 'THE PULSE', 'CATCH-UP CHARGE', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
     if NEON:      # flight sections: W / S fly up and down there; the rings work like the pads
         items = [('boost', 'GOLD PADS/RINGS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS/RINGS', 'CHARGE + SHIELD', MINT),
-                 ('fly', 'FLIGHT: W UP S DOWN', 'FLY THE GATES', ICE), ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM),
+                 ('fly', 'FLIGHT: W DOWN S UP', 'FLY THE GATES', ICE), ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM),
                  ('slick', 'PURPLE WAVES', 'LOW GRIP', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
     colw = (X1 - X0) // 2
     for i, (kind, title, desc, col) in enumerate(items):

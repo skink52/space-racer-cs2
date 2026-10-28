@@ -161,7 +161,7 @@ class Car {
     const ground = p.z + lift;
     const road = track.road[p.i];
     if (track.fly[p.i] && (this.state === 'racing' || finished)) {
-      this.flyStep(track, p, finished ? clamp((p.z - this.z) / 120, -1, 1) : clamp(c.throttle, -1, 1), dt, tic, finished);
+      this.flyStep(track, p, finished ? clamp((p.z - this.z) / 120, -1, 1) : clamp(-c.throttle, -1, 1), dt, tic, finished);   // like a plane: W noses down, S pulls up
     } else if (this.air) {
       if (this.fly) this.fly = false;   // out of the corridor: falls onto the landing road
       this.airTime += dt;

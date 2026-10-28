@@ -2,7 +2,7 @@
 
 Extra fields (Neon Racer):
 flights: (from, to, radius) fractions of the lap flown instead of driven: no road, a round corridor of gates around the
-centreline (its z is the corridor's middle); W climbs, S dives; the corridor narrows onto the road at the end.
+centreline (its z is the corridor's middle); S climbs, W dives (like a plane); the corridor narrows onto the road at the end.
 rings: (frac, lat, dz, radius, kind) inside a flight: kind 'ring' boosts like a pad, 'cring' charges; lat -1..1 across
 the corridor (-1 left), dz up from its middle.
 """
@@ -82,7 +82,7 @@ TRACKS.append(dict(id='voidhop', title='VOID HOP', laps=3, theme='violet', bank=
     gaps=[(0.71, 0.83)], tunnels=[],
     flights=[(0.405, 0.555, 330)],
     rings=[(0.43, 0.0, 120, 120, 'ring'), (0.47, -0.45, 210, 110, 'ring'), (0.47, 0.5, -60, 110, 'cring'), (0.51, 0.2, 60, 120, 'ring')],
-    slogans=['VOID HOP', 'W CLIMB S DIVE', 'FLY THE RINGS']))
+    slogans=['VOID HOP', 'S CLIMB W DIVE', 'FLY THE RINGS']))
 
 # 4. Data Stream: a three-lobed loop that rolls up and down all the way round, with a tube through one valley.
 ds = []
