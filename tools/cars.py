@@ -466,6 +466,28 @@ def write_effects():
         tc = (0, 0, Hs + 16, 0.5, 0.5)
         tris.append(('spr_fx', (d, c, tc), (0, 0, 1)))
     out['aegis'] = s2.write_model(OUT, MDIR, 'aegis', tris, {'spr_fx': mat})
+    # SEEKER BOLT: a glowing dart pointing along +x with a flickering exhaust tail, on two crossed planes (horizontal and
+    # vertical, both faces drawn), two frames that the script alternates
+    for f in range(2):
+        W_, Hh = 32, 8
+        yy, xx = np.mgrid[0:Hh, 0:W_]
+        cy = np.abs(yy + 0.5 - Hh / 2)
+        head = xx >= 22
+        body = (xx >= 10) & (xx < 22) & (cy < 2.2)
+        tip = head & (cy < (W_ - xx) * 0.45)
+        tail_len = 10 if f == 0 else 7
+        tail = (xx < 10) & (xx >= 10 - tail_len) & (cy < 1.2 + (10 - xx) * (0.18 if f == 0 else 0.28))
+        m = body | tip | tail
+        img = np.zeros((Hh, W_, 3), np.uint8); img[:] = SKYBLUE
+        img[body | tip] = ICE; img[(body | tip) & (cy < 1.1)] = WHITE
+        img[tail] = (GOLD, ORANGE)[f]; img[tail & (cy < 0.8)] = CREAM
+        mat = s2.write_material(OUT, '%s/bolt%d' % (PAL_DIR, f), up(img, 4), up((m * 255).astype(np.uint8), 4), blend=2, backfaces=True, comment='seeker bolt %d' % f)
+        L0, L1, H2 = -60, 36, 12
+        hq = [(L0, -H2, 0, 0, 1), (L1, -H2, 0, 1, 1), (L1, H2, 0, 1, 0), (L0, H2, 0, 0, 0)]
+        vq = [(L0, 0, -H2, 0, 1), (L1, 0, -H2, 1, 1), (L1, 0, H2, 1, 0), (L0, 0, H2, 0, 0)]
+        tris = [('spr_fx', (hq[0], hq[1], hq[2]), (0, 0, 1)), ('spr_fx', (hq[0], hq[2], hq[3]), (0, 0, 1)),
+                ('spr_fx', (vq[0], vq[1], vq[2]), (0, 1, 0)), ('spr_fx', (vq[0], vq[2], vq[3]), (0, 1, 0))]
+        out['bolt%d' % f] = s2.write_model(OUT, MDIR, 'bolt%d' % f, tris, {'spr_fx': mat})
     # null model (nothing visible) for idle props and sound anchors
     tiny = [('spr_fx', ((0, 0, 0, 0, 0), (0.01, 0, 0, 0, 0), (0, 0.01, 0, 0, 0)), (0, 0, 1))]
     out['null'] = s2.write_model(OUT, 'models/spr', 'null', tiny, {'spr_fx': fence})

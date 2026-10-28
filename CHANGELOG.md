@@ -1,5 +1,13 @@
 # Space Racer changelog
 
+## v0.5.0 (28 Oct 2026)
+
+### Changed
+- **Hornet: Seeker Bolt replaces Phase Dash.** E fires a bolt forward down the road. It locks on to the first car
+  ahead and curves into it. The car hit is shoved sideways, skids, loses a quarter of its speed and 6 shield
+  (credited to you). An Aegis shell stops it. Costs 20 charge, 6 s cooldown, range 2,500 units. Like the Shockwave,
+  it unlocks 6 seconds after GO.
+
 ## v0.4.1 (18 Oct 2026)
 
 ### Changed

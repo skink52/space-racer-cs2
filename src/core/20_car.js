@@ -15,7 +15,7 @@ class Car {
     this.draft = null; this.spinTimer = 0; this.spinCd = 0; this.spinYaw = 0; this.hitCd = 0; this.ghost = 0;
     this.stagger = 0; this.knockCd = 0; this.lock = 0;   // lock: seconds left before spin / E work (the start)   // skidding after a spin hit; no second shove from the same spin
     // the E ability: cooldown; what fired this step (the arena does the part that touches other cars); timers
-    this.abilCd = 0; this.fired = null; this.dashTime = 0; this.novaTimer = 0; this.novaLeft = 0; this.fireT = 0; this.aegis = 0; this.scorch = 0; this.burnCd = 0;
+    this.abilCd = 0; this.fired = null; this.novaTimer = 0; this.novaLeft = 0; this.fireT = 0; this.aegis = 0; this.scorch = 0; this.burnCd = 0;
     this.driftDir = 0; this.driftStreak = 0;   // drift charge needs a held slide one way
     this.seg = 0; this.t = 0; this.d = 0; this.s = 0; this.prevS = 0; this.rawLap = 0; this.lapsDone = 0; this.nextCp = 1; this.total = 0;
     this.lapStart = 0; this.bestLap = 0; this.lastLap = 0;
@@ -57,7 +57,6 @@ class Car {
     if (this.ghost > 0) this.ghost -= dt;
     if (this.noDamage > 0) this.noDamage -= dt;
     if (this.abilCd > 0) this.abilCd -= dt;
-    if (this.dashTime > 0) this.dashTime -= dt;
     if (this.aegis > 0) this.aegis -= dt;
     if (this.scorch > 0) this.scorch -= dt;
     this.stateTime += dt;
@@ -73,9 +72,9 @@ class Car {
     const wantBoost = !finished && !air && c.boost && this.charge > 0;
     this.drifting = !finished && !air && c.drift && this.speed > 250;
     // spin attack
-    // the start: no spins, and no Shockwave (the only E that hits others); the rest can't hurt anyone while nothing
-    // takes damage, so a Phase Dash, Nova Burn or Aegis off the line is fine
-    if (this.lock > 0) { this.lock -= dt; c.spin = false; if (sp.ability === 'quake') c.ability = false; }
+    // the start: no spins, no Shockwave and no Seeker Bolt (the E abilities that hit others); Nova Burn and Aegis off
+    // the line are fine
+    if (this.lock > 0) { this.lock -= dt; c.spin = false; if (sp.ability === 'quake' || sp.ability === 'bolt') c.ability = false; }
     if (!finished && c.spin && this.spinCd <= 0 && this.charge >= sp.spinCost && this.spinTimer <= 0) {
       this.charge -= sp.spinCost; this.spinTimer = RULES.spinTime; this.spinCd = RULES.spinCooldown; this.fx |= 32;
     }
@@ -134,7 +133,6 @@ class Car {
     if (this.slick) grip *= RULES.slickGrip;
     if (this.spinTimer > 0) grip *= 0.5;
     if (this.stagger > 0) grip *= RULES.staggerGrip;
-    if (this.dashTime > 0) grip *= 0.1;                                 // the dash carries the car sideways
     if (this.scorch > 0) grip *= 0.6;                                   // driving through Nova fire
     if (!air) grip *= 1 + Math.abs(this.bank) * RULES.bankGrip;        // ... and hold the car better
     const g = air ? 1 : Math.exp(-grip * dt);
@@ -197,7 +195,7 @@ class Car {
           this.vx -= (1 + RULES.railRestitution) * vn * nx; this.vy -= (1 + RULES.railRestitution) * vn * ny;
           const hard = Math.max(0, vn - 140);
           if (hard > 0 && !finished) {
-            if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * 0.04) * (this.dashTime > 0 ? RULES.dashRail : 1), null, tic);
+            if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * 0.04), null, tic);
             const k = 1 - Math.min(0.45, vn / 1400);
             this.vx *= k; this.vy *= k;
             this.fx |= 2;
@@ -320,17 +318,8 @@ class Car {
     const sp = this.spec;
     this.abilCd = sp.abilityCd; this.fired = sp.ability; this.fx |= 2048;
     const fx = Math.cos(this.yaw), fy = Math.sin(this.yaw), lx = -fy, ly = fx;
-    if (sp.ability === 'dash') {
-      this.charge -= sp.abilityCost;
-      // the side: the one steered towards (or the bot's choice), else back towards the middle of the road
-      let side = c.abilityDir || (c.steer > 0.2 ? 1 : c.steer < -0.2 ? -1 : 0);
-      if (!side) {
-        const inX = -track.nx[this.seg] * Math.sign(this.d || 1), inY = -track.ny[this.seg] * Math.sign(this.d || 1);
-        side = inX * lx + inY * ly >= 0 ? 1 : -1;
-      }
-      const vf = this.vx * fx + this.vy * fy;
-      this.vx = fx * (vf + 60) + lx * side * RULES.dashSpeed; this.vy = fy * (vf + 60) + ly * side * RULES.dashSpeed;
-      this.dashTime = RULES.dashTime; this.ghost = Math.max(this.ghost, RULES.dashGhost); this.knockCd = RULES.dashGhost;
+    if (sp.ability === 'bolt') {
+      this.charge -= sp.abilityCost;                // the arena launches the bolt
     } else if (sp.ability === 'nova') {
       const all = this.charge;
       this.charge = 0;

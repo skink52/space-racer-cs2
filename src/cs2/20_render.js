@@ -93,6 +93,7 @@ class ArenaView {
     this.fx = [];                // { prop, kind, until, frames, start, x, y, z, yaw }
     this.pulseProp = null;
     this.shells = new Map();     // car slot -> prop: the Aegis shell round a Bastion
+    this.boltProps = new Map();  // bolt id -> prop: Seeker Bolts in flight
     this.anchors = null;
     this.fxDone = false;         // the per-car sound / shake bits of the last race step have been handled (results)
   }
@@ -120,6 +121,7 @@ class ArenaView {
     }
     for (const [slot, sh] of this.shells) if (!a.cars.get(slot) || !a.cars.get(slot).visible) { releaseProp(sh); this.shells.delete(slot); }
     this.drawPulse();
+    this.drawBolts();
     // effects
     for (let k = this.fx.length - 1; k >= 0; k--) {
       const e = this.fx[k];
@@ -211,6 +213,28 @@ class ArenaView {
     } else if (this.pulseProp) { releaseProp(this.pulseProp); this.pulseProp = null; }
   }
 
+  // Seeker Bolts: a prop per bolt, moved every tick, two frames flickering
+  drawBolts() {
+    const a = this.arena, seen = new Set();
+    for (const b of a.bolts) {
+      seen.add(b.id);
+      let p = this.boltProps.get(b.id);
+      if (!p) {
+        if (this.boltProps.size >= 8) continue;
+        p = takeProp(); if (!p) continue;
+        p.hidden = false; p.lastPos = null; p.model = ''; p.alpha = -1;
+        propAlpha(p, 255);
+        this.boltProps.set(b.id, p);
+      }
+      if ((tickNo & 15) === 0 && !live(p.ent)) { this.boltProps.delete(b.id); continue; }
+      propModel(p, (tickNo >> 2) & 1 ? CAR_MODELS.fx.bolt1 : CAR_MODELS.fx.bolt0);
+      const pos = this.world(b.x, b.y, b.z), ang = { pitch: 0, yaw: deg(b.yaw), roll: 0 };
+      if (!p.lastPos) p.ent.Teleport({ position: pos, angles: ang }); else p.ent.Move({ position: pos, angles: ang });
+      p.lastPos = pos;
+    }
+    for (const [id, p] of this.boltProps) if (!seen.has(id)) { releaseProp(p); this.boltProps.delete(id); }
+  }
+
   // an effect at a track position: frames = list of models, shown over `seconds`
   effect(x, y, z, yaw, frames, seconds, now) {
     if (this.fx.length >= CONFIG.MAX_EFFECT_PROPS) return;
@@ -237,6 +261,8 @@ class ArenaView {
     this.props.clear();
     for (const p of this.shells.values()) releaseProp(p);
     this.shells.clear();
+    for (const p of this.boltProps.values()) releaseProp(p);
+    this.boltProps.clear();
     for (const e of this.fx) releaseProp(e.prop);
     this.fx = [];
     if (this.pulseProp) { releaseProp(this.pulseProp); this.pulseProp = null; }

@@ -14,7 +14,7 @@ const TEAM_NAMES = ['T', 'CT'];
 const CARS = {
   hornet:  { key: 'hornet',  name: 'HORNET',  maxSpeed: 1064,  accel: 640, brake: 1000, turn: 2.7,  grip: 12, driftGrip: 3.2, mass: 1.0, shield: 108, charge: 100, boost: 1.32, padMult: 1.0, driftCharge: 2.5, spinCost: 18, ram: 1.0, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
              perk: 'DRIFT CHARGE', desc: 'LIGHT AND SHARP. DRIFTING FILLS CHARGE FAST. CHEAP SPIN ATTACK.',
-             ability: 'dash', abilityName: 'PHASE DASH', abilityCd: 5, abilityCost: 15 },
+             ability: 'bolt', abilityName: 'SEEKER BOLT', abilityCd: 6, abilityCost: 20 },
   meteor:  { key: 'meteor',  name: 'METEOR',  maxSpeed: 1090, accel: 535, brake: 900,  turn: 2.35, grip: 10, driftGrip: 3.0, mass: 1.6, shield: 110, charge: 100, boost: 1.28, padMult: 1.0, driftCharge: 1.0, spinCost: 30, ram: 1.8, chargeMult: 1.0, draftMult: 1.0, draftRegen: 0,
              perk: 'RAM', desc: 'HEAVY AND FAST IN A STRAIGHT LINE. BUMPS HURT THEM, NOT YOU.',
              ability: 'quake', abilityName: 'SHOCKWAVE', abilityCd: 12, abilityCost: 40 },
@@ -78,8 +78,9 @@ const RULES = {
   // big air: a clean landing after this long in the air pays some charge
   bigAirTime: 0.7, bigAirCharge: 15,
   // ---- the cars' E abilities (CARS[*].ability; cooldown and charge cost per car)
-  // PHASE DASH (Hornet): a sideways dash (steer to pick the side), passing through cars for a moment
-  dashSpeed: 900, dashTime: 0.3, dashGhost: 0.4, dashRail: 0.4,
+  // SEEKER BOLT (Hornet): a bolt fired forward along the road, curving towards the first car ahead; the car it hits is
+  // shoved, skids and loses shield (an Aegis shell stops it)
+  boltSpeed: 900, boltRange: 2500, boltTurn: 280, boltRadius: 34, boltDamage: 6, boltKnock: 260, boltStagger: 0.6, boltSlow: 0.25, boltLift: 30,
   // SHOCKWAVE (Meteor): every car close by is shoved sideways (harder the closer), skids and loses shield
   quakeRadius: 320, quakeKnock: 300, quakeDamage: 2, quakeStagger: 0.3,
   // NOVA BURN (Comet): all the charge at once - a kick and a long overdrive - and a trail of fire behind

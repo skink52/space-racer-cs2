@@ -17,7 +17,7 @@
 [h2]Four cars[/h2]
 [table]
 [tr][th]Car[/th][th]Style[/th][th]Ability (E)[/th][/tr]
-[tr][td][b]Hornet[/b][/td][td]Light and sharp. Drifting fills charge fast.[/td][td][b]Phase Dash:[/b] dash sideways through traffic.[/td][/tr]
+[tr][td][b]Hornet[/b][/td][td]Light and sharp. Drifting fills charge fast.[/td][td][b]Seeker Bolt:[/b] fire a homing bolt at the car ahead.[/td][/tr]
 [tr][td][b]Meteor[/b][/td][td]Heavy ram. Bumps hurt them, not you.[/td][td][b]Shockwave:[/b] shove everyone nearby across the road.[/td][/tr]
 [tr][td][b]Comet[/b][/td][td]Biggest tank, strongest boost.[/td][td][b]Nova Burn:[/b] all your charge in one overdrive, with a trail of fire.[/td][/tr]
 [tr][td][b]Bastion[/b][/td][td]Toughest shield. Drafting repairs it.[/td][td][b]Aegis:[/b] a shell nothing can hurt, and a shield boost for teammates.[/td][/tr]

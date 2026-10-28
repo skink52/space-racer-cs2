@@ -28,6 +28,7 @@ class Arena {
     this.result = null;
     this.finishedAt = 0;
     this.lastBeep = -1;
+    this.bolts = []; this.boltIds = 0;                // Seeker Bolts in flight: { owner, s, d, z, x, y, yaw, speed, left, target }
     this.fires = [];                // Nova Burn fire on the road: { x, y, z, until, owner }
     this.pairs = null;              // flat copies of positions for the pair loops in step()
     this.lanes = null;              // the bots' lane picture for this tic (laneCars)
@@ -86,6 +87,8 @@ class Arena {
               o.damage(RULES.quakeDamage * k, c, this.raceTic); o.fx |= 1; hits++;
             }
           }
+        } else if (kind === 'bolt') {
+          this.launchBolt(c);
         } else if (kind === 'aegis') {
           // AEGIS: teammates close by get a share of the shell as shield
           for (const o of cars) {
@@ -107,6 +110,7 @@ class Arena {
         }
       }
     }
+    if (this.bolts.length) this.moveBolts(cars, dt);
     if (!this.fires.length) return;
     // fire burns anyone else driving through it: a little shield, less grip, credited to the Comet
     const R2 = RULES.fireRadius * RULES.fireRadius;
@@ -120,6 +124,63 @@ class Arena {
         o.scorch = 0.25;
         if (o.burnCd <= this.time && o.noDamage <= 0) { o.damage(RULES.fireDamage, f.owner, this.raceTic); o.burnCd = this.time + RULES.fireEvery; o.fx |= 1; }
         break;
+      }
+    }
+  }
+
+  // SEEKER BOLT: launched from the Hornet's nose along the road; it locks on to the first car ahead (by road distance)
+  launchBolt(c) {
+    const T = this.track, L = T.len;
+    let target = null, best = RULES.boltRange;
+    for (const o of this.order) {
+      if (o === c || !o.solid || Math.abs(o.z - c.z) > 150) continue;
+      const ahead = (((o.s - c.s) % L) + L) % L;
+      if (ahead > 20 && ahead < best) { best = ahead; target = o; }
+    }
+    const b = { owner: c, s: c.s + CAR_LEN * 0.6, d: c.d, z: c.z, x: c.x, y: c.y, yaw: c.yaw, speed: Math.max(0, c.speed) + RULES.boltSpeed, left: RULES.boltRange, target, id: ++this.boltIds };
+    this.placeBolt(b);
+    this.bolts.push(b);
+    this.events.push({ type: 'bolt', bolt: b });
+  }
+  placeBolt(b) {
+    const T = this.track, p = T.point(b.s);
+    b.d = clamp(b.d, -p.hw, p.hw);
+    b.x = p.x + p.nx * b.d; b.y = p.y + p.ny * b.d;
+    b.z = p.z - b.d * T.bankAt(p.i, 0) + RULES.boltLift;
+    b.yaw = Math.atan2(p.ty, p.tx);
+  }
+  moveBolts(cars, dt) {
+    const L = this.track.len, R = RULES.boltRadius + CAR_R;
+    for (let k = this.bolts.length - 1; k >= 0; k--) {
+      const b = this.bolts[k], c = b.owner;
+      const step = b.speed * dt;
+      b.s += step; b.left -= step;
+      const t = b.target;
+      if (t && t.solid) {
+        const ahead = (((t.s - b.s) % L) + L) % L;
+        if (ahead < L / 2) b.d += clamp(t.d - b.d, -RULES.boltTurn * dt, RULES.boltTurn * dt);
+      }
+      this.placeBolt(b);
+      let hit = null;
+      for (const o of cars) {
+        if (o === c || !o.solid || o.noDamage > 0) continue;
+        const dx = o.x - b.x, dy = o.y - b.y, dz = o.z + RULES.boltLift - b.z;
+        if (dx * dx + dy * dy + dz * dz < R * R) { hit = o; break; }
+      }
+      if (hit) {
+        const blocked = hit.aegis > 0;
+        if (!blocked) {
+          const dx = hit.x - b.x, dy = hit.y - b.y, dist = Math.hypot(dx, dy) || 1;
+          hit.knockCd = 0;
+          shove(c, hit, dx / dist, dy / dist, RULES.boltKnock, RULES.boltStagger);
+          hit.vx *= 1 - RULES.boltSlow; hit.vy *= 1 - RULES.boltSlow;
+          hit.damage(RULES.boltDamage, c, this.raceTic); hit.fx |= 1; hit.hitCd = 0.25;
+        }
+        this.events.push({ type: 'boltHit', bolt: b, car: hit, blocked });
+        this.bolts.splice(k, 1);
+      } else if (b.left <= 0 || c.state === 'withdrawn') {
+        this.events.push({ type: 'boltEnd', bolt: b });
+        this.bolts.splice(k, 1);
       }
     }
   }

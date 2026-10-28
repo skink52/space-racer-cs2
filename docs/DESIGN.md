@@ -79,13 +79,13 @@ pulsing when ready, red when there isn't enough charge). Bots use them too.
 
 | | Ability | Cost / cooldown | What it does |
 |---|---|---|---|
-| HORNET | **Phase Dash** | 15 / 5 s | A sideways dash (steer to pick the side, else back towards the middle of the road) at 900 u/s; for 0.4 s the car is a ghost - other cars and spin attacks pass through it. Dodge a spin, slip past a blocker - or dash off a rail-less edge. Rail hits during the dash do 40% damage. |
+| HORNET | **Seeker Bolt** | 20 / 6 s | Fires a bolt forward along the road at the Hornet's speed + 900 u/s, out to 2,500 units. It locks on to the first car ahead (by road distance, either team) and curves towards its line at 280 u/s. The car it hits is shoved sideways, skids for 0.6 s, loses 25% of its speed and 6 shield (credited to the Hornet). An Aegis shell stops it. Locked for the first seconds of a race like the Shockwave. (Replaced Phase Dash, a sideways dodge, on 28 Oct 2026.) |
 | METEOR | **Shockwave** | 40 / 12 s | Slams the road: every car within 320 units is shoved sideways away from the Meteor (300 x its mass / theirs, more the closer), skids for 0.3 s and loses a little shield; the Meteor loses 8% of its speed. A ring of light shows the blast; everyone caught gets a hard camera shake. |
 | COMET | **Nova Burn** | at least 40 / 12 s | Spends all its charge at once: a 220 u/s kick, then an overdrive (1.5x top speed, double acceleration) for 0.7 s + 0.012 s per point of charge, and a trail of blue fire for the first 0.8 s. Anyone else driving through the fire loses grip and 2 shield every half second (credited to the Comet). |
 | BASTION | **Aegis** | 30 / 12 s | A 2.5-second hexagon shell: no damage and no shoves, and cars bounce off it as if it weighed four times as much. Teammates within 500 units get +20 shield. |
 
 Balance with the abilities in: see the table under the cars (18 Oct). Bots use their abilities too
-(about 2.5 Phase Dashes, 2.9 Shockwaves, 1.4 Nova Burns and 1.9 Aegis shells per race).
+(about 2.9 Seeker Bolts with 2.5 hits, 2.6 Shockwaves, 1.4 Nova Burns and 1.9 Aegis shells per race; bots fire a bolt only at a foe roughly in line).
 
 ## Track mechanics
 
@@ -146,8 +146,8 @@ Balance with the abilities in: see the table under the cars (18 Oct). Bots use t
 - **Shield repair**: once nothing has hit you for 4 seconds the shield repairs slowly (2.2/s), so a race is lost
   to sustained aggression, not to attrition. Bumps below a closing speed of 250 are free.
 - **Clean start**: for the first 6 seconds after the lights nothing can be damaged, nobody can spin and the Meteor
-  can't Shockwave (its ability bar counts down "ATTACKS IN 6"; then everyone gets "ATTACKS ON"), so the start is a
-  drag race, not a brawl in a 32-car pack. Phase Dash, Nova Burn and Aegis work from GO (they can't hurt anyone
+  can't Shockwave or the Hornet Seeker Bolt (their ability bar counts down "ATTACKS IN 6"; then everyone gets "ATTACKS ON"), so the start is a
+  drag race, not a brawl in a 32-car pack. Nova Burn and Aegis work from GO (they can't hurt anyone
   while nothing takes damage, and locking them too cost the Comet its launch: wins 3.8 -> 3.0 per 100). Meteor bots
   then Shockwave over the next few seconds, not all at once. A car hit by a spin can't
   be spun again for 1.5 s, so a pack can't chain-spin someone to a wreck. Measured (scratchpad start.cjs, 24 races):

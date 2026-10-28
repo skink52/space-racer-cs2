@@ -85,7 +85,7 @@ radar and map icon are in `panorama/images/` and compile with the HUD. The radar
 |---|---|
 | W / S | accelerate / brake and reverse |
 | A / D | steer; move through the cars while the car picker is up |
-| E | the car's ability (Hornet Phase Dash, Meteor Shockwave, Comet Nova Burn, Bastion Aegis); confirms your car on the picker |
+| E | the car's ability (Hornet Seeker Bolt, Meteor Shockwave, Comet Nova Burn, Bastion Aegis); confirms your car on the picker |
 | R | brings the car picker back (when not driving) |
 | Mouse 1 | boost (uses charge) |
 | Mouse 2 | spin attack |

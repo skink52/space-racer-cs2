@@ -37,6 +37,7 @@ for (let r = 0; r < ROUNDS; r++) {
       if (e.type === 'wreck') { wrecks[a.index] = (wrecks[a.index] || 0) + 1; if (e.attacker) { kos[a.index] = (kos[a.index] || 0) + 1; classStats[e.attacker.cls].kos++; } }
       if (e.type === 'spinHit' && e.attacker) classStats[e.attacker.cls].spinHits++;
       if (e.type === 'ability') { classStats[e.car.cls].abil++; classStats[e.car.cls].abilHits += e.hits || 0; }
+      if (e.type === 'boltHit' && !e.blocked) classStats[e.bolt.owner.cls].abilHits++;
       if (e.type === 'launch') launches++;
       if (e.type === 'stall') stalls++;
       if (e.type === 'lap') { (laps[a.index] ||= []).push(e.last); }

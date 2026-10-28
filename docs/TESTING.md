@@ -176,7 +176,7 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 
 ## C7. Abilities, flames, jumps (17 Oct, night)
 
-- **E abilities** (DESIGN.md "E abilities"): Hornet Phase Dash (steer + E: a sideways dash, see-through for a moment),
+- **E abilities** (DESIGN.md "E abilities"): Hornet Seeker Bolt (E: a bolt shoots ahead down the road and curves into the first car ahead, which is shoved and skids; see C12),
   Meteor Shockwave (a ring on the road, nearby cars shoved sideways, a hard shake for them), Comet Nova Burn (all
   charge into a long overdrive and a trail of blue fire), Bastion Aegis (a spinning hexagon shell; teammates near get
   +20 shield). The HUD's third bar (under charge) is the cooldown: gold and pulsing when ready, red when short of
@@ -204,9 +204,9 @@ Rebuild fully after copying the files (`disconnect`, then load the map again) so
 
 ## C8. Clean start (18 Oct)
 
-- For the first 6 seconds after GO: no damage, no spin attacks and no Shockwave. In a Meteor the ability bar reads
+- For the first 6 seconds after GO: no damage, no spin attacks and no Shockwave. In a Meteor or a Hornet the ability bar reads
   "ATTACKS IN 6 ... 1" and fills; then everyone's bottom line says "ATTACKS ON: SPINS ARE LIVE". Mashing Mouse 2
-  off the line does nothing except show "ATTACKS UNLOCK IN n". Phase Dash, Nova Burn and Aegis still work from GO
+  off the line does nothing except show "ATTACKS UNLOCK IN n". Nova Burn and Aegis still work from GO
   (they can't hurt anyone yet).
 - A car that's just been spun can't be spun again for 1.5 seconds (so two or three cars can't spin-lock someone).
 - Meteor bots don't all Shockwave the moment the lock ends; the calmer ones wait up to 3 seconds more.
@@ -283,4 +283,15 @@ Needs the models and materials compiled (new skins on every car): a Hammer build
   the dots were cut away by their own panel (8 px tall) as soon as they moved down - now each dot runs in a column
   as tall as the map. If they still don't move, tell me what you see (dots stuck in the top-left corner, or none).
 - The car picker no longer reopens by itself at the results when someone was tapping A / D as the race ended.
+
+## C12. Hornet Seeker Bolt (28 Oct, v0.5.0)
+
+Needs the new bolt models compiled (`models/spr/cars/bolt0/1`): a Hammer build, or `run_build.bat` with
+`assets mg_space_racer` in build_queue.txt.
+- In a Hornet the ability reads `E SEEKER BOLT`; for the first 6 s after GO it counts `ATTACKS IN n` like the Meteor.
+- E with a car ahead: a blue dart with a gold tail shoots down the road, curves onto the car ahead and bursts on it.
+  The car hit is shoved sideways and skids (`HIT BY <name>'S SEEKER BOLT`, hard shake); you get `BOLT HIT <name>`.
+- E into an Aegis shell: `BOLT BLOCKED BY AEGIS`, no damage or shove.
+- E with nobody ahead: the bolt flies about 2,500 units down the road and vanishes.
+- Bots in Hornets fire it now and then at a foe roughly in line ahead (about 3 a race).
 

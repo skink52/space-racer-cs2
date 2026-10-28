@@ -70,7 +70,7 @@ FEAT_Y0, FEAT_Y1 = 604, 948              # the panel that changes
 # the slides: what the second panel shows, and whose sky is behind it (slide 0 is <map>.png, then <map>_1.png ...)
 SLIDES = [('cars', 'oval'), ('tracks', 'crosswire'), ('win', 'spire'), ('track', 'skyway')]
 
-CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: PHASE DASH']),
+CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: SEEKER BOLT']),
         ('meteor', 'METEOR', 'RAM', ['BUMPS HURT THEM', 'E: SHOCKWAVE']),
         ('comet', 'COMET', 'AFTERBURN', ['BIGGEST BOOST', 'E: NOVA BURN']),
         ('bastion', 'BASTION', 'SLIPSTREAM', ['TOUGHEST SHIELD', 'E: AEGIS'])]

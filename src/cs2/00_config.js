@@ -115,4 +115,4 @@ const CONFIG = {
   DEBUG: false,
 };
 
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';

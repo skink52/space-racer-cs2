@@ -134,7 +134,7 @@ function botThink(arena, car) {
   if (!ramp && b.abilThink <= 0 && car.abilCd <= 0 && car.charge >= car.spec.abilityCost) { b.abilThink = 0.25; botAbility(arena, car, b, c, straight); }
 }
 
-// when a bot uses its car's E ability: dodge a spin or slip past a blocker (Phase Dash), a Shockwave into a crowd,
+// when a bot uses its car's E ability: a Seeker Bolt at a foe ahead in line, a Shockwave into a crowd,
 // Nova Burn down a straight, Aegis when hurt in traffic or boxed in
 function botAbility(arena, car, b, c, straight) {
   const kind = car.spec.ability;
@@ -151,9 +151,17 @@ function botAbility(arena, car, b, c, straight) {
     if (along > 40 && along < 220 && Math.abs(side) < 70 && (!ahead || along < ahead.along)) ahead = { o, along };
   }
   const roll = rnd();
-  if (kind === 'dash') {
-    if (alongside && alongside.o.spinTimer > 0 && roll < 0.6) { c.ability = true; c.abilityDir = alongside.side > 0 ? -1 : 1; }
-    else if (ahead && car.speed - ahead.o.speed > 80 && roll < 0.4 * b.aggression) c.ability = true;
+  if (kind === 'bolt') {
+    // a foe ahead on the road, roughly in line (the bolt curves the rest of the way)
+    const L = arena.track.len;
+    let tgt = null, tAhead = 1e9;
+    for (const o of arena.order) {
+      if (o === car || !o.solid || Math.abs(o.z - car.z) > 150) continue;
+      const a2 = (((o.s - car.s) % L) + L) % L;
+      if (a2 > 20 && a2 < tAhead) { tAhead = a2; tgt = o; }
+    }
+    const foe = tgt && !(tgt.team >= 0 && tgt.team === car.team);
+    if (foe && tAhead < RULES.boltRange * 0.7 && Math.abs(tgt.d - car.d) < 150 + tAhead * 0.08 && roll < 0.04 + 0.06 * b.aggression) c.ability = true;
   } else if (kind === 'quake') {
     if (near >= 2 && roll < 0.1) c.ability = true;
     else if (near === 1 && alongside && roll < 0.05 * b.aggression) c.ability = true;

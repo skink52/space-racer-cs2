@@ -266,6 +266,14 @@ function handleArenaEvents(a, now) {
         }
         break;
       }
+      case 'boltHit': {
+        // a Seeker Bolt landed: a burst, a hard shake for the car hit, a line for both drivers
+        const b = e.bolt, vp = e.car.person, ap = b.owner.person;
+        if (view) { view.effect(b.x, b.y, b.z - RULES.boltLift, b.yaw, [CAR_MODELS.fx.boom0, CAR_MODELS.fx.boom1], 0.3, now); sfxCar(view, e.blocked ? 'aegis' : 'hit', e.car, 0.2); }
+        if (!e.blocked && vp && !vp.bot) { shake(vp.slot, 0.5, 18); hudFlash(vp.slot, 'hit', 0.4); bottom(vp.slot, 'HIT BY ' + b.owner.name.slice(0, 16).toUpperCase() + "'S SEEKER BOLT", 2); }
+        if (ap && !ap.bot) bottom(ap.slot, e.blocked ? 'BOLT BLOCKED BY AEGIS' : 'BOLT HIT ' + e.car.name.slice(0, 20).toUpperCase(), 2);
+        break;
+      }
       case 'fire': {
         const f = e.fire;
         // Nova fire: two frames flickering for as long as it burns
