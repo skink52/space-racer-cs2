@@ -1,5 +1,22 @@
 # Space Racer changelog
 
+## v0.6.1: track edges and jungle music (29 Oct 2026)
+
+- **Out of bounds** (all three games): the rails only hold a car on the road or just above it (`RULES.railHeight` 30).
+  Higher in the air, past the edge, the car flies out of the map. It loses 55 shield (`outPenalty`) and comes back on
+  the centreline where it left the road, or just past it if that was a gap, ramp or flight (`safeSpot`). Before
+  this, invisible walls in mid-air caught cars that overshot a jump into a bend. Gap falls cost 35 (was 20). All falls
+  now respawn where the car left, not at the last checkpoint. The HUD says `OUT OF BOUNDS` / `FELL OFF` and the hit.
+- **Jumps land before the bend**: each ramp knows how far its landing deck runs straight (`f.maxD`). A fast car's
+  throw is capped so a straight launch comes down by then. Slow cars still fall short of gaps as before.
+- A little steering in the air (`RULES.airGrip` 2.5). Bots line up square and drift to the middle before a ramp.
+- Sea creatures hitting a car in the air give a smaller shove (`creatureAirKnock` 0.3) and stop its climb.
+- Coral Crown's kicker moved from mid-bend to the straight after it (0.13 -> 0.235).
+- Sim (32 bots, 6 races per track): fly-outs at most 0.5 a race on any track (Skyway was 59 before the fixes).
+- **Depth Racer music** is now atmospheric jungle / liquid drum & bass: 'Pressure' 172 bpm, 'Leviathan' 174 bpm,
+  'Still Water' half-time lobby. Synthesised chopped breakbeats with ghost notes and rolls and 12-bit sampler grit,
+  a phasing reese bass over a sine sub, choir / string pads, FM Rhodes chords and an airy delayed lead.
+
 ## v0.6.0: Depth Racer, and +200 km/h for all three games (29 Oct 2026)
 
 - **Depth Racer** (`mg_depth_racer`, `SPR_THEME=depth`): a third game on the same code, on the sea floor.

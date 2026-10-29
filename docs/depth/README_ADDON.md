@@ -32,18 +32,26 @@ The entity names are Space Racer's, with the script name `depth_racer`. The `poi
 - **Sea creatures**:
   - Each one crosses the track at one spot on a fixed cycle, one way and then back. Every client sees the same thing.
   - A sea creature hit shoves the car the way it is swimming, makes it skid and takes shield (whale 24, serpent 22,
-    manta 16). An Aegis shell blocks it. A car can't be hit again for 1 s.
+    manta 16). In the air it is a smaller shove and the car stops climbing. An Aegis shell blocks it. A car can't be
+    hit again for 1 s.
   - Coming up to a crossing while a creature is on it, the bottom line warns you (`SERPENT AHEAD` etc.).
   - Bots hold back and let it pass, except on the run-up to a jump.
 - **Glides**: Neon Racer's flight sections. S pulls up, W noses down, A / D steer. Gold rings boost and blue rings charge.
 - **Cars**: the voxel cars with dark hulls and glowing team trim.
-- **Music**: four original pieces: 'Pressure' (112 bpm) and 'Leviathan' (118 bpm) race loops, 'Still Water' (86 bpm)
-  in the lobby and a results sting.
+- **Music**: atmospheric jungle / liquid drum & bass: 'Pressure' (172 bpm) and 'Leviathan' (174 bpm) race loops,
+  'Still Water' (half-time 172) in the lobby, and a results sting. Chopped breaks, reese bass, choir pads, Rhodes.
 
-## 3. Speed (all three games, v0.6.0)
+## 3. Speed and track edges (all three games, v0.6.0 / v0.6.1)
 
 Top speeds are 200 km/h higher than in v0.5.0 (+556 units/s). Acceleration, brakes and turning were raised to match.
 Ramps throw cars at a flatter angle and gravity is stronger, so jumps land about where they did. Rail and bump damage
 start at higher speeds so the faster racing doesn't wreck more cars.
+
+Track edges (v0.6.1): a car in the air higher than the rails (30 units) is no longer held in by them. If it crosses the
+edge it is **out of bounds**. It sails off, loses 55 shield and comes back on the centreline where it left the road,
+or just past it if that was a gap, ramp or glide. Falling into a gap or off a rail-less edge costs 35 (20 before). A
+fast car's jump flattens so that a straight launch lands before the road bends. Leaving the lip at an angle, or being
+shoved in the air, can still put you out. Bots line up straight for jumps. Sim: at most 0.5 fly-outs a race per track
+with 32 bots.
 
 Source: github.com/skink52/space-racer-cs2. `SPR_THEME=depth sh tools/build_all.sh` builds this addon.

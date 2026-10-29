@@ -48,6 +48,18 @@ class Track {
       }
       this.curve[i] = s;
     }
+    // jumps: where the landing deck starts, and how far from the lip a car may come down before the road bends away
+    // (Car caps a fast car's throw so it lands by then: the jump flattens out rather than flying it into the bend)
+    for (const f of this.ramps) {
+      let land = f.b + 1, k = 0;
+      while (k++ < 80 && !this.road[land % this.n]) land++;
+      let end = land + 2;
+      while (end < land + 40 && this.road[end % this.n] && !this.fly[end % this.n] && this.curve[end % this.n] < 0.15) end++;
+      f.land = land % this.n;
+      const e = Math.max(land + 4, end - 2);
+      f.maxD = (e - f.b) * this.step;
+      f.endZ = this.z[e % this.n];          // the road's height there (the deck may run downhill)
+    }
   }
 
   // project a point onto segment i (from sample i to i+1); returns null when the point is not beside it

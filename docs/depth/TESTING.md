@@ -1,4 +1,4 @@
-# Depth Racer: what to test (v0.6.0, first build)
+# Depth Racer: what to test (v0.6.1)
 
 Build `maps/mg_depth_racer.vmap` in Hammer first. Then load the map with `bot_quota 8`.
 
@@ -25,5 +25,13 @@ Build `maps/mg_depth_racer.vmap` in Hammer first. Then load the map with `bot_qu
 - Jumps still land on the road on every track, with no falls at full speed.
 - Corners can be taken at full speed with a little braking or a drift. Say if it is too twitchy.
 
-## D5. Music
+## D5. Track edges (all three games)
+- Steer off a jump at an angle: once you're higher than the rails and past the edge you fly out, see `OUT OF BOUNDS`
+  and `-55 SHIELD`, and come back on the middle of the road near where you left it (past the gap if it was a gap).
+- A straight launch at full boost lands before the next bend on every jump (Skyway, Switchback Spire, Pulse City,
+  Kelp Canyon, The Wreck, Vent Field, Coral Crown's kicker, now on the straight after the first bend).
+- Falling into a gap says `FELL OFF` / `-35 SHIELD`. Nothing hits an invisible wall in mid-air any more.
+
+## D6. Music
+- Atmospheric jungle: chopped breaks, a deep reese bass, pads and Rhodes. Say if it is energetic enough.
 - The lobby, both race loops and the results sting play, and the loops have no click where they repeat.

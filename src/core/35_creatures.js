@@ -74,8 +74,12 @@ function creatureHits(arena, cars) {
       c.creatureCd = 1.0;
       if (c.aegis > 0) { arena.events.push({ type: 'creatureHit', car: c, cr, blocked: true }); continue; }
       const nx = p.nx * cr.dir, ny = p.ny * cr.dir;
-      c.vx = c.vx * 0.75 + nx * K.knock; c.vy = c.vy * 0.75 + ny * K.knock;
-      if (c.air || c.fly) c.vz = Math.max(c.vz, 160);
+      // on the road: shoved hard across it. In the air: swatted (a smaller shove, knocked down out of the jump),
+      // since a full shove there flies the car out over the rails nearly every time (it stops climbing)
+      const k = c.air && !c.fly ? RULES.creatureAirKnock : 1;
+      c.vx = c.vx * 0.75 + nx * K.knock * k; c.vy = c.vy * 0.75 + ny * K.knock * k;
+      if (c.fly) c.vz = Math.max(c.vz, 160);
+      else if (c.air) c.vz = Math.min(c.vz, 0);
       c.stagger = RULES.spinStagger * 1.2; c.knockCd = 0.5;
       c.damage(K.damage, null, arena.raceTic); c.fx |= 1;
       arena.events.push({ type: 'creatureHit', car: c, cr, blocked: false });

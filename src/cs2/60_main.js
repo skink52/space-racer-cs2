@@ -366,7 +366,7 @@ function handleArenaEvents(a, now) {
     if (f & 2) { sfxCar(view, 'rail', car, 0.3); if (human) shake(pe.slot, 0.2, 5); }
     if (f & 64) sfxCar(view, 'scrape', car, 0.6);
     if (f & 8) sfxCar(view, 'pad', car, 0.5);
-    if (f & 16) { sfxCar(view, 'fall', car); if (human) center(pe.slot, 'FELL OFF', 2, 'red'); }
+    if (f & 16) { sfxCar(view, 'fall', car); if (human) { center(pe.slot, car.out ? 'OUT OF BOUNDS' : 'FELL OFF', 2, 'red'); sub(pe.slot, '-' + (car.out ? RULES.outPenalty : RULES.fallPenalty) + ' SHIELD', 2); } }
     if (f & 32) sfxCar(view, 'spin', car);
     if (f & 128) { sfxCar(view, 'reset', car); const pk = pe ? parked.get(pe.slot) : null; if (pk) pk.camYaw = null; }
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);

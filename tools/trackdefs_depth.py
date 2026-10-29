@@ -40,9 +40,9 @@ def cc_z(f):
     return 420 * smoothstep(0.18, 0.36, f) - 420 * smoothstep(0.60, 0.74, f)
 TRACKS.append(dict(id='coral', title='CORAL CROWN', laps=3, theme='coral', bank=20, scenery='coral',
     pts=[(x, y, cc_z(k / len(cc)), 340) for k, (x, y) in enumerate(cc)],
-    feats=[('boost', 0.04, 0.06, -0.6, 0.6), ('charge', 0.22, 0.29, 0.45, 1.0), ('boost', 0.38, 0.40, -0.5, 0.5),
+    feats=[('boost', 0.04, 0.06, -0.6, 0.6), ('charge', 0.25, 0.30, 0.45, 1.0), ('boost', 0.38, 0.40, -0.5, 0.5),
            ('charge', 0.78, 0.84, -1.0, -0.45), ('slick', 0.86, 0.88, -1.0, 1.0), ('boost', 0.93, 0.95, -0.6, 0.6)],
-    gaps=[], tunnels=[], jumps=[(0.13, 4, 0, 70)],
+    gaps=[], tunnels=[], jumps=[(0.235, 4, 0, 70)],
     flights=[(0.46, 0.62, 360)],
     rings=[(0.49, 0.0, 60, 120, 'ring'), (0.53, -0.5, -80, 110, 'cring'), (0.57, 0.45, 40, 120, 'ring')],
     creatures=[('manta', 0.515, 0, 11.0, 2.0, 620, 2200)],

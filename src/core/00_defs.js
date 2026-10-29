@@ -56,7 +56,10 @@ const RULES = {
   contactRestitution: 0.45,
   wreckShow: 1.5,           // seconds a wreck stays visible
   fallTime: 1.2,            // seconds falling before the reset
-  fallPenalty: 20,          // shield lost for falling off
+  fallPenalty: 35,          // shield lost for falling off (into a gap, off a rail-less edge; 20 before v0.6.0)
+  outPenalty: 55,           // shield lost for flying clean over the rails out of the map (overshooting a jump or a bend)
+  railHeight: 30,           // the rails' height (tools/tracks.py RAIL_H): a car in the air higher than this over the road
+                            // clears them and leaves the track
   pulseSpeed: 2300, pulseCharge: 40, pulseEnabled: true,
   startCharge: 40,
   coastDrag: 0.35,          // per second when not accelerating
@@ -70,6 +73,8 @@ const RULES = {
                             // before the +200 km/h (+20%) instead of 2.5x (distance goes with speed squared)
   rampKick: 60,             // extra upward speed off a ramp lip
   airControl: 0.35,         // steering left in the air
+  airGrip: 2.5,             // how fast the car's heading pulls its flight round in the air (on the road: grip, about 11).
+                            // Steer through a jump that lands on a bend, or sail out over the rails
   landSafe: 1050,           // landing faster than this (units/s downwards) scrapes the shield
   bankTurn: 0.6, bankGrip: 1.5,   // banked bends: extra turning and grip per unit of lean (tan of the angle)
   // the secret turbo start: gas down on the third beep (1 s before GO) or after it, and held: a launch. The window
@@ -86,6 +91,7 @@ const RULES = {
   flyClimb: 520, flyDive: 640, flySink: 70, flyResp: 5, flyRest: 0.3,
   // ---- sea creatures (Depth Racer): warn a driver this far (road units) before a crossing
   creatureWarn: 4200,
+  creatureAirKnock: 0.3,    // a car hit in the air (over a jump) is shoved this much as hard as on the road, and stops climbing
   // ---- the cars' E abilities (CARS[*].ability; cooldown and charge cost per car)
   // SEEKER BOLT (Hornet): a bolt fired forward along the road, curving towards the first car ahead; the car it hits is
   // shoved, skids and loses shield (an Aegis shell stops it)

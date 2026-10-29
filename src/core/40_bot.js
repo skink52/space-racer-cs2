@@ -60,8 +60,10 @@ function botThink(arena, car) {
   const ramp = T.nextFeature(seg, 'ramp', 28);
   let lane;
   b.passTimer -= dt;
-  if (ramp) {
-    lane = b.lane * 0.7;                // ramps are full width: hold the lane, just keep straight
+  if (ramp || (car.air && !car.fly)) {
+    // ramps and the air: no swerving - hold the line we're on (drifting a little to the middle) and point straight
+    // down the track, so the car leaves the lip square and lands straight (an angled launch flies out over the rails)
+    lane = car.air ? -car.d / (T.hw[seg] * 0.92) : clamp(-car.d / (T.hw[seg] * 0.92), -0.35, 0.35) * 0.8;
   } else {
     // pass slower traffic in our lane, otherwise return home
     const mine = laneTraffic(arena, car, b.lane, 260);
