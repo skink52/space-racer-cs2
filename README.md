@@ -77,3 +77,7 @@ cd test && tsc -p tsconfig.json    # type check against point_script.d.ts
 ## Licence
 
 Free for non-commercial use: copy, change, share and run it, including on game servers (donation/VIP servers are fine). Not to be sold, paywalled or built into a paid product or service. Code: [PolyForm Noncommercial 1.0.0](LICENSE). Art, models, sounds and maps: [CC BY-NC 4.0](LICENSE-CC-BY-NC-4.0.txt). Not affiliated with Valve or any racing game.
+
+## Shared files
+
+`test/types/point_script.d.ts`, `tools/dmx.py`, `tools/s2.py`, `tools/synth.py`, `tools/vmaplib.py` are master copies from [cs2mapping](https://github.com/skink52/cs2mapping) (`create/libsync.json`). Change them there and run `python3 create/libsync.py push`, or if a fix lands here first, `libsync.py pull` it into cs2mapping. `libsync.py check` shows drift.
