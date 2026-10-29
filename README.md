@@ -76,4 +76,4 @@ cd test && tsc -p tsconfig.json    # type check against point_script.d.ts
 
 ## Licence
 
-Code: MIT (`LICENSE`). Art, sounds and track designs: CC BY 4.0. Not affiliated with Valve or any racing game.
+Free for non-commercial use: copy, change, share and run it, including on game servers (donation/VIP servers are fine). Not to be sold, paywalled or built into a paid product or service. Code: [PolyForm Noncommercial 1.0.0](LICENSE). Art, models, sounds and maps: [CC BY-NC 4.0](LICENSE-CC-BY-NC-4.0.txt). Not affiliated with Valve or any racing game.

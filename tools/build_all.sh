@@ -34,6 +34,7 @@ else
   cp docs/TESTING.md out/addon/TESTING_SPACE_RACER.md 2>/dev/null || true
 fi
 cp docs/CREDITS.md out/addon/CREDITS.md 2>/dev/null || true
+cp LICENSE LICENSE-CC-BY-NC-4.0.txt out/addon/
 cp test/types/point_script.d.ts out/addon/maps/scripts/ 2>/dev/null || true
 rm -rf out/addon/_gen/*.json.tmp
 echo "built out/addon (map maps/$MAP.vmap, script maps/scripts/$NAME.js)"
