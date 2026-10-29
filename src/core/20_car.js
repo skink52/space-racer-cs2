@@ -26,6 +26,7 @@ class Car {
     this.pulsed = 0; this.noDamage = 0; this.calm = 0;   // seconds of no-damage after the start
     this.air = false; this.tz = 0; this.lift = 0; this.airTime = 0;   // jumps: airborne flag, track height, ramp height under the car
     this.fly = false;              // in a flight section (air is true too)
+    this.creatureCd = 0; this.creatureWarned = -1;   // sea creatures: no second hit for a moment; the pass last warned about
     this.bank = 0;                 // tan of the road's lean under the car (banked bends)
     this.yawRate = 0;              // how fast the car is turning (radians per second, smoothed; + = left)
     this.gasAt = null; this.stall = 0;   // turbo start: when the gas went down on the grid; seconds of stalled engine
@@ -60,6 +61,7 @@ class Car {
     if (this.abilCd > 0) this.abilCd -= dt;
     if (this.aegis > 0) this.aegis -= dt;
     if (this.scorch > 0) this.scorch -= dt;
+    if (this.creatureCd > 0) this.creatureCd -= dt;
     this.stateTime += dt;
     if (this.state !== 'racing' && this.state !== 'finished') this.yawRate *= 0.9;
     if (this.state === 'falling') { this.fallStep(track, dt); return; }
@@ -95,7 +97,7 @@ class Car {
     let fx = Math.cos(this.yaw), fy = Math.sin(this.yaw);
     this.vf = this.vx * fx + this.vy * fy;
     const absv = Math.abs(this.vf);
-    let turnRate = sp.turn * clamp(absv / 220, 0, 1) / (1 + Math.max(0, absv - 450) / 1500);
+    let turnRate = sp.turn * clamp(absv / 220, 0, 1) / (1 + Math.max(0, absv - 450) / RULES.turnFade);
     if (this.drifting) turnRate *= 1.45;
     if (this.slick) turnRate *= 0.8;
     if (this.spinTimer > 0) turnRate *= 0.3;
@@ -180,7 +182,7 @@ class Car {
       const along = this.vx * track.tx[p.i] + this.vy * track.ty[p.i];
       const f = track.rampAt(p.i - 1);
       const slope = f ? f.h / ((f.b - f.a + 1) * track.step) : 0.3;
-      this.air = true; this.airTime = 0; this.z = p.z + this.lift; this.vz = Math.max(0, along) * slope + RULES.rampKick; this.fx |= 512;
+      this.air = true; this.airTime = 0; this.z = p.z + this.lift; this.vz = Math.max(0, along) * slope * RULES.rampThrow + RULES.rampKick; this.fx |= 512;
     } else if (!road && !finished) {
       this.state = 'falling'; this.stateTime = 0; this.fallTimer = RULES.fallTime; this.vz = 0; this.fx |= 16;
     } else {
@@ -199,9 +201,9 @@ class Car {
         const vn = this.vx * nx + this.vy * ny;
         if (vn > 0) {
           this.vx -= (1 + RULES.railRestitution) * vn * nx; this.vy -= (1 + RULES.railRestitution) * vn * ny;
-          const hard = Math.max(0, vn - 140);
+          const hard = Math.max(0, vn - RULES.railSoft);
           if (hard > 0 && !finished) {
-            if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * 0.04), null, tic);
+            if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * RULES.railDamage), null, tic);
             const k = 1 - Math.min(0.45, vn / 1400);
             this.vx *= k; this.vy *= k;
             this.fx |= 2;
@@ -266,9 +268,9 @@ class Car {
     if (vr <= 0) return;
     const k = 1 + RULES.flyRest;
     this.vx -= nx * k * vr * ud; this.vy -= ny * k * vr * ud; this.vz -= k * vr * uz;
-    const hard = Math.max(0, vr - 140);
+    const hard = Math.max(0, vr - RULES.railSoft);
     if (hard > 0 && !finished) {
-      if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * 0.04), null, tic);
+      if (this.noDamage <= 0) this.damage(Math.min(RULES.contactMax, hard * RULES.railDamage), null, tic);
       this.fx |= 2;
     } else this.fx |= 64;
   }

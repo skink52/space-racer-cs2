@@ -37,9 +37,8 @@ vmaplib.init(d, OUT)
 
 # ---------------------------------------------------------------- skies: a pixel-art panorama per track theme (tools/skies.py)
 import skies
-from theme import NEON
-if NEON: from trackdefs_neon import THEMES, TRACKS as DEFS
-else: from trackdefs import THEMES, TRACKS as DEFS
+from theme import NEON, defs
+THEMES, DEFS = defs().THEMES, defs().TRACKS
 import retro
 DEF = {t['id']: t for t in DEFS}
 def sky_files(key, img):

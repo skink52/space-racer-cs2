@@ -201,7 +201,7 @@ for n in (1, 2):
         save(turn_arrow(n, right, GOLD if n == 1 else SALMON), 'turn_%s%d.png' % ('r' if right else 'l', n))
 
 # the SPACE RACER logo: chrome-gradient pixel letters with an outline and a deep drop shadow
-from theme import TITLE, NEON
+from theme import TITLE, NEON, DEPTH
 LOGO = pixfont.logo(TITLE)
 save(LOGO, 'logo.png')
 RES = pixfont.logo('RESULTS', 6)
@@ -510,7 +510,8 @@ lobby = P(None, 'LobbyLines ' + place(center=True, y=212, w=row_w(60, 'S'), h=3 
 HELP = [(TITLE + ' - HOW TO DRIVE', 'Y'), ('W / S    GAS / BRAKE', 'W'), ('A / D    STEER', 'W'), ('MOUSE 1  BOOST (USES CHARGE)', 'W'),
         ('MOUSE 2  SPIN ATTACK', 'W'), ('SPACE    DRIFT (FILLS CHARGE)', 'W'), ('E        YOUR CAR\'S ABILITY', 'W'), ('R        PICK A CAR', 'W'),
         ('', 'W'), ('GOLD PADS: FREE SPEED', 'Y'), ('CYAN PADS: CHARGE + SHIELD', 'C'),
-        ('RAMPS: HIT THEM FAST!', 'R') if not NEON else ('FLYING: W DOWN  S UP  RINGS!', 'R'), ('BANKED BENDS GRIP HARDER', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SHADE !VOTE !SPEC !AFK !BACK', 'P')]
+        ('RAMPS: HIT THEM FAST!', 'R') if not NEON else (('GLIDES' if DEPTH else 'FLYING') + ': W DOWN  S UP  RINGS!', 'R'),
+        ('BANKED BENDS GRIP HARDER', 'G') if not DEPTH else ('WATCH FOR SEA CREATURES!', 'G'), ('', 'W'), ('!CAR 1-4  !CAM  !CRT  !TILT', 'P'), ('!SHADE !VOTE !SPEC !AFK !BACK', 'P')]
 help_ = P('spr_help', box('Help', 'cyan', 640, len(HELP) * 28 + 24, center=True, y=180),
           [stext(t or ' ', 'S', c, x=20, y=14 + i * 28) for i, (t, c) in enumerate(HELP)])
 

@@ -94,6 +94,7 @@ class ArenaView {
     this.pulseProp = null;
     this.shells = new Map();     // car slot -> prop: the Aegis shell round a Bastion
     this.boltProps = new Map();  // bolt id -> prop: Seeker Bolts in flight
+    this.crProps = new Map();    // creature id -> [prop per body segment] (Depth Racer)
     this.anchors = null;
     this.fxDone = false;         // the per-car sound / shake bits of the last race step have been handled (results)
   }
@@ -122,6 +123,7 @@ class ArenaView {
     for (const [slot, sh] of this.shells) if (!a.cars.get(slot) || !a.cars.get(slot).visible) { releaseProp(sh); this.shells.delete(slot); }
     this.drawPulse();
     this.drawBolts();
+    if (this.arena.creatures.length) this.drawCreatures(now);
     // effects
     for (let k = this.fx.length - 1; k >= 0; k--) {
       const e = this.fx[k];
@@ -235,6 +237,40 @@ class ArenaView {
     for (const [id, p] of this.boltProps) if (!seen.has(id)) { releaseProp(p); this.boltProps.delete(id); }
   }
 
+  // sea creatures: a prop per body segment while a pass is on, moved every tick
+  drawCreatures(now) {
+    const fx = CAR_MODELS.fx;
+    for (const cr of this.arena.creatures) {
+      let ps = this.crProps.get(cr.id);
+      if (!cr.active) {
+        if (ps) { for (const p of ps) releaseProp(p); this.crProps.delete(cr.id); }
+        continue;
+      }
+      if (!ps) {
+        ps = [];
+        for (let j = 0; j < cr.segs.length; j++) {
+          const p = takeProp(); if (!p) break;
+          p.hidden = false; p.lastPos = null; p.model = ''; p.alpha = -1; propAlpha(p, 255);
+          ps.push(p);
+        }
+        this.crProps.set(cr.id, ps);
+      }
+      const last = cr.segs.length - 1;
+      for (let j = 0; j < ps.length; j++) {
+        const p = ps[j], s = cr.segs[j];
+        if (((tickNo + j) & 15) === 0 && !live(p.ent)) continue;
+        let model;
+        if (cr.kind === 'manta') model = Math.floor(now * 3) % 2 ? fx.cr_manta1 : fx.cr_manta0;
+        else if (cr.kind === 'whale') model = j === 0 ? fx.cr_whale_head : j === last ? fx.cr_whale_tail : fx.cr_whale_body;
+        else model = j === 0 ? fx.cr_serpent_head : j === last ? fx.cr_serpent_tail : fx.cr_serpent_body;
+        if (model) propModel(p, model);
+        const pos = this.world(s.x, s.y, s.z), ang = { pitch: 0, yaw: deg(s.yaw), roll: 0 };
+        if (!p.lastPos) p.ent.Teleport({ position: pos, angles: ang }); else p.ent.Move({ position: pos, angles: ang });
+        p.lastPos = pos;
+      }
+    }
+  }
+
   // an effect at a track position: frames = list of models, shown over `seconds`
   effect(x, y, z, yaw, frames, seconds, now) {
     if (this.fx.length >= CONFIG.MAX_EFFECT_PROPS) return;
@@ -263,6 +299,8 @@ class ArenaView {
     this.shells.clear();
     for (const p of this.boltProps.values()) releaseProp(p);
     this.boltProps.clear();
+    for (const ps of this.crProps.values()) for (const p of ps) releaseProp(p);
+    this.crProps.clear();
     for (const e of this.fx) releaseProp(e.prop);
     this.fx = [];
     if (this.pulseProp) { releaseProp(this.pulseProp); this.pulseProp = null; }

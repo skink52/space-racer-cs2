@@ -16,6 +16,7 @@ class Track {
     this.fly = data.fly || new Array(this.n).fill(0);     // 1 in a flight section (no road: a corridor of gates)
     this.flyR = data.flyR || new Array(this.n).fill(0);   // the corridor's radius there
     this.hasFly = this.fly.some((v) => v);
+    this.creatureDefs = data.creatures || [];            // giant sea creatures crossing the track (Depth Racer)
     this.zmin = data.zmin || 0; this.zmax = data.zmax || 0;
     this.ramps = this.feats.filter((f) => f.kind === 'ramp');
     this.rampOf = new Array(this.n).fill(null);

@@ -1,5 +1,30 @@
 # Space Racer changelog
 
+## v0.6.0: Depth Racer, and +200 km/h for all three games (29 Oct 2026)
+
+- **Depth Racer** (`mg_depth_racer`, `SPR_THEME=depth`): a third game on the same code, on the sea floor.
+  - Six tracks: Kelp Canyon, Coral Crown, The Wreck, Vent Field, Abyss Drop and Lantern Deep. Three have glides
+    (Neon Racer's flight sections). The scenery is kelp, coral, ruins and rocks.
+  - **Giant sea creatures** (`src/core/35_creatures.js`, `tools/creatures.py`): sea serpents, manta rays and whales
+    cross the track over the jumps and glides on a fixed cycle. A hit shoves the car, makes it skid and takes shield;
+    Aegis blocks it. Drivers get a warning before a crossing; bots hold back and let them pass.
+  - Deep-sea pixel textures and skies, dark car hulls, a sea-floor loading screen, and dub / electro music
+    ('Pressure', 'Leviathan', 'Still Water').
+  - docs/depth/README_ADDON.md, TESTING.md and the Workshop description and thumbnail in workshop/depth/.
+- **+200 km/h** (all three games):
+  - Top speeds +556 u/s (Hornet 1620, Meteor 1646, Comet 1596, Bastion 1599). Acceleration x1.45, brakes x1.3.
+  - Turning fades more slowly with speed (`RULES.turnFade` 1500 -> 2400).
+  - Boost pads, the Pulse wave, the turbo start and Nova Burn kick harder. The Seeker Bolt reaches further.
+    Flights climb and dive faster.
+  - Jumps: ramps throw cars flatter (`RULES.rampThrow` 0.65) and gravity is 1150 -> 1500. Jump length goes with
+    speed squared, so without this cars flew 2.5x as far and landed in the next bend.
+  - Rail and bump damage start at higher speeds (`railSoft` 140 -> 220, `contactSoft` 250 -> 380), with less per
+    unit over, so the faster racing doesn't wreck more cars.
+  - Bots look further ahead for bends at speed.
+  - Sim (32 bots, 12 rounds each game): laps about 30% quicker; wrecks Space 10 -> 19, Neon 17 -> 24, Depth 14 -> 37
+    (mostly the Vent Field whale); falls about the same.
+- Space Racer and Neon Racer: only the script changed (tracks, models, HUD and music are the same as in v0.5.0).
+
 ## Neon Racer pixel update (28 Oct 2026, evening)
 
 - **Pixel style, neon colours**:

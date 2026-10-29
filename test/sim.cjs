@@ -2,6 +2,7 @@
 // usage: node test/sim.cjs [players=32] [rounds=6] [opts: trace,track=<id>,skill=0.5,laps=N,v,seed=N,even,json,tune=<file>]
 const C = require('../build/core_test.cjs');
 const N = +(process.argv[2] || 32), ROUNDS = +(process.argv[3] || 6), OPTS = process.argv[4] || '';
+if (OPTS.includes('nocr')) for (const t of C.TRACKS) delete t.creatures;     // nocr: the sea creatures stay home
 const opt = (k, d) => { const m = OPTS.match(new RegExp(k + '=([^,]+)')); return m ? m[1] : d; };
 C.seedRandom(+opt('seed', 7));
 // tune=<file.json>: try other numbers without rebuilding - { "RULES": { ... }, "CARS": { "hornet": { ... } } }
@@ -23,6 +24,7 @@ let launches = 0, stalls = 0;
 let totalWrecks = 0, totalFalls = 0, totalKO = 0, worst = 0;
 const t0 = Date.now();
 let ticks = 0;
+const creatureHits = {}, creatureByTrack = {};
 for (let r = 0; r < ROUNDS; r++) {
   if (even) for (let i = 0; i < N; i++) rm.person(i).carChoice = C.CAR_KEYS[(i + (r >> 1)) % C.CAR_KEYS.length];
   if (!rm.startRound()) { console.log('not enough players'); break; }
@@ -36,6 +38,7 @@ for (let r = 0; r < ROUNDS; r++) {
     for (const a of rm.arenas) for (const e of a.events) {
       if (e.type === 'wreck') { wrecks[a.index] = (wrecks[a.index] || 0) + 1; if (e.attacker) { kos[a.index] = (kos[a.index] || 0) + 1; classStats[e.attacker.cls].kos++; } }
       if (e.type === 'spinHit' && e.attacker) classStats[e.attacker.cls].spinHits++;
+      if (e.type === 'creatureHit') { creatureHits[e.car.isBot ? 'bot' : 'human'] = (creatureHits[e.car.isBot ? 'bot' : 'human'] || 0) + 1; creatureByTrack[e.cr.kind] = (creatureByTrack[e.cr.kind] || 0) + 1; }
       if (e.type === 'ability') { classStats[e.car.cls].abil++; classStats[e.car.cls].abilHits += e.hits || 0; }
       if (e.type === 'boltHit' && !e.blocked) classStats[e.bolt.owner.cls].abilHits++;
       if (e.type === 'launch') launches++;
@@ -75,4 +78,5 @@ for (const [k, s] of Object.entries(classStats)) {
 }
 if (OPTS.includes('json')) console.log('JSON ' + JSON.stringify(classStats));
 console.log(`turbo starts ${launches}, stalls ${stalls}`);
+if (Object.keys(creatureByTrack).length) console.log('sea creature hits', JSON.stringify(creatureByTrack));
 console.log(`wrecks ${totalWrecks} (KO ${totalKO}), falls ${totalFalls}; ${ticks} tics in ${Date.now() - t0} ms (${((Date.now() - t0) / ticks).toFixed(3)} ms/tic, worst ${worst.toFixed(1)} ms)`);

@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import pixfont, retro
 from retro import *
 import cars as C
-from theme import NEON
+from theme import NEON, DEPTH
 
 OUTD = sys.argv[1] if len(sys.argv) > 1 else '.'
 HERO = sys.argv[2] if len(sys.argv) > 2 else 'hornet'
@@ -155,6 +155,46 @@ def gates(img):
                 img[y, x] = GOLD
 
 
+def depth_scene(img):
+    """Depth Racer: the scene under the sea - water instead of sky, light shafts, a serpent's coils over the road"""
+    for y in range(HZ):
+        k = y / HZ
+        img[y] = np.array(SKYBLUE) * (1 - k) * 0.35 + np.array(NAVY) * k * 0.9 + np.array(INK) * 0.2
+    for x0 in range(10, B, 37):                                     # light shafts
+        for y in range(HZ):
+            x = int(x0 + y * 0.25)
+            if 0 <= x < B and (x + y) % 3: img[y, x] = np.minimum(255, img[y, x] + 25)
+    img[0:4, :] = ICE
+    for x in range(0, B, 2): img[4 + (x // 2) % 3, x] = WHITE                # the rippling surface
+    # coral and kelp silhouettes on the horizon
+    for x in range(0, B, 3):
+        h = int(8 + 7 * math.sin(x / 9.0) + (x * 7919) % 9)
+        img[HZ - h:HZ, x:x + 2] = DEEPTEAL if x % 2 else (40, 20, 60)
+    # the sea floor: dim the grid to faint teal lines on dark sand
+    floor = img[HZ:].reshape(-1, 3)
+    m = (floor.sum(1) > 200)
+    floor[m] = (np.array(DEEPTEAL) * 0.8).astype(floor.dtype)
+    img[HZ:] = floor.reshape(img[HZ:].shape)
+    # the serpent: thick coils arching out of the deep and over the road, head on the right
+    xs = np.arange(14, B - 40)
+    for x in xs:
+        u = (x - 14) / (B - 54)
+        y = HZ - 30 - 36 * math.sin(u * math.pi * 2.0) * (0.6 + 0.4 * u)
+        r = 4 + 4 * math.sin(min(1, u * 1.4) * math.pi / 2)
+        for t in range(int(-r), int(r) + 1):
+            yy = int(round(y + t))
+            if 0 <= yy < B:
+                img[yy, x] = MINT if t < -r + 2 else (TEAL if t < r * 0.4 else DEEPTEAL)
+        if int(x) % 7 == 0: img[int(round(y)), x] = SKYBLUE                 # glowing spots along the side
+        if int(x) % 5 == 0 and r > 5: img[int(round(y - r - 1)), x] = PINK    # dorsal spines
+    hx, hy = B - 40, int(round(HZ - 30 - 36 * math.sin(2.0 * math.pi) * 1.0))
+    img[hy - 9:hy + 7, hx:hx + 20] = TEAL                                     # head
+    img[hy - 9:hy - 7, hx:hx + 20] = MINT
+    img[hy + 2:hy + 7, hx + 6:hx + 26] = DEEPTEAL                             # jaw
+    for k in range(hx + 8, hx + 24, 3): img[hy + 1, k] = WHITE                # teeth
+    img[hy - 6:hy - 3, hx + 12:hx + 16] = GOLD                                # eye
+
+
 def speed_lines(img):
     for _ in range(26):
         side = rng.choice([-1, 1])
@@ -183,6 +223,7 @@ def main():
     if NEON:
         neon_recolour(img)
         gates(img)
+    if DEPTH: depth_scene(img)
     speed_lines(img)
     # the hero, seen from behind like the chase camera sees it, flames lit, heading for the sun
     hero = car_sprite(HERO, 't', 150)
@@ -197,7 +238,7 @@ def main():
     from theme import TITLE
     lg = pixfont.logo(TITLE, 8)
     pixfont.paste(big, lg, (B * 4 - lg.shape[1]) // 2, 34)
-    pixfont.draw(big, B * 2, 34 + lg.shape[0] + 10, '32-CAR ANTI-GRAV RACING' if not NEON else 'RACE AND FLY - 32 CARS', 4, ICE, shadow=PURPLE, align='center')
+    pixfont.draw(big, B * 2, 34 + lg.shape[0] + 10, '32-CAR ANTI-GRAV RACING' if not NEON else ('RACE THE DEEP - 32 CARS' if DEPTH else 'RACE AND FLY - 32 CARS'), 4, ICE, shadow=PURPLE, align='center')
     big = retro.scanlines(big, 4, 0.86)
     os.makedirs(OUTD, exist_ok=True)
     Image.fromarray(big).save(os.path.join(OUTD, 'icon.png'), optimize=True)

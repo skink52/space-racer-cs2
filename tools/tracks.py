@@ -14,9 +14,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import s2, pixfont
 from retro import *
 import retro
-from theme import NEON
-if NEON: from trackdefs_neon import TRACKS, THEMES, HALF
-else: from trackdefs import TRACKS, THEMES, HALF
+from theme import NEON, DEPTH, defs
+TRACKS, THEMES, HALF = defs().TRACKS, defs().THEMES, defs().HALF
 
 OUT = sys.argv[1] if __name__ == '__main__' else None
 PREVIEW = sys.argv[2] if len(sys.argv) > 2 and __name__ == '__main__' else None
@@ -424,8 +423,11 @@ def build_materials(track):
     m['win2'] = W('win2', window_texture(th, 2, 0.7), 'tower shade')
     m['roof'] = W('roof', roof_texture(th), 'roof')
     base = th['planet'][0] if track['scenery'] != 'crystals' else th['glow']
+    if DEPTH:
+        m['kelp'] = s2.write_material(OUT, '%s/kelp' % md, kelp_texture(th['glow']), blend=0, backfaces=True, comment='kelp ' + tid)
     for k, (name, f) in enumerate((('rock0', 1.0), ('rock1', 0.7), ('rock2', 0.45))):
-        if track['scenery'] == 'crystals': m[name] = W(name, crystal_texture(th['glow'], f * 1.1), 'crystal')
+        if DEPTH: m[name] = W(name, crystal_texture(th['accent'] if track['scenery'] == 'coral' else (70, 90, 110), f * (1.1 if track['scenery'] == 'coral' else 0.8)), 'coral / rock')
+        elif track['scenery'] == 'crystals': m[name] = W(name, crystal_texture(th['glow'], f * 1.1), 'crystal')
         else: m[name] = W(name, rock_texture(TAN if track['scenery'] != 'rings' else SAND, f, 40 + k), 'rock')
     for k, text in enumerate(track.get('slogans', [])):
         m['bill%d' % k] = W('bill%d' % k, billboard_texture(text, th), 'billboard')
@@ -789,8 +791,8 @@ def scenery(track, S, th, flyR=None):
         d = np.hypot(pts2[:, 0] - x, pts2[:, 1] - y) - reach
         return bool(((d < r_xy) & (np.abs(pos[:, 2] - z) < r_z + (0 if flyR is None else flyR))).any())
     count = 0
-    if kind in ('city', 'rings'):
-        step = 620 if kind == 'city' else 900
+    if kind in ('city', 'rings', 'ruins'):
+        step = 620 if kind in ('city', 'ruins') else 900
         for gx in np.arange(-E + 300, E - 300, step):
             for gy in np.arange(-E + 300, E - 300, step):
                 x = gx + rng.uniform(-150, 150); y = gy + rng.uniform(-150, 150)
@@ -808,8 +810,8 @@ def scenery(track, S, th, flyR=None):
                     tris += s2.box_tris('post', x - 8, y - 8, top, x + 8, y + 8, top + 180, uscale=1 / 256.0)
                     tris += s2.box_tris('beacon', x - 22, y - 22, top + 180, x + 22, y + 22, top + 224)
                 count += 1
-    if kind in ('asteroids', 'rings', 'crystals', 'clouds'):
-        n_rocks = {'asteroids': 260, 'rings': 80, 'crystals': 0, 'clouds': 0}[kind]
+    if kind in ('asteroids', 'rings', 'crystals', 'clouds', 'rocks', 'kelp'):
+        n_rocks = {'asteroids': 260, 'rings': 80, 'crystals': 0, 'clouds': 0, 'rocks': 150, 'kelp': 50}[kind]
         tries = 0
         while n_rocks > 0 and tries < 4000:
             tries += 1
@@ -820,8 +822,8 @@ def scenery(track, S, th, flyR=None):
             v, f = icosphere(rad, rng, squash=(1, rng.uniform(0.6, 1), rng.uniform(0.5, 0.9)))
             tris += shaded_mesh(v, f, (x, y, z), rot_matrix(rng), ('rock0', 'rock1', 'rock2'))
             n_rocks -= 1; count += 1
-    if kind == 'crystals':
-        tries = 0; n = 160
+    if kind in ('crystals', 'coral', 'rocks'):
+        tries = 0; n = {'crystals': 160, 'coral': 190, 'rocks': 110}[kind]
         while n > 0 and tries < 4000:
             tries += 1
             x, y = rng.uniform(-E + 300, E - 300, 2)
@@ -840,8 +842,8 @@ def scenery(track, S, th, flyR=None):
             faces = [(0, 2 + k, 2 + (k + 1) % 6) for k in range(6)] + [(1, 2 + (k + 1) % 6, 2 + k) for k in range(6)]
             tris += shaded_mesh(v, faces, (x, y, floor), np.eye(3), ('rock0', 'rock1', 'rock2'))
             n -= 1; count += 1
-        # floating shards around the track
-        for _ in range(90):
+        # floating shards around the track (Space Racer's crystal worlds only)
+        for _ in range(90 if kind == 'crystals' else 0):
             x, y = rng.uniform(-E + 400, E - 400, 2)
             z = rng.uniform(zmin, zmax + 1500)
             if near_track(x, y, z, 500, 800): continue
@@ -873,6 +875,24 @@ def scenery(track, S, th, flyR=None):
                 cz = z + rng.uniform(-40, 80)
                 tris += s2.box_faces(dict(top='cloud', bottom='cloud2', x='cloud2', y='cloud2'), cx - w / 2, cy - dp / 2, cz, cx + w / 2, cy + dp / 2, cz + h)
             count += 1
+    if kind in ('kelp', 'coral', 'ruins', 'rocks'):
+        # Depth Racer: kelp stalks swaying up from the sea floor, thick in a kelp forest
+        n = {'kelp': 260, 'coral': 90, 'ruins': 110, 'rocks': 70}[kind]
+        tries = 0
+        while n > 0 and tries < 6000:
+            tries += 1
+            x, y = rng.uniform(-E + 200, E - 200, 2)
+            h = rng.uniform(900, 2600 if kind == 'kelp' else 1800)
+            wdt = rng.uniform(26, 48); segs = 10; ph = rng.rand() * 6.28; amp = rng.uniform(40, 120)
+            path = [(x + amp * math.sin(ph + k * 0.6), y + amp * 0.6 * math.cos(ph + k * 0.5), floor + h * k / segs) for k in range(segs + 1)]
+            if any(near_track(px, py, pz, wdt + 160, 260) for px, py, pz in path): continue
+            for (x0, y0, z0), (x1, y1, z1) in zip(path, path[1:]):
+                for ax in ((1, 0), (0, 1)):     # two crossed blades: kelp seen from any side
+                    a0 = (x0 - ax[0] * wdt, y0 - ax[1] * wdt, z0); b0 = (x0 + ax[0] * wdt, y0 + ax[1] * wdt, z0)
+                    a1 = (x1 - ax[0] * wdt, y1 - ax[1] * wdt, z1); b1 = (x1 + ax[0] * wdt, y1 + ax[1] * wdt, z1)
+                    v0, v1 = (z0 - floor) / h * 4, (z1 - floor) / h * 4
+                    tris += s2.quad_n('kelp', a0, b0, b1, a1, (0, v0), (1, v0), (1, v1), (0, v1), (-ax[1], ax[0], 0))
+            n -= 1; count += 1
     return tris, count, floor
 
 def torus_tris(R, r, rot, c, seg=28, side=4):
@@ -1056,6 +1076,9 @@ def build_track(ti, track):
             t = min(1.0, (len(run) - 1 - k) / 14.0)
             flyR[i] = 110 + (R - 110) * (t * t * (3 - 2 * t))
         for k in range(-12, len(run) + 12): zero[(ia + k) % N] = True
+    creatures = []
+    for kind, frac, h, period, phase, speed, span in track.get('creatures', []):
+        creatures.append(dict(kind=kind, i=frac_idx(frac), h=float(h), period=float(period), phase=float(phase), speed=float(speed), span=float(span)))
     for frac, lat, dz, rr, kind in track.get('rings', []):
         i = frac_idx(frac)
         assert fly[i], 'ring outside a flight section: %s %.3f' % (track['id'], frac)
@@ -1080,7 +1103,7 @@ def build_track(ti, track):
     for i in gapset: rail[i] = 0
     rail[road == 0] = 0
     return dict(S=S, problems=problems, crossings=crossings, feats=feats, gaps_idx=gaps_idx, gapset=gapset, road=road, lift=lift,
-                tubes=tubes, tb=tb, bankdeg=bankdeg, curv=curv, G=G, cps=cps, rail=rail, fly=fly, flyR=flyR)
+                tubes=tubes, tb=tb, bankdeg=bankdeg, curv=curv, G=G, cps=cps, rail=rail, fly=fly, flyR=flyR, creatures=creatures)
 
 def main():
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
@@ -1116,6 +1139,7 @@ def main():
             hw=[round(float(v), 1) for v in hw], rail=[int(v) for v in B['rail']], road=[int(v) for v in B['road']],
             bk=[round(float(v), 4) for v in B['tb']], tube=[int(v) for v in B['tubes']],
             **(dict(fly=[int(v) for v in B['fly']], flyR=[round(float(v), 1) for v in B['flyR']]) if B['fly'].any() else {}),
+            **(dict(creatures=B['creatures']) if B['creatures'] else {}),
             cp=B['cps'], feats=B['feats'], crossing=bool(track.get('crossing')),
             mm=dict(scale=round(mm['scale'], 5), size=mm['size']),
             ext=round(float(np.abs(pos[:, :2]).max() + hw.max()), 1),

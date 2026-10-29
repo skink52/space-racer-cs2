@@ -25,9 +25,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 import pixfont, skies
 from retro import *
 import retro
-from theme import NEON, TITLE
-if NEON: from trackdefs_neon import THEMES as RTHEMES, TRACKS as RDEFS
-else: from trackdefs import THEMES as RTHEMES, TRACKS as RDEFS
+from theme import NEON, DEPTH, TITLE, defs
+RTHEMES, RDEFS = defs().THEMES, defs().TRACKS
 
 OUT, MAP = sys.argv[1], sys.argv[2]
 PREVIEW = sys.argv[3] if len(sys.argv) > 3 else None
@@ -72,6 +71,7 @@ FEAT_Y0, FEAT_Y1 = 604, 948              # the panel that changes
 # the slides: what the second panel shows, and whose sky is behind it (slide 0 is <map>.png, then <map>_1.png ...)
 SLIDES = [('cars', 'oval'), ('tracks', 'crosswire'), ('win', 'spire'), ('track', 'skyway')]
 if NEON: SLIDES = [('cars', 'grid'), ('tracks', 'voidhop'), ('win', 'pulse'), ('track', 'dive')]
+if DEPTH: SLIDES = [('cars', 'kelp'), ('tracks', 'abyss'), ('win', 'coral'), ('track', 'wreck')]
 
 CARS = [('hornet', 'HORNET', 'DRIFT CHARGE', ['LIGHT AND SHARP', 'E: SEEKER BOLT']),
         ('meteor', 'METEOR', 'RAM', ['BUMPS HURT THEM', 'E: SHOCKWAVE']),
@@ -81,6 +81,8 @@ TRACK_TAGS = {'oval': 'FLAT OUT', 'hairpin': 'THREE HAIRPINS', 'crosswire': 'SPI
               'spire': 'CLIMB AND DIVE', 'ringworld': 'OVER AND UNDER', 'skyway': 'BIG JUMPS', 'helix': 'CORKSCREW'}
 TRACK_TAGS.update({'grid': 'FLAT OUT', 'pulse': 'TWO HAIRPINS', 'voidhop': 'FLY THE GAP', 'stream': 'ROLLERCOASTER',
                    'dive': 'FLY DOWN', 'overclock': 'OVER AND UNDER'})
+TRACK_TAGS.update({'kelp': 'SERPENT JUMP', 'coral': 'MANTA GLIDE', 'wreck': 'THROUGH THE HULL', 'vents': 'WHALE CROSSING',
+                   'abyss': 'GLIDE THE TRENCH', 'lantern': 'NO RAILS'})
 
 
 def background(theme_id, seed):
@@ -94,6 +96,7 @@ def background(theme_id, seed):
     canvas = np.zeros((LH, LW, 3), np.uint8)
     canvas[:HZ] = sky[skies.H // 2 - HZ:skies.H // 2]
     fl = th.get('floor', MAGENTA)
+    if DEPTH: return up(seabed(canvas, fl, seed), 4).copy()
     for y in range(HZ, LH):
         k_ = (y - HZ) / (LH - HZ)
         canvas[y] = (np.array(BLACK) * (1 - k_) + np.array(INK) * k_).astype(np.uint8)
@@ -108,6 +111,36 @@ def background(theme_id, seed):
             x = int(round(x_top + (x_bot - x_top) * k_))
             if 0 <= x < LW: canvas[y, x] = fl if k_ > 0.12 else shade(fl, 0.55)
     return up(canvas, 4).copy()
+
+
+def seabed(canvas, fl, seed):
+    """Depth Racer: a sandy sea floor fading into the murk instead of the neon grid - rippled sand bunching towards
+    the horizon, faint glowing specks and a few dark rocks"""
+    rng = np.random.default_rng(seed + 11)
+    murk, sand = np.array((8, 40, 56), float), np.array((40, 44, 52), float)
+    for y in range(HZ, LH):
+        k_ = ((y - HZ) / (LH - HZ)) ** 0.7
+        canvas[y] = (murk * (1 - k_) + sand * k_).astype(np.uint8)
+    xs = np.arange(LW)
+    for j in range(1, 22):                              # sand ripples, wavy, closer together further away
+        k_ = (j / 21) ** 2.0
+        y0 = HZ + (LH - HZ) * k_
+        ys = (y0 + np.sin(xs / (6 + 30 * k_) + j * 1.7) * (1 + 4 * k_)).astype(int)
+        col = np.array(shade(fl, 0.18 + 0.3 * k_), np.uint8)
+        ok = (ys > HZ) & (ys < LH)
+        canvas[ys[ok], xs[ok]] = col
+    for _ in range(26):                                 # rocks
+        k_ = rng.uniform(0.15, 1.0) ** 1.5
+        cy, cx = int(HZ + (LH - HZ) * k_), int(rng.uniform(0, LW))
+        r = max(1, int((2 + 10 * k_) * rng.uniform(0.6, 1.2)))
+        for dy in range(-r, 1):
+            w = int(r * 1.6 * (1 - (dy / r) ** 2) ** 0.5)
+            yy = cy + dy
+            if HZ < yy < LH: canvas[yy, max(0, cx - w):min(LW, cx + w)] = (10, 18, 26) if dy > -r // 2 else (18, 30, 40)
+    for _ in range(140):                                # glowing specks drifting over the floor
+        y, x = int(rng.uniform(HZ + 2, LH)), int(rng.uniform(0, LW))
+        canvas[y, x] = shade(fl, rng.uniform(0.5, 1.0))
+    return canvas
 
 
 def panel(big, x0, y0, x1, y1, edge, dark=0.13):
@@ -239,6 +272,12 @@ def icon(kind):
             put(int(round(5.5 + 5 * math.sin(t))), int(round(7.5 + 6 * math.cos(t))), SKYBLUE if a % 6 < 3 else ICE)
         for x, y in ((5, 8), (6, 7), (7, 7), (8, 6), (9, 6), (10, 5)): put(y, x, GOLD); put(y + 1, x, ORANGE)
         put(4, 11, WHITE)
+    elif kind == 'creature':                             # a sea serpent's coils breaking the water
+        for x in range(16):
+            y = int(round(6 + 3.2 * math.sin(x / 16 * 2 * math.pi * 1.5)))
+            put(y, x, TEAL); put(y + 1, x, DEEPTEAL)
+            if x % 4 == 1: put(y - 1, x, MINT)
+        put(int(round(6 + 3.2 * math.sin(15 / 16 * 2 * math.pi * 1.5))) - 1, 15, GOLD)
     elif kind == 'shield':                               # the shield bar running out
         g[3:9, 0:16] = tuple(BLACK) + (255,)
         for s in range(5):
@@ -252,7 +291,11 @@ def feat_track(big, edge):
     items = [('boost', 'GOLD PADS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS', 'CHARGE + SHIELD', MINT),
              ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM), ('slick', 'PURPLE WAVES', 'LOW GRIP', PINK),
              ('pulse', 'THE PULSE', 'CATCH-UP CHARGE', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
-    if NEON:      # flight sections: W / S fly up and down there; the rings work like the pads
+    if DEPTH:     # glides, rings and the sea creatures
+        items = [('boost', 'GOLD PADS/RINGS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS/RINGS', 'CHARGE + SHIELD', MINT),
+                 ('fly', 'GLIDE: W DOWN S UP', 'SWIM THE GATES', ICE), ('creature', 'SEA CREATURES', 'TIME YOUR RUN', TEAL),
+                 ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]
+    elif NEON:    # flight sections: W / S fly up and down there; the rings work like the pads
         items = [('boost', 'GOLD PADS/RINGS', 'FREE SPEED', GOLD), ('charge', 'CYAN PADS/RINGS', 'CHARGE + SHIELD', MINT),
                  ('fly', 'FLIGHT: W DOWN S UP', 'FLY THE GATES', ICE), ('ramp', 'RAMPS', 'HIT THEM FAST', CREAM),
                  ('slick', 'PURPLE WAVES', 'LOW GRIP', PINK), ('shield', 'SHIELD AT 0', 'WRECKED', SALMON)]

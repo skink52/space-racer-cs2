@@ -170,3 +170,109 @@ def neon_music():
     x, _ = loop(results, 2, 120, tail=0.01)
     out['mus_results'] = (x, 4 * 60 / 120 * 2)
     return out
+
+# ---------------------------------------------------------------- Depth Racer: deep, dubby, heavy
+def sonar(times, n, note=m('E6')):
+    """a sonar ping: a pure tone with a long watery echo"""
+    k = S.sec(1.4); t = np.arange(k) / S.SR
+    one = S.sine(S.midi_hz(note) * (1 - 0.02 * t), k) * np.exp(-t / 0.35) * np.minimum(t / 0.003, 1)
+    buf = np.zeros(n)
+    for t0 in times:
+        S.add(buf, one, S.sec(t0))
+        S.add(buf, one * 0.35, S.sec(t0 + 0.37)); S.add(buf, one * 0.15, S.sec(t0 + 0.74))
+    return buf
+
+def depth1(beat, bars, n):
+    """'Pressure' - 112 bpm, D minor: a pounding kick, a deep rolling saw bass, dub chord stabs echoing away, sonar
+    pings and a dark supersaw lead in the second half"""
+    prog = [('D', 'min'), ('A#', 'maj'), ('G', 'min'), ('A', 'min')]
+    bass, stab, pad, lead, pings = [], [], [], [], []
+    for b in range(bars):
+        root, kind = prog[b % 4]
+        ch = chord(root, kind, 3)
+        pad.append((b * 4 * beat, 4 * beat, ch, 0.7, {}))
+        r1 = m(root + '1')
+        for e in range(8):
+            t = (b * 4 + e / 2) * beat
+            bass.append((t, beat / 2 * 0.8, r1 + (12 if e in (3, 6) else 0), 1.0 if e % 2 else 0.8, {}))
+        for q in (1.5, 3.5): stab.append(((b * 4 + q) * beat, beat * 0.3, [c + 12 for c in ch], 0.8, {}))
+        if b % 2 == 0: pings.append((b * 4 + 0.5) * beat)
+    mel = [('D5', 3), ('F5', 1), ('E5', 2), ('C5', 2), ('D5', 3), ('A4', 1), ('C5', 4), ('D5', 3), ('F5', 1), ('G5', 2),
+           ('A5', 2), ('F5', 4), ('E5', 4)]
+    tt = (bars // 2) * 4 * beat
+    for note, d in mel:
+        if tt >= bars * 4 * beat: break
+        lead.append((tt, d * beat * 0.95, m(note), 0.85, {'slide': d >= 3})); tt += d * beat
+    drums, kicks = four_floor(beat, bars, hats16=False)
+    kit = S.Drums(seed=21, style='electronic').render(drums, n)
+    mx = S.Mixer(n, S.reverb_ir(seed=9, length=2.6)); mx.pump = S.pump_curve(kicks, n, 0.75, 0.16)
+    mx.add(S.Bass(seed=22, drive=4.5, sub=0.8, fc=700).render(bass, n), -6, 0.0, -100, 0.9)
+    mx.add(S.Lead(seed=23, voices=5, detune=12, drive=1.6, delay=beat * 0.75, fb=0.6, dmix=0.5, vib_depth=0.0).render(stab, n), -10, 0.0, -6, 0.6)
+    mx.add(S.Pad(seed=24, mode='strings', voices=6, detune=18).render(pad, n), -12, 0.0, -4, 0.7)
+    mx.add(sonar(pings, n), -10, 0.3, -4)
+    if lead: mx.add(S.Lead(seed=25, voices=7, detune=16, drive=2.2, vib_depth=0.15, delay=beat * 0.75, dmix=0.3).render(lead, n), -5, -0.1, -10, 0.35)
+    mix_drums(mx, kit, kicks, n, -11)
+    return mx.master(comp_thr=-18, ratio=4.0, drive_db=8.0, eq=PUNCH)
+
+def depth2(beat, bars, n):
+    """'Leviathan' - 118 bpm, A minor: a huge distorted bass riff, a pulsing arpeggio deep in the water, a horn-like
+    lead calling over it"""
+    prog = [('A', 'min'), ('F', 'maj'), ('D', 'min'), ('E', 'min')]
+    bass, arp, lead = [], [], []
+    riff = [0, 0, 12, 0, 10, 0, 7, 0]
+    for b in range(bars):
+        root, kind = prog[b % 4]
+        ch = chord(root, kind, 4)
+        r1 = m(root + '1') if root in ('A', 'F', 'E') else m(root + '2') - 12
+        for e in range(8):
+            bass.append(((b * 4 + e / 2) * beat, beat / 2 * 0.85, r1 + riff[e], 1.0 if e % 2 == 0 else 0.85, {}))
+        for s_ in range(16):
+            arp.append(((b * 4 + s_ / 4) * beat, beat / 4 * 0.5, ch[(0, 2, 1, 2)[s_ % 4]] + (12 if s_ % 8 > 5 else 0), 0.5, {}))
+    calls = [('E5', 2), ('A5', 2), ('G5', 1), ('E5', 3), ('-', 8), ('C6', 2), ('B5', 2), ('A5', 4), ('-', 8)]
+    tt = 4 * 4 * beat
+    while tt < bars * 4 * beat:
+        for note, d in calls:
+            if tt >= bars * 4 * beat: break
+            if note != '-': lead.append((tt, d * beat * 0.95, m(note), 0.85, {'slide': True}))
+            tt += d * beat
+    drums, kicks = four_floor(beat, bars, ohat=True)
+    kit = S.Drums(seed=26, style='electronic').render(drums, n)
+    mx = S.Mixer(n, S.reverb_ir(seed=11, length=2.4)); mx.pump = S.pump_curve(kicks, n, 0.7, 0.14)
+    mx.add(S.Bass(seed=27, drive=5.0, sub=0.7, fc=1100).render(bass, n), -6, 0.0, -100, 0.85)
+    mx.add(S.lp(S.Lead(seed=28, voices=3, detune=8, drive=1.4, delay=beat * 0.5, dmix=0.3, vib_depth=0.0).render(arp, n)[:, 0], 1800, 2), -10, 0.2, -10, 0.7)
+    mx.add(S.Lead(seed=29, voices=6, detune=14, drive=2.6, vib_depth=0.25, delay=beat * 0.75, dmix=0.35).render(lead, n), -5, -0.1, -8, 0.3)
+    mix_drums(mx, kit, kicks, n, -10)
+    return mx.master(comp_thr=-18, ratio=4.0, drive_db=8.0, eq=PUNCH)
+
+def depth_lobby(beat, bars, n):
+    """'Still Water' - 86 bpm, D minor: slow and heavy, a sub bass, a wide dark pad, sonar pings and a lazy kick"""
+    prog = [('D', 'min'), ('A#', 'maj'), ('F', 'maj'), ('C', 'maj')]
+    bass, pad, pings = [], [], []
+    for b in range(bars):
+        root, kind = prog[b % 4]
+        ch = chord(root, kind, 3)
+        pad.append((b * 4 * beat, 4 * beat, ch + [ch[0] + 12], 0.85, {}))
+        bass.append((b * 4 * beat, 3.5 * beat, m(root + '1') if root != 'A#' else m('A#1'), 0.9, {}))
+        pings += [(b * 4 + 1) * beat, (b * 4 + 2.75) * beat]
+    ev, kicks = [], []
+    for b in range(bars):
+        for q in range(4):
+            t = (b * 4 + q) * beat
+            if q in (0, 2): ev.append((t, 'kick', 0.9)); kicks.append(t)
+            if q == 2: ev.append((t, 'snare', 0.7))
+            ev.append((t + beat / 2, 'hat', 0.3))
+    kit = S.Drums(seed=30, style='electronic').render(ev, n)
+    mx = S.Mixer(n, S.reverb_ir(seed=12, length=3.2)); mx.pump = S.pump_curve(kicks, n, 0.4, 0.3)
+    mx.add(S.Bass(seed=31, drive=2.0, sub=1.0, fc=500).render(bass, n), -7, 0.0, -100, 0.5)
+    mx.add(S.Pad(seed=32, mode='strings', voices=7, detune=22).render(pad, n), -7, 0.0, -3, 0.4)
+    mx.add(sonar(pings, n, m('A5')), -9, -0.3, -3)
+    mix_drums(mx, kit, kicks, n, -13)
+    return mx.master(comp_thr=-18, ratio=3.0, drive_db=6.0, eq=PUNCH)
+
+def depth_music():
+    out = {}
+    for name, fn, bars, bpm in (('mus_race', depth1, 16, 112), ('mus_race2', depth2, 16, 118), ('mus_lobby', depth_lobby, 8, 86)):
+        out[name] = loop(fn, bars, bpm, tail=3.0)
+    x, _ = loop(results, 2, 120, tail=0.01)
+    out['mus_results'] = (x, 4 * 60 / 120 * 2)
+    return out

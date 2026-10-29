@@ -104,8 +104,9 @@ function botThink(arena, car) {
   b.brakeHold -= dt;
   // can we make the bend at this speed? (turn rate needed vs the car's turn rate at this speed, with a margin by skill)
   let worstK = 0;
-  for (let k = 4; k <= 28; k += 4) worstK = Math.max(worstK, T.curve[(seg + k) % T.n] / (10 * T.step));
-  const v = car.speed, omega = car.spec.turn / (1 + Math.max(0, v - 450) / 1500);
+  const v = car.speed, reachK = Math.max(28, Math.ceil(v * 0.9 / T.step));     // look as far as it takes to brake
+  for (let k = 4; k <= reachK; k += 4) worstK = Math.max(worstK, T.curve[(seg + k) % T.n] / (10 * T.step));
+  const omega = car.spec.turn / (1 + Math.max(0, v - 450) / RULES.turnFade);
   const tooFast = v * worstK > omega * (0.72 + b.skill * 0.18);
   if (!ramp && (tooFast || (bend > 0.9 && v > 700 - b.skill * 150))) b.brakeHold = 0.2;
   // don't ram the car in front: brake if closing on it, ease off if it is just slower
@@ -113,6 +114,12 @@ function botThink(arena, car) {
   const closing = front ? car.speed - front.car.speed : 0;
   const tooClose = !!front && closing > 40 && front.ds < 90 + closing * 0.35;
   c.throttle = b.brakeHold > 0 ? -0.5 : tooClose && !ramp ? (closing > 150 ? -0.6 : 0) : 1;
+  // a sea creature will be across the road when we get there: hold back and let it pass
+  // (never on the run-up to a jump: a car that slows down there drops into the gap)
+  if (arena.creatures.length && !ramp) {
+    const cw = creatureAhead(arena, car, Math.max(2600, car.speed * 2.6));
+    if (cw && cw.ahead > 300 && b.skill > 0.3 && !T.nextFeature(seg, 'ramp', Math.ceil(cw.ahead / T.step) + 2)) c.throttle = cw.eta < 1.5 ? -0.5 : 0.25;
+  }
   // boost on straights when there is charge to spare (always before a jump)
   b.boostHold -= dt;
   const straight = bend < 0.25;
@@ -152,6 +159,15 @@ function botFly(arena, car, b, c) {
     }
   }
   if (best) { td = best.rd; tz = best.rz; }
+  // a sea creature crossing the corridor ahead: go over or under it
+  if (arena.creatures.length) {
+    const cw = creatureAhead(arena, car, 2200);
+    if (cw) {
+      const R = Math.max(80, T.flyR[(cw.cr.i) % T.n] - CAR_R - 20);
+      const clear = cw.cr.h + (car.slot % 2 ? 1 : -1) * (cw.cr.K.r + CAR_R + 70);
+      tz = clamp(clear, -R, R);
+    }
+  }
   const look = clamp(140 + car.speed * 0.32, 200, 520);
   const p = T.point(car.s + look);
   const want = Math.atan2(p.y + p.ny * td - car.y, p.x + p.nx * td - car.x);

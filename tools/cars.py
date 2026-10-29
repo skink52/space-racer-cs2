@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, os.path.dirname(__file__))
 import s2
 import retro
-from theme import NEON
+from theme import NEON, DEPTH
 from retro import *
 
 OUT = sys.argv[1] if __name__ == '__main__' else None          # (importable: tools/workshop.py renders the cars too)
@@ -25,6 +25,8 @@ def palette_neon(team):
     t = np.array(team, np.float32)
     neon = tuple(np.clip(t * 1.0 + 15, 0, 255).astype(int))
     hull = tuple((t * 0.16 + 14).astype(int)); hull2 = tuple((t * 0.08 + 8).astype(int))
+    if DEPTH:      # Depth Racer: deep-sea hulls (dark teal), the team colour glowing like bioluminescence
+        hull = tuple((t * 0.08 + np.array((14, 46, 62))).astype(int)); hull2 = tuple((t * 0.04 + np.array((8, 26, 38))).astype(int))
     base = [hull, hull2, neon, (24, 26, 36), (150, 235, 255), (255, 220, 120), (255, 255, 230), tuple(neon),
             (255, 40, 80), (255, 255, 255), tuple(np.clip(t * 1.3 + 50, 0, 255).astype(int)), (6, 6, 10)]
     pal = np.zeros((64, 3), np.float32)
@@ -92,7 +94,7 @@ SKINS.update({
     'ct_indigo': ((110, 85, 255), (55, 35, 155)),
     'ct_ice': ((175, 215, 255), (95, 135, 195)),
 })
-if NEON: SKINS['neutral'] = ((0, 225, 255), (0, 110, 140))     # Neon Racer: cars glow cyan before a team is picked
+if NEON: SKINS['neutral'] = ((0, 210, 190), (0, 100, 96)) if DEPTH else ((0, 225, 255), (0, 110, 140))     # glow cyan / teal before a team is picked
 SKIN_ORDER = ['t', 'ct', 'gold'] + [k for side in ('t', 'ct') for k, _ in SHADES[side][1:]]
 
 def write_palettes():
@@ -594,6 +596,9 @@ def main():
             grids[key + ('_' + boost if boost else '')] = g
         print(key, 'voxels', int(grids[key].occ.sum()))
     fx = write_effects()
+    if DEPTH:                          # the sea creatures go with the effect models (the map caches them all)
+        import creatures
+        fx.update(creatures.build(OUT))
     os.makedirs(os.path.join(OUT, '_gen'), exist_ok=True)
     shades = {side: [dict(skin=k, name=nm, rgb=list(SKINS[k][0])) for k, nm in SHADES[side]] for side in SHADES}
     json.dump(dict(cars=models, fx=fx, skins=['neutral'] + SKIN_ORDER, shades=shades, hover=HOVER), open(os.path.join(OUT, '_gen/car_models.json'), 'w'), indent=1)

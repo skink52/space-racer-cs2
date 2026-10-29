@@ -30,6 +30,7 @@ class Arena {
     this.lastBeep = -1;
     this.bolts = []; this.boltIds = 0;                // Seeker Bolts in flight: { owner, s, d, z, x, y, yaw, speed, left, target }
     this.fires = [];                // Nova Burn fire on the road: { x, y, z, until, owner }
+    this.creatures = makeCreatures(track);   // sea creatures crossing the track (35_creatures.js)
     this.pairs = null;              // flat copies of positions for the pair loops in step()
     this.lanes = null;              // the bots' lane picture for this tic (laneCars)
     this.hudCache = null; this.newRecord = false;   // used by the CS2 side
@@ -192,6 +193,10 @@ class Arena {
   // ---------------------------------------------------------------- per tic
   step() {
     this.tic++; this.time = this.tic / TICRATE;
+    if (this.creatures.length) {
+      placeCreatures(this, this.time);
+      for (const cr of this.creatures) if (cr.active && cr.cycle !== cr.warned) { cr.warned = cr.cycle; this.events.push({ type: 'creaturePass', cr }); }
+    }
     if (this.state === 'grid') {
       this.countdown--;
       const secs = Math.ceil(this.countdown / TICRATE);
@@ -256,6 +261,17 @@ class Arena {
     // drive
     for (const c of cars) c.step(this.track, dt, this.raceTic);
     this.abilities(cars, dt);
+    if (this.creatures.length) {
+      creatureHits(this, cars);
+      // the drivers coming up to a crossing are warned (a few times a second; once per creature pass)
+      if ((this.tic & 7) === 0) for (const c of cars) {
+        if (c.isBot || c.state !== 'racing') continue;
+        const a = creatureAhead(this, c, RULES.creatureWarn);
+        const key = a ? a.cr.id * 100000 + a.cr.cycle : -1;
+        if (a && key !== c.creatureWarned) this.events.push({ type: 'creatureWarn', car: c, cr: a.cr });
+        c.creatureWarned = key;
+      }
+    }
     // bumps
     for (let i = 0; i < n; i++) {
       const c = cars[i];

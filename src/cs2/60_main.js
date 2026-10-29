@@ -266,6 +266,26 @@ function handleArenaEvents(a, now) {
         }
         break;
       }
+      case 'creaturePass': {
+        // a sea creature starts a pass: its call, from where it sets off
+        const s = e.cr.segs[0];
+        if (view && CAR_MODELS.fx.cr_serpent_head) playSound(view, 'creature', null, s.x, s.y, s.z);
+        break;
+      }
+      case 'creatureWarn': {
+        const pe = e.car.person;
+        if (pe && !pe.bot) { bottom(pe.slot, '!! ' + (CREATURE_NAMES[e.cr.kind] || 'CREATURE') + ' AHEAD !!', 2.5); hudFlash(pe.slot, 'pulse', 0.3); }
+        break;
+      }
+      case 'creatureHit': {
+        const pe = e.car.person;
+        if (view) sfxCar(view, e.blocked ? 'aegis' : 'hit', e.car, 0.2);
+        if (pe && !pe.bot) {
+          if (e.blocked) bottom(pe.slot, 'AEGIS HELD OFF THE ' + (CREATURE_NAMES[e.cr.kind] || 'CREATURE'), 2);
+          else { shake(pe.slot, 0.7, 22); hudFlash(pe.slot, 'hit', 0.5); bottom(pe.slot, 'HIT BY THE ' + (CREATURE_NAMES[e.cr.kind] || 'CREATURE') + '!', 2.5); }
+        }
+        break;
+      }
       case 'boltHit': {
         // a Seeker Bolt landed: a burst, a hard shake for the car hit, a line for both drivers
         const b = e.bolt, vp = e.car.person, ap = b.owner.person;
@@ -352,7 +372,7 @@ function handleArenaEvents(a, now) {
     if (f & 4 && human) hudFlash(pe.slot, 'pulse', 0.4);
     if (f & 512) sfxCar(view, 'jump', car, 0.3);
     if (f & 1024) { sfxCar(view, 'land', car, 0.3); if (human) shake(pe.slot, 0.3, 12); }
-    if (f & 8192 && human) bottom(pe.slot, 'FLIGHT: W DOWN  S UP  HIT THE RINGS', 3);
+    if (f & 8192 && human) bottom(pe.slot, (GAME_THEME === 'depth' ? 'GLIDE' : 'FLIGHT') + ': W DOWN  S UP  HIT THE RINGS', 3);
     if (f & 4096) { sfxCar(view, 'pulsed', car, 0.4); if (human) bottom(pe.slot, 'BIG AIR! +' + RULES.bigAirCharge + ' CHARGE', 2); }
     if (car.boosting && !car.wasBoost) sfxCar(view, 'boost', car, 0.8);
     if (car.onCharge && !car.wasCharge) sfxCar(view, 'charge', car, 1.0);
@@ -361,6 +381,7 @@ function handleArenaEvents(a, now) {
 }
 
 // Nova fire flickers between its two frames (the effect steps through the list over its lifetime)
+const CREATURE_NAMES = { serpent: 'SERPENT', manta: 'MANTA', whale: 'WHALE' };
 const FIRE_FRAMES = Array.from({ length: Math.round(RULES.fireTime * 8) }, (_, k) => (k % 2 ? CAR_MODELS.fx.fire1 : CAR_MODELS.fx.fire0));
 
 const flashes = new Map();   // slot -> { cls, until }

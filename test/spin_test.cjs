@@ -8,7 +8,7 @@ if (process.argv[2]) {                                         // a tuning file,
   Object.assign(C.RULES, t.RULES || {});
   for (const [k, v] of Object.entries(t.CARS || {})) Object.assign(C.CARS[k], v);
 }
-const track = new C.Track(C.TRACKS.find((t) => t.id === 'oval') || C.TRACKS.find((t) => t.id === 'grid'));   // (Space Racer's oval, or Neon Racer's Grid Circuit)
+const track = new C.Track(C.TRACKS.find((t) => t.id === 'oval') || C.TRACKS.find((t) => t.id === 'grid') || C.TRACKS[0]);   // (Space Racer's oval, Neon Racer's Grid Circuit, or the first track)
 
 function trial(attKey, vicKey, speed = 900, gap = 70) {
   const a = new C.Arena(0, track, { countdownTics: 1, finishWindow: 30, raceCap: 300, endHold: 6, laps: 0 });

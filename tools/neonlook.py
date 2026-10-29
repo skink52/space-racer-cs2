@@ -14,7 +14,17 @@ def _neon_palette():
         for k in (1.0, 0.6, 0.3, 0.14):
             pal.append(tuple(int(c * k) for c in h))
     return pal
-NEON_PAL = _neon_palette()
+def _depth_palette():
+    """the deep sea: blue-black water, teal and green glow, coral and amber life, a pale surface light"""
+    hues = [(0, 210, 190), (60, 220, 255), (70, 255, 150), (255, 110, 90), (255, 190, 60), (150, 90, 255), (255, 90, 200),
+            (40, 120, 200)]
+    pal = [(0, 0, 0), (2, 8, 20), (6, 18, 34), (12, 32, 52), (24, 54, 74), (235, 250, 255), (170, 230, 240), (60, 70, 90), (30, 36, 50)]
+    for h in hues:
+        for k in (1.0, 0.6, 0.3, 0.14):
+            pal.append(tuple(int(c * k) for c in h))
+    return pal
+from theme import DEPTH
+NEON_PAL = _depth_palette() if DEPTH else _neon_palette()
 
 def pixelate(img, k=4, spread=14.0):
     """full-size float image -> shrink k x (box average), dither to the neon palette, nearest-neighbour back up"""
@@ -23,7 +33,7 @@ def pixelate(img, k=4, spread=14.0):
     small = a[:h, :w].reshape(h // k, k, w // k, k, 3).mean((1, 3))
     return up(quantize(small, spread, NEON_PAL), k)
 
-DARK = np.array((6, 8, 16), np.float32)
+DARK = np.array((2, 10, 22) if DEPTH else (6, 8, 16), np.float32)
 
 def _f(c): return np.array(c, np.float32)
 
@@ -178,3 +188,75 @@ def crystal_texture(color, k):
 def rock_texture(base, k, seed):
     """Neon Racer has no rocks: data blocks - dark cubes with glowing edges"""
     return crystal_texture(base, k + 0.3)
+
+# ---------------------------------------------------------------- Depth Racer overrides (SPR_THEME=depth)
+def _caustics(S, seed, scale=1.0):
+    """the wobbling net of light the surface throws on the sea floor: a cell pattern's edges, 0..1"""
+    rng = np.random.RandomState(seed)
+    pts = rng.rand(14, 2) * S
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+    d = []
+    for px, py in pts:
+        dx = np.minimum(np.abs(xx - px), S - np.abs(xx - px)); dy = np.minimum(np.abs(yy - py), S - np.abs(yy - py))
+        d.append(np.hypot(dx, dy))
+    d = np.sort(np.array(d), 0)
+    return np.clip(1 - (d[1] - d[0]) / (4.0 * scale), 0, 1)
+
+def kelp_texture(color):
+    """a kelp frond: a dark green blade with a glowing midrib and leaf veins (u across, v up the stalk)"""
+    yy, xx = np.mgrid[0:128, 0:32].astype(np.float32)
+    img = np.zeros((128, 32, 3), np.float32); img[:] = (4, 30, 22)
+    add(img, color, glow_line(np.abs(xx - 15.5), 0.8, 3) * 0.8)
+    vein = np.abs(((yy + np.abs(xx - 15.5) * 0.9) % 16) - 8)
+    add(img, color, glow_line(vein, 0.4, 1.5) * 0.35)
+    add(img, (20, 90, 60), glow_line(np.minimum(xx, 31 - xx), 1.0, 2) * 0.6)
+    return finish(img)
+
+if DEPTH:
+    def road_texture(th):
+        """dark stone slabs on the sea floor: glowing edge strips, slab seams, the surface's caustics shimmering over it"""
+        S = 256
+        yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+        img = np.zeros((S, S, 3), np.float32); img[:] = DARK + _f((10, 30, 46))
+        seam = np.minimum(np.minimum(xx % 64, 64 - xx % 64), np.minimum((yy + (xx // 64 % 2) * 32) % 64, 64 - (yy + (xx // 64 % 2) * 32) % 64))
+        img -= 6 * glow_line(seam, 0.5, 1)[..., None]
+        add(img, (90, 200, 220), _caustics(S, 7) * 0.22)
+        for e in (6, S - 7):
+            add(img, th['line'], glow_line(np.abs(yy - e), 1.0, 4) * 0.8)
+        for e in (14, S - 15):
+            add(img, th['rail'], glow_line(np.abs(yy - e), 0.5, 3) * 0.7)
+        dash = (xx % 128) < 40
+        add(img, th['rail'], glow_line(np.abs(yy - (S - 1) / 2), 0.9, 3) * dash * 0.7)
+        return finish(img)
+
+    def floor_texture(th):
+        """the sea floor far below: rippled sand in the dark with caustics on it"""
+        S = 128
+        yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+        img = np.zeros((S, S, 3), np.float32); img[:] = (6, 20, 30)
+        rip = 0.5 + 0.5 * np.sin((yy + 6 * np.sin(xx / S * 2 * math.pi * 2)) / S * 2 * math.pi * 8)
+        add(img, (30, 60, 70), rip * 0.5)
+        add(img, th['floor'], _caustics(S, 3) * 0.35)
+        return finish(img)
+
+    def window_texture(th, seed, dark=1.0):
+        """sunken ruins: dark stone, barnacle patches, a few portholes still glowing"""
+        rng = np.random.RandomState(seed)
+        S = 128
+        yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+        img = np.zeros((S, S, 3), np.float32); img[:] = (16, 30, 40)
+        img *= (0.8 + 0.4 * rng.rand(S, S))[..., None] * dark
+        for _ in range(7):
+            cx, cy = rng.randint(10, S - 10), rng.randint(10, S - 10)
+            d = np.hypot(xx - cx, yy - cy)
+            add(img, th['win'][rng.randint(len(th['win']))], (glow_line(np.abs(d - 6), 0.8, 2) * 0.8 + (d < 5) * 0.5) * dark)
+        add(img, (30, 90, 70), (rng.rand(S, S) < 0.05) * 0.7)
+        return finish(img)
+
+    def roof_texture(th):
+        yy, xx = np.mgrid[0:64, 0:64].astype(np.float32)
+        img = np.zeros((64, 64, 3), np.float32); img[:] = (14, 34, 40)
+        add(img, (40, 110, 80), (np.random.RandomState(4).rand(64, 64) < 0.25) * 0.6)
+        add(img, th['glow'], glow_line(np.minimum(np.minimum(xx, 63 - xx), np.minimum(yy, 63 - yy)), 0.8, 3) * 0.6)
+        return finish(img)
+

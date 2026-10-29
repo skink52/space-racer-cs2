@@ -200,7 +200,65 @@ def make_sky_neon(theme, th, scenery, seed):
     from neonlook import pixelate                  # Space Racer's chunky pixels, in neon colours
     return pixelate(np.clip(img, 0, 255), 4, 10.0)
 
+# ---------------------------------------------------------------- Depth Racer: underwater panoramas
+def make_sky_depth(theme, th, scenery, seed):
+    """looking round under the sea: the rippling bright surface overhead with light shafts slanting down, the water
+    darkening to the abyss below, a far ridge of rock and kelp along the 'horizon', drifting marine snow, and the
+    silhouette of something very big in the distance. Pixelated like the neon skies."""
+    global LAST_PLANET
+    Wn, Hn = 2048, 1024
+    rng = np.random.RandomState(seed)
+    top, mid, low = [np.array(c, np.float32) for c in th['sky']]
+    glow = np.array(th['glow'], np.float32); acc = np.array(th.get('accent', th['glow']), np.float32)
+    yy, xx = np.mgrid[0:Hn, 0:Wn].astype(np.float32)
+    lat = 1 - yy / (Hn / 2)
+    up_ = np.clip(lat, 0, 1)[..., None]; dn = np.clip(-lat, 0, 1)[..., None]
+    img = mid * (1 - up_) + top * up_ ** 1.6
+    img = img * (1 - dn) + low * dn ** 0.5 + mid * 0.25 * (1 - dn) * (lat < 0)[..., None]
+    # the surface: a bright rippling band at the very top
+    ang = xx / Wn * 2 * math.pi
+    rip = 0.5 + 0.5 * np.sin(ang * 40 + 3 * np.sin(ang * 7)) * np.sin(ang * 23)
+    surf = np.clip((lat - 0.86) / 0.14, 0, 1) ** 1.5
+    img += np.array((150, 230, 240), np.float32) * (surf * (0.4 + 0.6 * rip))[..., None]
+    # light shafts: slanted bright bands fading down into the water
+    for _ in range(18):
+        x0 = rng.uniform(0, Wn); w = rng.uniform(40, 120); slant = rng.uniform(-0.3, 0.3); k = rng.uniform(0.08, 0.2)
+        d = np.abs(((xx - x0 - (yy * slant)) + Wn / 2) % Wn - Wn / 2)
+        shaft = np.clip(1 - d / w, 0, 1) * np.clip(lat + 0.1, 0, 1) ** 1.5
+        img += np.array((120, 200, 210), np.float32) * (shaft * k)[..., None]
+    # something huge far away: a whale's silhouette, side on, high in the water
+    cx, cy = rng.randint(300, Wn - 300), int(Hn * 0.30)
+    L_, H_ = 420, 90
+    body = (((xx - cx) / L_) ** 2 + ((yy - cy) / H_) ** 2 <= 1) | (((xx - cx + L_ * 1.05) / 70) ** 2 + ((yy - cy) / 60) ** 2 <= 1) & (xx < cx - L_ * 0.9)
+    fluke = (np.abs(xx - (cx - L_ * 1.12)) < 30) & (np.abs(yy - cy) < 110 - np.abs(xx - (cx - L_ * 1.12)) * 2)
+    sil = body | fluke
+    img[sil] = img[sil] * 0.45 + np.array((4, 14, 24), np.float32) * 0.55
+    LAST_PLANET = (cx // 4, cy // 4, L_ // 8)
+    # the far seabed: a ridge of rock, with kelp and coral silhouettes standing on it and a glowing rim
+    hy = Hn // 2
+    ridge = (30 + 40 * np.sin(np.arange(Wn) / Wn * 2 * math.pi * 3 + seed) + 22 * np.sin(np.arange(Wn) / 37.0)).astype(int)
+    sil = np.zeros((Hn, Wn), bool)
+    for x in range(Wn):
+        sil[hy - ridge[x]:hy + 160, x] = True
+    for _ in range(140):
+        x = rng.randint(0, Wn); h = rng.randint(30, 200); base = hy - ridge[x]
+        for k in range(h):
+            xo = int(x + 6 * math.sin(k / 18.0 + x))
+            if 0 <= xo < Wn and base - k > 0: sil[base - k, max(0, xo - 1):xo + 2] = True
+    edge = sil & ~(np.roll(sil, 1, 0) & np.roll(sil, -1, 0) & np.roll(sil, 1, 1) & np.roll(sil, -1, 1))
+    img[sil] = np.array((3, 10, 18), np.float32)
+    img[edge] = glow * 0.7
+    lit = sil & (rng.rand(Hn, Wn) < 0.004)
+    img[lit] = acc
+    # marine snow: specks drifting everywhere
+    for _ in range(1600):
+        x, y = rng.randint(0, Wn), rng.randint(0, Hn)
+        img[y, x] += 60 + 80 * rng.rand()
+    from neonlook import pixelate
+    return pixelate(np.clip(img, 0, 255), 4, 10.0)
+
 _make_sky_pixel = make_sky
 def make_sky(theme, th, scenery, seed):
-    from theme import NEON
+    from theme import NEON, DEPTH
+    if DEPTH: return make_sky_depth(theme, th, scenery, seed)
     return make_sky_neon(theme, th, scenery, seed) if NEON else _make_sky_pixel(theme, th, scenery, seed)

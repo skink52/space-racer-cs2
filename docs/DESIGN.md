@@ -39,8 +39,8 @@ signature perk. Nobody gets more total "stat"; they trade speed for armour and s
 | | HORNET | METEOR | COMET | BASTION |
 |---|---|---|---|---|
 | Style | light, agile | heavy, rams | boost specialist | tank, team player |
-| Top speed | 1064 | 1090 | 1040 | 1043 |
-| Acceleration | 640 | 535 | 525 | 550 |
+| Top speed (u/s; x0.36 = km/h) | 1620 | 1646 | 1596 | 1599 |
+| Acceleration | 928 | 776 | 761 | 798 |
 | Turning | sharpest | widest | medium | medium |
 | Shield | 108 | 110 | 110 | 115 |
 | Mass (bumps, spin shoves) | 1.0 | 1.6 | 1.0 | 1.3 |
