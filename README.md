@@ -1,5 +1,7 @@
 # Space Racer for CS2
 
+> **Moved.** This project now lives in the [cs2mapping](https://github.com/skink52/cs2mapping) repo at [`projects/space-racer-cs2`](https://github.com/skink52/cs2mapping/tree/main/projects/space-racer-cs2), with its full history. This repo is archived (read-only) and no longer updated.
+
 A 32-car anti-gravity racing minigame that runs entirely inside one Counter-Strike 2 map as a cs_script, with no
 server plugins. Up to 64 players in two 32-car arenas, four cars with different perks, boost pads, charge
 platforms, jump ramps, banked bends, tubes, spin attacks, turbo starts, wrecks, the Pulse, eight huge original
